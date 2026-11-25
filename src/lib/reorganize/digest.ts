@@ -1,3 +1,4 @@
+import { isValidCatalogIcon } from '@/lib/icons/catalog';
 import type { LinkItem } from '@/lib/types/stash';
 import { extractDomain } from '@/lib/utils/url';
 
@@ -7,6 +8,7 @@ export interface ProposedCategory {
   id: string;
   name: string;
   description: string;
+  icon?: string;
 }
 
 export interface LibraryDigestResult {
@@ -146,6 +148,7 @@ export function buildLibraryDigest(
 export interface RawProposedCategory {
   name?: unknown;
   description?: unknown;
+  icon?: unknown;
 }
 
 /**
@@ -183,10 +186,14 @@ export function sanitizeProposedCategories(
         ? item.description.replace(/\s+/g, ' ').trim().slice(0, 120)
         : '';
 
+    const rawIcon = typeof item.icon === 'string' ? item.icon.trim() : '';
+    const icon = rawIcon && isValidCatalogIcon(rawIcon) ? rawIcon : undefined;
+
     cleaned.push({
       id: createId(),
       name: normalizedName,
       description,
+      ...(icon ? { icon } : {}),
     });
 
     if (cleaned.length >= maxCount) break;

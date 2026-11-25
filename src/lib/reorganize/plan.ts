@@ -1,3 +1,4 @@
+import { isValidCatalogIcon } from '@/lib/icons/catalog';
 import {
   type ProposedCategory,
   UNCATEGORIZED_CATEGORY_NAME,
@@ -112,13 +113,20 @@ export function buildReorganizationPlan(
   const ensureCollectionForName = (
     rawName: string,
     description?: string,
+    icon?: string,
   ): Collection => {
     const trimmed = rawName.trim() || UNCATEGORIZED_CATEGORY_NAME;
     const key = normalizeNameKey(trimmed);
+    const validIcon =
+      icon && isValidCatalogIcon(icon.trim()) ? icon.trim() : undefined;
     const existing = collectionByNameKey.get(key);
     if (existing) {
       if (!existing.description && description) {
         existing.description = description;
+        existing.updatedAt = nowIso;
+      }
+      if (!existing.icon && validIcon) {
+        existing.icon = validIcon;
         existing.updatedAt = nowIso;
       }
       return existing;
@@ -134,6 +142,7 @@ export function buildReorganizationPlan(
       id: createId(),
       name: trimmed,
       description: description?.trim() || undefined,
+      icon: validIcon,
       color,
       order: workingCollections.length,
       collapsed: false,
@@ -183,6 +192,7 @@ export function buildReorganizationPlan(
       targetCollection = ensureCollectionForName(
         approvedMatch.name,
         approvedMatch.description,
+        approvedMatch.icon,
       );
     } else if (existingMatch) {
       targetCollection = existingMatch;

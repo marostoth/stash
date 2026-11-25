@@ -15,6 +15,7 @@ import { Select } from '@/components/ui/input';
 import { TriageRowCard } from '@/components/workbench/triage-row-card';
 import { categorizeLink } from '@/lib/categorizer/categorizer';
 import type { CategorizationSuggestion } from '@/lib/categorizer/types';
+import { autoAssignCollectionIconIfEmpty } from '@/lib/icons/auto-assign-icon';
 import { stashRepo } from '@/lib/storage/repo';
 import type {
   CategorizationRule,
@@ -220,7 +221,10 @@ export function TriageModal({
     setApplying(true);
 
     try {
-      const createdByName = new Map<string, string>();
+      const createdByName = new Map<
+        string,
+        { id: string; name: string; sampleTitles: string[] }
+      >();
       let movedCount = 0;
       let skippedDuplicates = 0;
 
@@ -231,12 +235,17 @@ export function TriageModal({
         if (targetCollectionId.startsWith(NEW_PREFIX)) {
           const newName = targetCollectionId.slice(NEW_PREFIX.length).trim();
           const key = newName.toLowerCase();
-          const existingNewId = createdByName.get(key);
-          if (existingNewId) {
-            targetCollectionId = existingNewId;
+          const existingNew = createdByName.get(key);
+          if (existingNew) {
+            targetCollectionId = existingNew.id;
+            existingNew.sampleTitles.push(row.link.title);
           } else {
             const created = await stashRepo.createCollection({ name: newName });
-            createdByName.set(key, created.id);
+            createdByName.set(key, {
+              id: created.id,
+              name: created.name,
+              sampleTitles: [row.link.title],
+            });
             targetCollectionId = created.id;
           }
         }
@@ -293,6 +302,15 @@ export function TriageModal({
       }
 
       closeTriage();
+
+      // Fire-and-forget background AI icon assignment for newly created collections
+      for (const created of createdByName.values()) {
+        void autoAssignCollectionIconIfEmpty(
+          created.id,
+          created.name,
+          created.sampleTitles,
+        );
+      }
     } finally {
       setApplying(false);
     }

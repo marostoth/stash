@@ -2,7 +2,6 @@ import {
   Cpu,
   Download,
   FolderSync,
-  HeartPulse,
   Loader2,
   Palette,
   SlidersHorizontal,
@@ -13,6 +12,7 @@ import {
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { BackupImportPanel } from '@/components/settings/backup-import-panel';
+import { MaintenanceCard } from '@/components/settings/maintenance-card';
 import { PreviewsSettingsCard } from '@/components/settings/previews-settings-card';
 import { RulesManager } from '@/components/settings/rules-manager';
 import { ThemesPanel } from '@/components/settings/themes-panel';
@@ -328,51 +328,13 @@ export function SettingsModal({
               <PreviewsSettingsCard settings={settings} settingsOpen={open} />
 
               {/* Library Maintenance */}
-              <div className="space-y-2.5 rounded-card border border-border bg-canvas p-4">
-                <div className="flex items-center gap-2">
-                  <HeartPulse className="h-4 w-4 text-accent" />
-                  <h3 className="font-mono text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
-                    Maintenance &amp; Library
-                  </h3>
-                </div>
-                <p className="text-xs leading-relaxed text-fg-muted">
-                  Run an on-demand scan to detect dead links, parked domains,
-                  root redirects, duplicates, and search/dev clutter—with safe
-                  bulk cleanup and 8-second Undo.
-                </p>
-                <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={openHealthCheck}
-                    className="gap-1.5"
-                  >
-                    <HeartPulse className="h-3.5 w-3.5 text-accent" />
-                    Library Health Check ({links.length} links)
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={nanoStatus !== 'available' || links.length === 0}
-                    onClick={openReorganize}
-                    className="gap-1.5"
-                    title={
-                      nanoStatus !== 'available'
-                        ? 'Requires Chrome on-device Gemini Nano (enable below)'
-                        : 'Restructure collections with 2-pass on-device AI'
-                    }
-                  >
-                    <Sparkles className="h-3.5 w-3.5 text-accent" />
-                    Smart Reorganize (AI)
-                  </Button>
-                </div>
-                {nanoStatus !== 'available' ? (
-                  <p className="font-mono text-[10px] text-fg-muted">
-                    Smart Reorganize requires Chrome&apos;s on-device Gemini
-                    Nano model (status: {nanoStatus}).
-                  </p>
-                ) : null}
-              </div>
+              <MaintenanceCard
+                collections={collections}
+                links={links}
+                nanoStatus={nanoStatus}
+                onOpenHealthCheck={openHealthCheck}
+                onOpenReorganize={openReorganize}
+              />
 
               {/* Tier 2 On-Device AI */}
               <div className="space-y-3 rounded-card border border-border bg-canvas p-4">

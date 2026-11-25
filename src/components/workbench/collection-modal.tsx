@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { autoAssignCollectionIconIfEmpty } from '@/lib/icons/auto-assign-icon';
 import { stashRepo } from '@/lib/storage/repo';
 import {
   TAB_GROUP_COLOR_SWATCH,
@@ -58,12 +59,13 @@ export function CollectionModal() {
       });
       toast.success(`Updated "${trimmed}"`);
     } else {
-      await stashRepo.createCollection({
+      const created = await stashRepo.createCollection({
         name: trimmed,
         description,
         color,
       });
       toast.success(`Created "${trimmed}"`);
+      void autoAssignCollectionIconIfEmpty(created.id, created.name);
     }
 
     closeCollectionModal();

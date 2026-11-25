@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
+import { LinkFavicon } from '@/components/LinkFavicon';
 import { getPreviewEntry } from '@/lib/previews/cache';
-import { getMonogram } from '@/lib/utils/url';
 
 interface CoverCardBannerProps {
   url: string;
@@ -17,14 +17,12 @@ interface CoverCardBannerProps {
  */
 export function CoverCardBanner({
   url,
-  title,
   faviconUrl,
   collectionTint,
 }: CoverCardBannerProps) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [ogImageUrl, setOgImageUrl] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
-  const [faviconFailed, setFaviconFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -53,7 +51,6 @@ export function CoverCardBanner({
   }, [url]);
 
   const activeImageSrc = !imageFailed ? (blobUrl ?? ogImageUrl) : null;
-  const monogram = getMonogram(title, url);
   const tintBase = collectionTint || 'var(--stash-accent)';
 
   return (
@@ -75,25 +72,7 @@ export function CoverCardBanner({
       ) : (
         <div className="flex h-full w-full items-center justify-center">
           <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-card border border-border/80 bg-panel/90 shadow-sm">
-            {faviconUrl && !faviconFailed ? (
-              <img
-                src={faviconUrl}
-                alt=""
-                width={22}
-                height={22}
-                loading="lazy"
-                draggable={false}
-                onError={() => setFaviconFailed(true)}
-                className="h-5 w-5 object-contain"
-              />
-            ) : (
-              <span
-                aria-hidden="true"
-                className="font-mono text-sm font-semibold text-accent"
-              >
-                {monogram}
-              </span>
-            )}
+            <LinkFavicon url={url} faviconUrl={faviconUrl} size="lg" />
           </div>
         </div>
       )}

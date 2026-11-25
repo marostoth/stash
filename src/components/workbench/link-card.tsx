@@ -5,9 +5,10 @@ import {
   useMotionValue,
   useSpring,
 } from 'motion/react';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { CoverCardBanner } from '@/components/CoverCardBanner';
+import { LinkFavicon } from '@/components/LinkFavicon';
 import { CardActionDrawer } from '@/components/workbench/card-action-drawer';
 import { DropSparks } from '@/components/workbench/drop-sparks';
 import { playDelete, playDrop, playHoverRiffle } from '@/lib/audio/foley';
@@ -33,7 +34,7 @@ import type {
   MotionMode,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
-import { extractDomain, getMonogram } from '@/lib/utils/url';
+import { extractDomain } from '@/lib/utils/url';
 import { useUiStore } from '@/store/ui-store';
 
 interface LinkCardProps {
@@ -68,7 +69,6 @@ export const LinkCard = memo(function LinkCard({
   const schedulePreview = useUiStore((s) => s.schedulePreview);
   const dismissPreview = useUiStore((s) => s.dismissPreview);
   const isTagging = useUiStore((s) => s.taggingLinkIds.includes(link.id));
-  const [faviconFailed, setFaviconFailed] = useState(false);
 
   // Track previously rendered tags so only newly arriving AI tags pop in
   const seenTagsRef = useRef<Set<string>>(new Set(link.tags));
@@ -109,8 +109,6 @@ export const LinkCard = memo(function LinkCard({
   const isHighlighted = highlightedLinkId === link.id;
   const isSettling = tactile && settledLinkId === link.id;
   const domain = extractDomain(link.url);
-  const monogram = getMonogram(link.title, link.url);
-  const showFavicon = Boolean(link.faviconUrl) && !faviconFailed;
 
   const visibleTags = link.tags.slice(0, 3);
   const hiddenTagCount = Math.max(0, link.tags.length - visibleTags.length);
@@ -375,21 +373,12 @@ export const LinkCard = memo(function LinkCard({
             >
               {/* Header: Favicon + Title */}
               <div className="flex items-start gap-2.5 pr-6">
-                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-control border border-border bg-panel font-mono text-xs font-semibold text-accent">
-                  {showFavicon ? (
-                    <img
-                      src={link.faviconUrl}
-                      alt=""
-                      width={16}
-                      height={16}
-                      loading="lazy"
-                      draggable={false}
-                      onError={() => setFaviconFailed(true)}
-                      className="h-4 w-4 object-contain"
-                    />
-                  ) : (
-                    <span aria-hidden="true">{monogram}</span>
-                  )}
+                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-control border border-border bg-panel">
+                  <LinkFavicon
+                    url={link.url}
+                    faviconUrl={link.faviconUrl}
+                    size="md"
+                  />
                 </div>
 
                 <div className="min-w-0 flex-1">

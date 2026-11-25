@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { LinkFavicon } from '@/components/LinkFavicon';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -34,7 +35,7 @@ import {
   TAB_GROUP_COLOR_SWATCH,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
-import { extractDomain, getMonogram } from '@/lib/utils/url';
+import { extractDomain } from '@/lib/utils/url';
 import { useUiStore } from '@/store/ui-store';
 
 interface OpenTabsSidebarProps {
@@ -65,7 +66,6 @@ function OpenTabRow({
   const openCreateCollection = useUiStore((s) => s.openCreateCollection);
   const schedulePreview = useUiStore((s) => s.schedulePreview);
   const dismissPreview = useUiStore((s) => s.dismissPreview);
-  const [faviconFailed, setFaviconFailed] = useState(false);
 
   const { ref, isDragging } = useDraggable({
     id: `tab:${tab.id}`,
@@ -74,8 +74,6 @@ function OpenTabRow({
   });
 
   const domain = extractDomain(tab.url);
-  const monogram = getMonogram(tab.title, tab.url);
-  const showFavicon = Boolean(tab.favIconUrl) && !faviconFailed;
 
   const handleCloseTab = (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -120,20 +118,8 @@ function OpenTabRow({
         title={`${tab.title}\n${tab.url}`}
         className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 rounded cursor-pointer"
       >
-        <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-canvas font-mono text-[10px] font-semibold text-accent">
-          {showFavicon ? (
-            <img
-              src={tab.favIconUrl}
-              alt=""
-              width={14}
-              height={14}
-              draggable={false}
-              onError={() => setFaviconFailed(true)}
-              className="h-3.5 w-3.5 object-contain"
-            />
-          ) : (
-            <span aria-hidden="true">{monogram}</span>
-          )}
+        <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-canvas">
+          <LinkFavicon url={tab.url} faviconUrl={tab.favIconUrl} size="sm" />
         </div>
 
         <div className="min-w-0 flex-1">

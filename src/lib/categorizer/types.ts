@@ -64,6 +64,7 @@ export interface LanguageModelCreateOptions
 
 export interface LanguageModelPromptOptions {
   responseConstraint?: Record<string, unknown>;
+  omitResponseConstraintInput?: boolean;
   signal?: AbortSignal;
 }
 

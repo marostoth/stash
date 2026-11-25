@@ -334,7 +334,10 @@ export function CollectionSection({
               )}
             </Button>
 
-            <CollectionAppearancePopover collection={collection} />
+            <CollectionAppearancePopover
+              collection={collection}
+              sampleLinkTitles={links.slice(0, 5).map((l) => l.title)}
+            />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

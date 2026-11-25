@@ -286,8 +286,18 @@ describe('reorganize/plan', () => {
       currentState,
       { mode: 'full' },
       [
-        { id: 'cat-1', name: 'Engineering', description: 'Code' },
-        { id: 'cat-2', name: 'Reading', description: 'News' },
+        {
+          id: 'cat-1',
+          name: 'Engineering',
+          description: 'Code',
+          icon: 'code',
+        },
+        {
+          id: 'cat-2',
+          name: 'Reading',
+          description: 'News',
+          icon: 'not-a-valid-icon',
+        },
       ],
       { a: 'Engineering', b: 'Reading' },
       true,
@@ -297,6 +307,8 @@ describe('reorganize/plan', () => {
       'Engineering',
       'Reading',
     ]);
+    expect(plan.nextState.collections[0]?.icon).toBe('code');
+    expect(plan.nextState.collections[1]?.icon).toBeUndefined();
     expect(plan.summary.removedEmptyCollections).toBe(2);
     expect(plan.summary.createdCollections).toBe(2);
     expect(plan.summary.uncategorizedCount).toBe(0);

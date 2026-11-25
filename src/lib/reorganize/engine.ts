@@ -7,6 +7,7 @@ import type {
   LanguageModelSession,
   NanoAvailabilityStatus,
 } from '@/lib/categorizer/types';
+import { CATALOG_ICON_KEYS } from '@/lib/icons/catalog';
 import {
   buildLibraryDigest,
   type ProposedCategory,
@@ -30,8 +31,9 @@ const PROPOSE_CATEGORIES_SCHEMA: Record<string, unknown> = {
         properties: {
           name: { type: 'string', maxLength: 40 },
           description: { type: 'string', maxLength: 120 },
+          icon: { type: 'string', enum: [...CATALOG_ICON_KEYS] },
         },
-        required: ['name', 'description'],
+        required: ['name', 'description', 'icon'],
       },
     },
   },
@@ -186,9 +188,11 @@ export async function proposeCategories(
             '1. Use clear, concise 1–3 word category names (e.g., "Dev & Tools", "Design", "Reading", "Finance", "3D Printing").',
             '2. Categories must be mutually distinct with minimal overlap.',
             '3. Provide a crisp 1-sentence description of what belongs in each category.',
-            '4. Never include "Uncategorized" as a proposed category.',
+            '4. Pick one matching icon key for each category from this exact whitelist:',
+            `   ${CATALOG_ICON_KEYS.join(', ')}`,
+            '5. Never include "Uncategorized" as a proposed category.',
             existingHint,
-            'Return strict JSON: {"categories": [{"name": "...", "description": "..."}]}.',
+            'Return strict JSON: {"categories": [{"name": "...", "description": "...", "icon": "..."}]}.',
           ].join('\n'),
         },
       ],
@@ -201,10 +205,22 @@ export async function proposeCategories(
         `Propose 5 to 8 practical collections for this bookmark library:\n\n${digestText}`,
     );
 
-    const raw = await session.prompt(promptText, {
-      responseConstraint: PROPOSE_CATEGORIES_SCHEMA,
-      signal: options.signal,
-    });
+    let raw: string;
+    try {
+      raw = await session.prompt(promptText, {
+        responseConstraint: PROPOSE_CATEGORIES_SCHEMA,
+        omitResponseConstraintInput: true,
+        signal: options.signal,
+      });
+    } catch {
+      if (options.signal?.aborted) {
+        return { status: 'canceled' };
+      }
+      raw = await session.prompt(promptText, {
+        responseConstraint: PROPOSE_CATEGORIES_SCHEMA,
+        signal: options.signal,
+      });
+    }
 
     if (options.signal?.aborted) {
       return { status: 'canceled' };
