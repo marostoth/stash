@@ -14,6 +14,8 @@ import {
 } from '@/lib/previews/permissions';
 import type { LinkItem } from '@/lib/types/stash';
 import { normalizeUrlForComparison } from '@/lib/utils/url';
+import { useBackgroundJobsStore } from '@/store/background-jobs-store';
+import { useUiStore } from '@/store/ui-store';
 
 export interface ScanProgressState {
   scanned: number;
@@ -50,6 +52,9 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
   const userCanceledRef = useRef(false);
   const linksRef = useRef(links);
   linksRef.current = links;
+  const openRef = useRef(open);
+  openRef.current = open;
+  const cancelScanRef = useRef<() => void>(() => {});
 
   const stopActiveScan = useCallback(() => {
     localScanAbortRef.current?.abort();
@@ -71,6 +76,14 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
     }
   }, []);
 
+  // Only abort active scan if the entire workbench unmounts
+  useEffect(() => {
+    return () => {
+      stopActiveScan();
+      useBackgroundJobsStore.getState().removeJob('health-check');
+    };
+  }, [stopActiveScan]);
+
   const refreshPermission = useCallback(async () => {
     const granted = await hasVisualPreviewPermission();
     setHasPermission(granted);
@@ -78,20 +91,45 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
   }, []);
 
   useEffect(() => {
-    if (!open) {
-      stopActiveScan();
-      setScanning(false);
-      setProgress(null);
-      return;
+    if (!open) return;
+
+    // Clear "ready" notification pill once the user opens Health Check to review
+    const job = useBackgroundJobsStore
+      .getState()
+      .jobs.find((j) => j.id === 'health-check');
+    if (job?.status === 'ready') {
+      useBackgroundJobsStore.getState().removeJob('health-check');
     }
+
     void refreshPermission();
     const onFocus = () => void refreshPermission();
     window.addEventListener('focus', onFocus);
     return () => {
       window.removeEventListener('focus', onFocus);
-      stopActiveScan();
     };
-  }, [open, refreshPermission, stopActiveScan]);
+  }, [open, refreshPermission]);
+
+  // Keep bottom-right background tray synced with live scan progress
+  useEffect(() => {
+    if (!scanning) return;
+    useBackgroundJobsStore.getState().upsertJob({
+      id: 'health-check',
+      title: 'Library Health Check',
+      detail: progress?.refiningAi
+        ? 'Refining suspicious pages with AI...'
+        : progress
+          ? `Scanning ${progress.scanned} / ${progress.total} links`
+          : 'Starting scan...',
+      status: 'running',
+      progress:
+        progress && !progress.refiningAi
+          ? { current: progress.scanned, total: progress.total }
+          : null,
+      usesNano: Boolean(progress?.refiningAi),
+      onReopen: () => useUiStore.getState().openHealthCheck(),
+      onCancel: () => cancelScanRef.current(),
+    });
+  }, [scanning, progress]);
 
   const applyCompletedResults = useCallback(
     async (items: readonly HealthUrlScanItem[], canceled: boolean) => {
@@ -147,6 +185,29 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
         setSelectedIds(preChecked);
         setHasScanned(true);
         setWasCanceled(canceled);
+
+        const jobsStore = useBackgroundJobsStore.getState();
+        if (!canceled && !openRef.current) {
+          let flaggedCount = 0;
+          for (const item of Object.values(byNormalized)) {
+            if (item.status === 'dead' || item.status === 'needs_review') {
+              flaggedCount += 1;
+            }
+          }
+          jobsStore.upsertJob({
+            id: 'health-check',
+            title: 'Health Check ready',
+            detail:
+              flaggedCount > 0
+                ? `${flaggedCount} ${flaggedCount === 1 ? 'link' : 'links'} flagged · Click to review`
+                : 'Scan complete · All links look healthy',
+            status: 'ready',
+            reopenLabel: 'Review',
+            onReopen: () => useUiStore.getState().openHealthCheck(),
+          });
+        } else {
+          jobsStore.removeJob('health-check');
+        }
       } catch (error: unknown) {
         console.error('[Stash HealthCheck] Failed processing results:', error);
         const message =
@@ -154,6 +215,7 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
             ? error.message
             : 'Failed to process scan results.';
         setScanError(message);
+        useBackgroundJobsStore.getState().removeJob('health-check');
         toast.error(message);
       } finally {
         setScanning(false);
@@ -191,6 +253,7 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
         setScanError(message);
         setScanning(false);
         setProgress(null);
+        useBackgroundJobsStore.getState().removeJob('health-check');
         toast.error(message);
       }
     },
@@ -244,6 +307,7 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
           setScanning(false);
           setProgress(null);
           setScanError(msg.message);
+          useBackgroundJobsStore.getState().removeJob('health-check');
           console.error('[Stash HealthCheck] Scanner error:', msg.message);
           toast.error(msg.message);
           return;
@@ -272,6 +336,7 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
         if (userCanceledRef.current) {
           setScanning(false);
           setProgress(null);
+          useBackgroundJobsStore.getState().removeJob('health-check');
           return;
         }
 
@@ -294,6 +359,7 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
         setScanError(disconnectReason);
         setScanning(false);
         setProgress(null);
+        useBackgroundJobsStore.getState().removeJob('health-check');
         toast.error(`Health scan interrupted: ${disconnectReason}`);
       });
 
@@ -352,10 +418,11 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
       });
   };
 
-  const cancelScan = () => {
+  const cancelScan = useCallback(() => {
     userCanceledRef.current = true;
     localScanAbortRef.current?.abort();
     aiAbortRef.current?.abort();
+    useBackgroundJobsStore.getState().removeJob('health-check');
     if (portRef.current) {
       try {
         portRef.current.postMessage({ type: 'cancel' });
@@ -369,7 +436,9 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
       setScanning(false);
       setProgress(null);
     }
-  };
+  }, [stopActiveScan]);
+
+  cancelScanRef.current = cancelScan;
 
   return {
     hasPermission,

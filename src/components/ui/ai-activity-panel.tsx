@@ -1,4 +1,4 @@
-import { Loader2, Sparkles, X } from 'lucide-react';
+import { Loader2, Minimize2, Sparkles, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
@@ -13,13 +13,14 @@ interface AiActivityPanelProps {
   skeletonRows?: number;
   cancelLabel?: string;
   onCancel?: () => void;
+  onMinimize?: () => void;
   className?: string;
 }
 
 /**
  * Theme-matched AI & scanning activity panel with either a determinate progress
  * bar or an indeterminate phosphor sweep, optional elapsed-seconds counter,
- * pulsing skeleton rows, and a clean Cancel button.
+ * pulsing skeleton rows, and clean Minimize / Cancel controls.
  */
 export function AiActivityPanel({
   title,
@@ -29,6 +30,7 @@ export function AiActivityPanel({
   skeletonRows = 0,
   cancelLabel = 'Cancel',
   onCancel,
+  onMinimize,
   className,
 }: AiActivityPanelProps) {
   const [elapsedSec, setElapsedSec] = useState(0);
@@ -87,6 +89,18 @@ export function AiActivityPanel({
           ) : (
             <Sparkles className="h-3.5 w-3.5 animate-pulse text-accent" />
           )}
+          {onMinimize ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onMinimize}
+              title="Minimize to bottom-right activity tray"
+              className="h-7 gap-1 px-2 text-[11px] text-fg-muted hover:text-fg"
+            >
+              <Minimize2 className="h-3 w-3" />
+              Minimize
+            </Button>
+          ) : null}
           {onCancel ? (
             <Button
               variant="ghost"

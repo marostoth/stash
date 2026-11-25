@@ -39,6 +39,7 @@ interface UiStoreState {
   healthCheckOpen: boolean;
   reorganizeOpen: boolean;
   triageCollectionId: string | null;
+  triageOpen: boolean;
   highlightedLinkId: string | null;
   settledLinkId: string | null;
   taggingLinkIds: string[];
@@ -59,7 +60,9 @@ interface UiStoreState {
   openReorganize: () => void;
   closeReorganize: () => void;
   openTriage: (collectionId: string) => void;
+  reopenTriage: () => void;
   closeTriage: () => void;
+  clearTriage: () => void;
   pulseLink: (linkId: string) => void;
   settleLink: (linkId: string) => void;
   addTaggingLink: (linkId: string) => void;
@@ -92,6 +95,7 @@ export const useUiStore = create<UiStoreState>((set) => ({
   healthCheckOpen: false,
   reorganizeOpen: false,
   triageCollectionId: null,
+  triageOpen: false,
   highlightedLinkId: null,
   settledLinkId: null,
   taggingLinkIds: [],
@@ -175,11 +179,25 @@ export const useUiStore = create<UiStoreState>((set) => ({
     clearPreviewTimer();
     set({
       triageCollectionId: collectionId,
+      triageOpen: true,
       hoveredPreviewCandidate: null,
       activePreview: null,
     });
   },
-  closeTriage: () => set({ triageCollectionId: null }),
+  reopenTriage: () => {
+    clearPreviewTimer();
+    set((state) =>
+      state.triageCollectionId
+        ? {
+            triageOpen: true,
+            hoveredPreviewCandidate: null,
+            activePreview: null,
+          }
+        : state,
+    );
+  },
+  closeTriage: () => set({ triageOpen: false }),
+  clearTriage: () => set({ triageOpen: false, triageCollectionId: null }),
 
   pulseLink: (linkId) => {
     if (pulseTimer) {

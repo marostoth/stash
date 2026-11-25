@@ -10,7 +10,6 @@ import {
   Volume2,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import { BackupImportPanel } from '@/components/settings/backup-import-panel';
 import { MaintenanceCard } from '@/components/settings/maintenance-card';
 import { PreviewsSettingsCard } from '@/components/settings/previews-settings-card';
@@ -28,11 +27,9 @@ import {
 import { Select } from '@/components/ui/input';
 import { useAutoTagSweep } from '@/hooks/use-auto-tag-sweep';
 import { playDrop } from '@/lib/audio/foley';
-import {
-  checkNanoAvailability,
-  downloadNanoModel,
-} from '@/lib/categorizer/nano-engine';
+import { checkNanoAvailability } from '@/lib/categorizer/nano-engine';
 import type { NanoAvailabilityStatus } from '@/lib/categorizer/types';
+import { startNanoModelDownload } from '@/lib/jobs/background-sweeps';
 import { stashRepo } from '@/lib/storage/repo';
 import { filterEligibleLinks } from '@/lib/tagging/auto-tagger';
 import type {
@@ -44,6 +41,7 @@ import type {
   ThemeDefinition,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+import { useBackgroundJobsStore } from '@/store/background-jobs-store';
 import { useUiStore } from '@/store/ui-store';
 
 interface SettingsModalProps {
@@ -73,7 +71,13 @@ export function SettingsModal({
   const [activeTab, setActiveTab] = useState<SettingsTab>('rules');
   const [nanoStatus, setNanoStatus] =
     useState<NanoAvailabilityStatus>('unavailable');
-  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const downloadJob = useBackgroundJobsStore((s) =>
+    s.jobs.find((job) => job.id === 'nano-download'),
+  );
+  const downloadProgress =
+    downloadJob?.status === 'running'
+      ? (downloadJob.progress?.current ?? 0)
+      : null;
   const autoTagAll = useAutoTagSweep();
   const untaggedCount = filterEligibleLinks(links).length;
 
@@ -93,19 +97,7 @@ export function SettingsModal({
   }, [open]);
 
   const handleDownloadModel = async () => {
-    setDownloadProgress(0);
-    const ok = await downloadNanoModel((pct) => setDownloadProgress(pct));
-    const refreshed = await checkNanoAvailability();
-    setNanoStatus(refreshed);
-    setDownloadProgress(null);
-    if (ok) {
-      await stashRepo.updateSettings({ enableOnDeviceAi: true });
-      toast.success('On-device Gemini Nano model is ready');
-    } else {
-      toast.error(
-        'Could not enable On-Device AI. Falling back cleanly to Tier 1 rules.',
-      );
-    }
+    await startNanoModelDownload((refreshed) => setNanoStatus(refreshed));
   };
 
   return (

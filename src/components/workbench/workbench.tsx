@@ -14,6 +14,7 @@ import { HealthCheckModal } from '@/components/HealthCheckModal';
 import { ReorganizeModal } from '@/components/reorganize/ReorganizeModal';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { Button } from '@/components/ui/button';
+import { BackgroundJobsTray } from '@/components/workbench/background-jobs-tray';
 import { CollectionModal } from '@/components/workbench/collection-modal';
 import { CollectionSection } from '@/components/workbench/collection-section';
 import { DragGhost } from '@/components/workbench/drag-ghost';
@@ -33,6 +34,7 @@ import { stashRepo } from '@/lib/storage/repo';
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
 import { triggerAutoTagSingleLink } from '@/lib/tagging/trigger-auto-tag';
 import { groupAndFilterCollections } from '@/lib/utils/search';
+import { useBackgroundJobsStore } from '@/store/background-jobs-store';
 import { useUiStore } from '@/store/ui-store';
 
 function isEditableElement(target: EventTarget | null): boolean {
@@ -76,6 +78,7 @@ export function Workbench() {
   const pulseLink = useUiStore((s) => s.pulseLink);
   const settleLink = useUiStore((s) => s.settleLink);
   const dismissPreview = useUiStore((s) => s.dismissPreview);
+  const trayHeightPx = useBackgroundJobsStore((s) => s.trayHeightPx);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -112,7 +115,9 @@ export function Workbench() {
           ui.collectionModal !== null ||
           ui.linkModal !== null ||
           ui.settingsOpen ||
-          ui.triageCollectionId !== null;
+          ui.healthCheckOpen ||
+          ui.reorganizeOpen ||
+          ui.triageOpen;
         if (!modalOpen && ui.hoveredPreviewCandidate) {
           event.preventDefault();
           ui.openPreviewImmediate(ui.hoveredPreviewCandidate);
@@ -420,8 +425,14 @@ export function Workbench() {
             }
           </DragOverlay>
 
+          <BackgroundJobsTray motionMode={settings.motionMode} />
+
           <Toaster
             position="bottom-right"
+            offset={{
+              bottom: trayHeightPx > 0 ? trayHeightPx + 60 : 48,
+              right: 16,
+            }}
             theme={activeTheme.mode}
             toastOptions={{
               style: {

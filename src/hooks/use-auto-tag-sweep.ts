@@ -1,11 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { playSessionFreeze, playTagPop } from '@/lib/audio/foley';
-import {
-  type AutoTagProgress,
-  runBatchAutoTagSweep,
-} from '@/lib/tagging/auto-tagger';
-import { useUiStore } from '@/store/ui-store';
+import { useCallback } from 'react';
+import { startAutoTagSweep } from '@/lib/jobs/background-sweeps';
+import type { AutoTagProgress } from '@/lib/tagging/auto-tagger';
+import { useBackgroundJobsStore } from '@/store/background-jobs-store';
 
 export interface AutoTagSweepController {
   running: boolean;
@@ -15,72 +11,38 @@ export interface AutoTagSweepController {
 }
 
 export function useAutoTagSweep(collectionId?: string): AutoTagSweepController {
-  const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState<AutoTagProgress | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const job = useBackgroundJobsStore((s) =>
+    s.jobs.find((item) => item.id === 'auto-tag'),
+  );
+  const cancelJob = useBackgroundJobsStore((s) => s.cancelJob);
 
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, []);
+  const matchesScope =
+    job?.status === 'running' &&
+    (collectionId === undefined
+      ? job.scopeId === undefined
+      : job.scopeId === collectionId);
 
-  const cancel = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
+  const progress: AutoTagProgress | null =
+    matchesScope && job.progress
+      ? {
+          current: job.progress.current,
+          total: job.progress.total,
+          tagged: 0,
+        }
+      : null;
 
   const start = useCallback(async () => {
-    if (running) return;
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setRunning(true);
-    setProgress(null);
+    await startAutoTagSweep(collectionId);
+  }, [collectionId]);
 
-    try {
-      const { addTaggingLink, removeTaggingLink } = useUiStore.getState();
-      const result = await runBatchAutoTagSweep({
-        collectionId,
-        signal: controller.signal,
-        onProgress: setProgress,
-        onLinkStart: (id) => addTaggingLink(id),
-        onLinkEnd: (id, tags) => {
-          removeTaggingLink(id);
-          if (tags && tags.length > 0) {
-            playTagPop();
-          }
-        },
-      });
+  const cancel = useCallback(() => {
+    cancelJob('auto-tag');
+  }, [cancelJob]);
 
-      if (result.status === 'unavailable') {
-        toast.info(
-          'On-device Gemini Nano is unavailable in this browser right now.',
-        );
-        return;
-      }
-
-      if (result.status === 'canceled') {
-        toast.info(
-          result.tagged > 0
-            ? `Auto-Tag canceled (${result.tagged} link${result.tagged === 1 ? '' : 's'} tagged)`
-            : 'Auto-Tag canceled',
-        );
-        return;
-      }
-
-      if (result.tagged > 0) {
-        playSessionFreeze();
-        toast.success(
-          `Auto-tagged ${result.tagged} of ${result.total} link${result.total === 1 ? '' : 's'}`,
-        );
-      } else {
-        toast.info('No new tags were added.');
-      }
-    } finally {
-      abortRef.current = null;
-      setRunning(false);
-      setProgress(null);
-    }
-  }, [collectionId, running]);
-
-  return { running, progress, start, cancel };
+  return {
+    running: Boolean(matchesScope),
+    progress,
+    start,
+    cancel,
+  };
 }

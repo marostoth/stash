@@ -31,6 +31,7 @@ interface ScopeStepProps {
   onToggleKeepExistingTargets: () => void;
   onExportBackup: () => void;
   onPropose: () => void;
+  onMinimizePropose?: () => void;
   onCancelPropose: () => void;
 }
 
@@ -55,6 +56,7 @@ export function ScopeStep({
   onToggleKeepExistingTargets,
   onExportBackup,
   onPropose,
+  onMinimizePropose,
   onCancelPropose,
 }: ScopeStepProps) {
   return (
@@ -209,6 +211,7 @@ export function ScopeStep({
           subtitle={`Analyzing ${scopedLinksCount} ${scopedLinksCount === 1 ? 'link' : 'links'} across ${scopedDomainsCount} ${scopedDomainsCount === 1 ? 'domain' : 'domains'} locally on-device`}
           showElapsed
           skeletonRows={4}
+          onMinimize={onMinimizePropose}
           onCancel={onCancelPropose}
         />
       ) : null}

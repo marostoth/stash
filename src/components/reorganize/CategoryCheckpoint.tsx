@@ -27,6 +27,7 @@ interface CategoryCheckpointProps {
   onDeleteCategory: (id: string) => void;
   onAddCategory: () => void;
   onRegenerate: () => void;
+  onMinimizeRegenerate?: () => void;
   onCancelRegenerate: () => void;
   onBack: () => void;
   onStartSort: () => void;
@@ -175,6 +176,7 @@ export function CategoryCheckpoint({
   onDeleteCategory,
   onAddCategory,
   onRegenerate,
+  onMinimizeRegenerate,
   onCancelRegenerate,
   onBack,
   onStartSort,
@@ -229,6 +231,7 @@ export function CategoryCheckpoint({
           subtitle={`Re-evaluating ${scopedLinksCount} ${scopedLinksCount === 1 ? 'link' : 'links'} with Gemini Nano`}
           showElapsed
           skeletonRows={4}
+          onMinimize={onMinimizeRegenerate}
           onCancel={onCancelRegenerate}
         />
       ) : (

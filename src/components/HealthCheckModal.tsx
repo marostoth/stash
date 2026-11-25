@@ -284,6 +284,7 @@ export function HealthCheckModal({
                     : { current: progress.scanned, total: progress.total }
                 }
                 showElapsed
+                onMinimize={closeHealthCheck}
                 onCancel={cancelScan}
               />
             </div>

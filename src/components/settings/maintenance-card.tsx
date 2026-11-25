@@ -1,15 +1,11 @@
 import { HeartPulse, Sparkles, Wand2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { useMemo } from 'react';
 import { InlineProgressPill } from '@/components/ui/ai-activity-panel';
 import { Button } from '@/components/ui/button';
 import type { NanoAvailabilityStatus } from '@/lib/categorizer/types';
-import {
-  type BatchIconProgress,
-  pickIconsForCollections,
-} from '@/lib/icons/aiIconPicker';
-import { stashRepo } from '@/lib/storage/repo';
+import { startAutoIconSweep } from '@/lib/jobs/background-sweeps';
 import type { Collection, LinkItem } from '@/lib/types/stash';
+import { useBackgroundJobsStore } from '@/store/background-jobs-store';
 
 interface MaintenanceCardProps {
   collections: readonly Collection[];
@@ -26,95 +22,17 @@ export function MaintenanceCard({
   onOpenHealthCheck,
   onOpenReorganize,
 }: MaintenanceCardProps) {
-  const [iconifying, setIconifying] = useState(false);
-  const [iconProgress, setIconProgress] = useState<BatchIconProgress | null>(
-    null,
+  const autoIconJob = useBackgroundJobsStore((s) =>
+    s.jobs.find((job) => job.id === 'auto-icon'),
   );
-  const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, []);
+  const cancelJob = useBackgroundJobsStore((s) => s.cancelJob);
 
   const missingIconCollections = useMemo(
     () => collections.filter((c) => !c.icon),
     [collections],
   );
 
-  const handleAutoIconCollections = async () => {
-    if (
-      iconifying ||
-      nanoStatus !== 'available' ||
-      missingIconCollections.length === 0
-    ) {
-      return;
-    }
-
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setIconifying(true);
-    setIconProgress({
-      completed: 0,
-      total: missingIconCollections.length,
-      currentTitle: missingIconCollections[0]?.name ?? '',
-    });
-
-    try {
-      const sampleTitlesByCol = new Map<string, string[]>();
-      for (const link of links) {
-        const list = sampleTitlesByCol.get(link.collectionId);
-        if (list) {
-          if (list.length < 5) list.push(link.title);
-        } else {
-          sampleTitlesByCol.set(link.collectionId, [link.title]);
-        }
-      }
-
-      const items = missingIconCollections.map((col) => ({
-        id: col.id,
-        title: col.name,
-        sampleLinkTitles: sampleTitlesByCol.get(col.id),
-      }));
-
-      const pickedMap = await pickIconsForCollections(items, {
-        signal: controller.signal,
-        onProgress: (p) => setIconProgress(p),
-      });
-
-      const latest = await stashRepo.getCollections();
-      const latestById = new Map(latest.map((c) => [c.id, c]));
-
-      let applied = 0;
-      for (const [id, icon] of Object.entries(pickedMap)) {
-        const current = latestById.get(id);
-        if (!current || current.icon) continue;
-        await stashRepo.updateCollection(id, { icon });
-        applied += 1;
-      }
-
-      if (controller.signal.aborted) {
-        toast.info(
-          applied > 0
-            ? `Stopped early — assigned ${applied} collection ${applied === 1 ? 'icon' : 'icons'}.`
-            : 'Canceled icon assignment.',
-        );
-      } else if (applied > 0) {
-        toast.success(
-          `Assigned AI icons to ${applied} ${applied === 1 ? 'collection' : 'collections'}`,
-        );
-      } else {
-        toast.info('No new collection icons were assigned.');
-      }
-    } finally {
-      setIconifying(false);
-      setIconProgress(null);
-      abortRef.current = null;
-    }
-  };
+  const iconifying = autoIconJob?.status === 'running';
 
   return (
     <div className="space-y-2.5 rounded-card border border-border bg-canvas p-4">
@@ -127,7 +45,8 @@ export function MaintenanceCard({
       <p className="text-xs leading-relaxed text-fg-muted">
         Run an on-demand scan to detect dead links, parked domains, root
         redirects, duplicates, and search/dev clutter—with safe bulk cleanup and
-        8-second Undo.
+        8-second Undo. Any running task continues in the bottom-right tray if
+        you close this menu.
       </p>
       <div className="flex flex-wrap items-center gap-2 pt-0.5">
         <Button
@@ -158,10 +77,10 @@ export function MaintenanceCard({
 
         {iconifying ? (
           <InlineProgressPill
-            label={`Icons ${iconProgress?.completed ?? 0} / ${iconProgress?.total ?? missingIconCollections.length}...`}
-            current={iconProgress?.completed ?? 0}
-            total={iconProgress?.total ?? missingIconCollections.length}
-            onCancel={() => abortRef.current?.abort()}
+            label={`Icons ${autoIconJob.progress?.current ?? 0} / ${autoIconJob.progress?.total ?? missingIconCollections.length}...`}
+            current={autoIconJob.progress?.current ?? 0}
+            total={autoIconJob.progress?.total ?? missingIconCollections.length}
+            onCancel={() => cancelJob('auto-icon')}
             className="h-8 px-2.5 text-xs"
           />
         ) : (
@@ -171,7 +90,7 @@ export function MaintenanceCard({
             disabled={
               nanoStatus !== 'available' || missingIconCollections.length === 0
             }
-            onClick={() => void handleAutoIconCollections()}
+            onClick={() => void startAutoIconSweep(collections, links)}
             className="gap-1.5"
             title={
               nanoStatus !== 'available'

@@ -191,6 +191,7 @@ export async function pickIconsForCollections(
   options: {
     signal?: AbortSignal;
     onProgress?: (progress: BatchIconProgress) => void;
+    onItemPicked?: (id: string, icon: string) => Promise<void> | void;
   } = {},
 ): Promise<Record<string, string>> {
   const results: Record<string, string> = {};
@@ -236,6 +237,7 @@ export async function pickIconsForCollections(
         );
         if (picked) {
           results[item.id] = picked;
+          await options.onItemPicked?.(item.id, picked);
         }
       } catch {
         // Ignore single-item failures and continue batch
