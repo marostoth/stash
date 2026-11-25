@@ -280,28 +280,37 @@ export function registerHealthScanPortListener(): void {
         scanController = controller;
 
         void (async () => {
-          const granted = await hasVisualPreviewPermission();
-          if (!granted) {
-            safePost({
-              type: 'error',
-              message:
-                'Site access permission is required to check link status.',
+          try {
+            const granted = await hasVisualPreviewPermission();
+            if (!granted) {
+              safePost({
+                type: 'error',
+                message:
+                  'Site access permission is required to check link status.',
+              });
+              return;
+            }
+
+            const outcome = await runHealthUrlScan(urls, {
+              signal: controller.signal,
+              onProgress: (scanned, total) => {
+                safePost({ type: 'progress', scanned, total });
+              },
             });
-            return;
+
+            safePost({
+              type: 'complete',
+              canceled: outcome.canceled,
+              results: outcome.results,
+            });
+          } catch (error: unknown) {
+            console.error('[Stash HealthCheck] Background scan failed:', error);
+            const message =
+              error instanceof Error
+                ? error.message
+                : 'Background scanner encountered an unexpected error.';
+            safePost({ type: 'error', message });
           }
-
-          const outcome = await runHealthUrlScan(urls, {
-            signal: controller.signal,
-            onProgress: (scanned, total) => {
-              safePost({ type: 'progress', scanned, total });
-            },
-          });
-
-          safePost({
-            type: 'complete',
-            canceled: outcome.canceled,
-            results: outcome.results,
-          });
         })();
       }
     });

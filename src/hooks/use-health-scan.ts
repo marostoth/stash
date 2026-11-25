@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { verifySuspiciousPageWithNano } from '@/lib/health/nano-tiebreaker';
 import {
+  buildUniqueScanTargets,
   HEALTH_SCAN_PORT_NAME,
   type HealthPortServerMessage,
   type HealthUrlScanItem,
+  runHealthUrlScan,
 } from '@/lib/health/scanner';
 import {
   hasVisualPreviewPermission,
@@ -19,9 +21,18 @@ export interface ScanProgressState {
   refiningAi?: boolean;
 }
 
+function readRuntimeLastError(): string | undefined {
+  try {
+    const rt = browser.runtime as { lastError?: { message?: string } };
+    return rt?.lastError?.message;
+  } catch {
+    return undefined;
+  }
+}
+
 export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
   const [hasPermission, setHasPermission] = useState(false);
-  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [hasScanned, setHasScanned] = useState(false);
   const [wasCanceled, setWasCanceled] = useState(false);
@@ -34,11 +45,15 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
   const portRef = useRef<ReturnType<typeof browser.runtime.connect> | null>(
     null,
   );
+  const localScanAbortRef = useRef<AbortController | null>(null);
   const aiAbortRef = useRef<AbortController | null>(null);
+  const userCanceledRef = useRef(false);
   const linksRef = useRef(links);
   linksRef.current = links;
 
   const stopActiveScan = useCallback(() => {
+    localScanAbortRef.current?.abort();
+    localScanAbortRef.current = null;
     aiAbortRef.current?.abort();
     aiAbortRef.current = null;
     if (portRef.current) {
@@ -59,13 +74,14 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
   const refreshPermission = useCallback(async () => {
     const granted = await hasVisualPreviewPermission();
     setHasPermission(granted);
-    if (granted) setPermissionError(null);
+    if (granted) setScanError(null);
   }, []);
 
   useEffect(() => {
     if (!open) {
       stopActiveScan();
       setScanning(false);
+      setProgress(null);
       return;
     }
     void refreshPermission();
@@ -79,124 +95,226 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
 
   const applyCompletedResults = useCallback(
     async (items: readonly HealthUrlScanItem[], canceled: boolean) => {
-      const byNormalized: Record<string, HealthUrlScanItem> = {};
-      for (const item of items) {
-        byNormalized[item.normalizedUrl] = item;
-      }
+      try {
+        const byNormalized: Record<string, HealthUrlScanItem> = {};
+        for (const item of items) {
+          byNormalized[item.normalizedUrl] = item;
+        }
 
-      // Optional on-device Gemini Nano tie-breaker for suspicious 200 OK pages
-      const suspicious = items.filter((item) => item.suspiciousForAi);
-      if (!canceled && suspicious.length > 0) {
-        const aiController = new AbortController();
-        aiAbortRef.current = aiController;
-        setProgress({
-          scanned: items.length,
-          total: items.length,
-          refiningAi: true,
-        });
+        // Optional on-device Gemini Nano tie-breaker for suspicious 200 OK pages
+        const suspicious = items.filter((item) => item.suspiciousForAi);
+        if (!canceled && suspicious.length > 0) {
+          const aiController = new AbortController();
+          aiAbortRef.current = aiController;
+          setProgress({
+            scanned: items.length,
+            total: items.length,
+            refiningAi: true,
+          });
 
-        for (const candidate of suspicious) {
-          if (aiController.signal.aborted) break;
-          const verdict = await verifySuspiciousPageWithNano(
-            {
-              url: candidate.finalUrl ?? candidate.originalUrl,
-              title: candidate.title,
-              snippet: candidate.snippet,
-            },
-            aiController.signal,
-          );
-          if (verdict?.isDead) {
-            byNormalized[candidate.normalizedUrl] = {
-              ...candidate,
-              status: 'dead',
-              reason: verdict.reason,
-              suspiciousForAi: false,
-            };
+          for (const candidate of suspicious) {
+            if (aiController.signal.aborted) break;
+            const verdict = await verifySuspiciousPageWithNano(
+              {
+                url: candidate.finalUrl ?? candidate.originalUrl,
+                title: candidate.title,
+                snippet: candidate.snippet,
+              },
+              aiController.signal,
+            );
+            if (verdict?.isDead) {
+              byNormalized[candidate.normalizedUrl] = {
+                ...candidate,
+                status: 'dead',
+                reason: verdict.reason,
+                suspiciousForAi: false,
+              };
+            }
+          }
+          aiAbortRef.current = null;
+        }
+
+        // Pre-check Confirmed Dead only; Needs a Quick Look & Clutter stay unchecked
+        const preChecked = new Set<string>();
+        for (const link of linksRef.current) {
+          const normalized = normalizeUrlForComparison(link.url);
+          if (byNormalized[normalized]?.status === 'dead') {
+            preChecked.add(link.id);
           }
         }
-        aiAbortRef.current = null;
-      }
 
-      // Pre-check Confirmed Dead only; Needs a Quick Look & Clutter stay unchecked
-      const preChecked = new Set<string>();
-      for (const link of linksRef.current) {
-        const normalized = normalizeUrlForComparison(link.url);
-        if (byNormalized[normalized]?.status === 'dead') {
-          preChecked.add(link.id);
-        }
+        setUrlResults(byNormalized);
+        setSelectedIds(preChecked);
+        setHasScanned(true);
+        setWasCanceled(canceled);
+      } catch (error: unknown) {
+        console.error('[Stash HealthCheck] Failed processing results:', error);
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Failed to process scan results.';
+        setScanError(message);
+        toast.error(message);
+      } finally {
+        setScanning(false);
+        setProgress(null);
       }
-
-      setUrlResults(byNormalized);
-      setSelectedIds(preChecked);
-      setHasScanned(true);
-      setWasCanceled(canceled);
-      setScanning(false);
-      setProgress(null);
     },
     [],
   );
 
+  const runInPageFallbackScan = useCallback(
+    async (urls: readonly string[], reason: string) => {
+      console.error(
+        '[Stash HealthCheck] Falling back to in-page scan after port disconnect:',
+        reason,
+      );
+      const controller = new AbortController();
+      localScanAbortRef.current = controller;
+
+      try {
+        const outcome = await runHealthUrlScan(urls, {
+          signal: controller.signal,
+          onProgress: (scanned, total) => {
+            setProgress({ scanned, total });
+          },
+        });
+        localScanAbortRef.current = null;
+        await applyCompletedResults(outcome.results, outcome.canceled);
+      } catch (error: unknown) {
+        localScanAbortRef.current = null;
+        console.error('[Stash HealthCheck] In-page scan failed:', error);
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Health scan failed unexpectedly.';
+        setScanError(message);
+        setScanning(false);
+        setProgress(null);
+        toast.error(message);
+      }
+    },
+    [applyCompletedResults],
+  );
+
   const launchBackgroundScan = useCallback(() => {
-    if (typeof browser === 'undefined' || !browser.runtime?.connect) {
-      toast.error('Extension background scanner is unavailable in this view.');
+    const rawUrls = linksRef.current.map((l) => l.url);
+    const uniqueTargets = buildUniqueScanTargets(rawUrls);
+
+    stopActiveScan();
+    userCanceledRef.current = false;
+    setScanning(true);
+    setWasCanceled(false);
+    setScanError(null);
+    setProgress({ scanned: 0, total: uniqueTargets.length });
+
+    if (uniqueTargets.length === 0) {
+      void applyCompletedResults([], false);
       return;
     }
 
-    stopActiveScan();
-    setScanning(true);
-    setWasCanceled(false);
-    setPermissionError(null);
-    setProgress({ scanned: 0, total: linksRef.current.length });
+    if (typeof browser === 'undefined' || !browser.runtime?.connect) {
+      void runInPageFallbackScan(
+        rawUrls,
+        'browser.runtime.connect is unavailable',
+      );
+      return;
+    }
 
-    const port = browser.runtime.connect({ name: HEALTH_SCAN_PORT_NAME });
-    portRef.current = port;
+    let settled = false;
+    let receivedAnyMessage = false;
 
-    port.onMessage.addListener((raw: unknown) => {
-      if (!raw || typeof raw !== 'object') return;
-      const msg = raw as HealthPortServerMessage;
+    try {
+      const port = browser.runtime.connect({ name: HEALTH_SCAN_PORT_NAME });
+      portRef.current = port;
 
-      if (msg.type === 'progress') {
-        setProgress({ scanned: msg.scanned, total: msg.total });
-        return;
-      }
+      port.onMessage.addListener((raw: unknown) => {
+        if (!raw || typeof raw !== 'object') return;
+        receivedAnyMessage = true;
+        const msg = raw as HealthPortServerMessage;
 
-      if (msg.type === 'error') {
-        stopActiveScan();
+        if (msg.type === 'progress') {
+          setProgress({ scanned: msg.scanned, total: msg.total });
+          return;
+        }
+
+        if (msg.type === 'error') {
+          settled = true;
+          stopActiveScan();
+          setScanning(false);
+          setProgress(null);
+          setScanError(msg.message);
+          console.error('[Stash HealthCheck] Scanner error:', msg.message);
+          toast.error(msg.message);
+          return;
+        }
+
+        if (msg.type === 'complete') {
+          settled = true;
+          try {
+            port.disconnect();
+          } catch {
+            // Ignore disconnect noise
+          }
+          portRef.current = null;
+          void applyCompletedResults(msg.results, msg.canceled);
+        }
+      });
+
+      port.onDisconnect.addListener(() => {
+        const lastError = readRuntimeLastError();
+        if (portRef.current === port) {
+          portRef.current = null;
+        }
+        if (settled) return;
+        settled = true;
+
+        if (userCanceledRef.current) {
+          setScanning(false);
+          setProgress(null);
+          return;
+        }
+
+        const disconnectReason =
+          lastError ||
+          'Background service worker disconnected before the scan finished.';
+
+        // If the background port dropped before delivering any messages (e.g.
+        // inactive/restarting worker), seamlessly fall back to in-page fetch
+        // which shares the exact same granted optional_host_permissions.
+        if (!receivedAnyMessage) {
+          void runInPageFallbackScan(rawUrls, disconnectReason);
+          return;
+        }
+
+        console.error(
+          '[Stash HealthCheck] Background port disconnected mid-scan:',
+          disconnectReason,
+        );
+        setScanError(disconnectReason);
         setScanning(false);
         setProgress(null);
-        setPermissionError(msg.message);
-        toast.error(msg.message);
-        return;
-      }
+        toast.error(`Health scan interrupted: ${disconnectReason}`);
+      });
 
-      if (msg.type === 'complete') {
-        try {
-          port.disconnect();
-        } catch {
-          // Ignore disconnect noise
-        }
-        portRef.current = null;
-        void applyCompletedResults(msg.results, msg.canceled);
-      }
-    });
-
-    port.onDisconnect.addListener(() => {
-      if (portRef.current === port) {
-        portRef.current = null;
-        setScanning(false);
-      }
-    });
-
-    port.postMessage({
-      type: 'start',
-      urls: linksRef.current.map((l) => l.url),
-    });
-  }, [applyCompletedResults, stopActiveScan]);
+      port.postMessage({
+        type: 'start',
+        urls: rawUrls,
+      });
+    } catch (error: unknown) {
+      settled = true;
+      const reason = error instanceof Error ? error.message : String(error);
+      console.error('[Stash HealthCheck] Port startup threw:', error);
+      void runInPageFallbackScan(rawUrls, reason);
+    }
+  }, [applyCompletedResults, runInPageFallbackScan, stopActiveScan]);
 
   const startScan = () => {
     if (scanning) return;
     if (links.length === 0) {
-      toast.info('Your library has no saved links to scan yet.');
+      const msg = 'Your library has no saved links to scan yet.';
+      setScanError(msg);
+      toast.info(msg);
       return;
     }
 
@@ -205,34 +323,49 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
       return;
     }
 
-    // Call permissions.request synchronously as the very first statement
+    // Call permissions.request() synchronously as the VERY FIRST statement
     // inside this click handler so Chrome preserves the user gesture.
     const requestPromise = requestVisualPreviewPermission();
-    setPermissionError(null);
-    void requestPromise.then((result) => {
-      setHasPermission(result.granted);
-      if (!result.granted) {
+    setScanError(null);
+    void requestPromise
+      .then((result) => {
+        setHasPermission(result.granted);
+        if (!result.granted) {
+          const message =
+            result.error ??
+            'Site access permission was not granted. Local clutter & duplicate checks remain available below.';
+          console.error('[Stash HealthCheck] Permission not granted:', message);
+          setScanError(message);
+          toast.error(message);
+          return;
+        }
+        launchBackgroundScan();
+      })
+      .catch((error: unknown) => {
+        console.error('[Stash HealthCheck] Permission request failed:', error);
         const message =
-          result.error ??
-          'Site access permission was not granted. Local clutter & duplicate checks remain available below.';
-        setPermissionError(message);
-        toast.info(message);
-        return;
-      }
-      launchBackgroundScan();
-    });
+          error instanceof Error
+            ? error.message
+            : 'Could not request site access permission.';
+        setScanError(message);
+        toast.error(message);
+      });
   };
 
   const cancelScan = () => {
+    userCanceledRef.current = true;
+    localScanAbortRef.current?.abort();
     aiAbortRef.current?.abort();
     if (portRef.current) {
       try {
         portRef.current.postMessage({ type: 'cancel' });
-      } catch {
+      } catch (error: unknown) {
+        console.error('[Stash HealthCheck] Cancel postMessage failed:', error);
         stopActiveScan();
         setScanning(false);
+        setProgress(null);
       }
-    } else {
+    } else if (!localScanAbortRef.current) {
       setScanning(false);
       setProgress(null);
     }
@@ -240,7 +373,7 @@ export function useHealthScan(open: boolean, links: readonly LinkItem[]) {
 
   return {
     hasPermission,
-    permissionError,
+    scanError,
     scanning,
     hasScanned,
     wasCanceled,
