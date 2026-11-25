@@ -92,6 +92,23 @@ export function partitionSidebarTabs(tabs: readonly OpenTabInfo[]): {
   return { pinned, regular };
 }
 
+/**
+ * Returns every stashable open tab eligible for a session (respecting includePinned),
+ * including duplicate URLs so "Save & Close" closes all duplicate copies too.
+ */
+export function selectEligibleTabsForClose(
+  tabs: readonly OpenTabInfo[],
+  options: { includePinned: boolean },
+): OpenTabInfo[] {
+  const eligible: OpenTabInfo[] = [];
+  for (const tab of tabs) {
+    if (!isStashableUrl(tab.url)) continue;
+    if (tab.pinned && !options.includePinned) continue;
+    eligible.push(tab);
+  }
+  return eligible;
+}
+
 export function selectTabsForSession(
   tabs: readonly OpenTabInfo[],
   options: { includePinned: boolean },
@@ -99,10 +116,7 @@ export function selectTabsForSession(
   const seenUrls = new Set<string>();
   const selected: OpenTabInfo[] = [];
 
-  for (const tab of tabs) {
-    if (!isStashableUrl(tab.url)) continue;
-    if (tab.pinned && !options.includePinned) continue;
-
+  for (const tab of selectEligibleTabsForClose(tabs, options)) {
     const normalized = normalizeUrlForComparison(tab.url);
     if (seenUrls.has(normalized)) continue;
     seenUrls.add(normalized);

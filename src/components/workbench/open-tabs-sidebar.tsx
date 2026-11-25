@@ -257,11 +257,19 @@ export function OpenTabsSidebar({
       triggerCollectionCascade(saved.collection.id);
 
       if (closeAfterSave) {
-        await closeTabs(saved.savedTabs.map((t) => t.id));
+        await closeTabs(saved.closableTabs.map((t) => t.id));
         playSessionFreeze(settings.soundEffects, settings.motionMode);
-        toast.success(
-          `Saved & closed ${saved.links.length} tab${saved.links.length === 1 ? '' : 's'} into "${saved.collection.name}"`,
-        );
+        const collapsedDuplicates =
+          saved.closableTabs.length - saved.links.length;
+        if (collapsedDuplicates > 0) {
+          toast.success(
+            `Saved ${saved.links.length} link${saved.links.length === 1 ? '' : 's'} & closed ${saved.closableTabs.length} tabs (${collapsedDuplicates} duplicate${collapsedDuplicates === 1 ? '' : 's'} collapsed)`,
+          );
+        } else {
+          toast.success(
+            `Saved & closed ${saved.links.length} tab${saved.links.length === 1 ? '' : 's'} into "${saved.collection.name}"`,
+          );
+        }
       } else {
         playSessionFreeze(settings.soundEffects, settings.motionMode);
         toast.success(

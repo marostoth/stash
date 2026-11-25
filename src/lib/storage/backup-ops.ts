@@ -18,6 +18,7 @@ import type {
 import {
   formatSessionName,
   type OpenTabInfo,
+  selectEligibleTabsForClose,
   selectTabsForSession,
 } from '@/lib/tabs/session-filter';
 import { normalizeImportedCustomTheme } from '@/lib/themes/theme-validator';
@@ -180,7 +181,10 @@ export async function saveSessionCollectionInStorage(
   tabs: readonly OpenTabInfo[],
   options: { includePinned: boolean; name?: string; date?: Date },
 ): Promise<SaveSessionResult | null> {
-  const savedTabs = selectTabsForSession(tabs, {
+  const closableTabs = selectEligibleTabsForClose(tabs, {
+    includePinned: options.includePinned,
+  });
+  const savedTabs = selectTabsForSession(closableTabs, {
     includePinned: options.includePinned,
   });
   if (savedTabs.length === 0) return null;
@@ -228,7 +232,12 @@ export async function saveSessionCollectionInStorage(
     linksStorage.setValue([...existingLinks, ...sessionLinks]),
   ]);
 
-  return { collection: sessionCollection, links: sessionLinks, savedTabs };
+  return {
+    collection: sessionCollection,
+    links: sessionLinks,
+    savedTabs,
+    closableTabs,
+  };
 }
 
 export async function deleteLinkInStorage(id: string): Promise<boolean> {

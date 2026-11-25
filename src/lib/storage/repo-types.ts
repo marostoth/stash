@@ -64,6 +64,7 @@ export interface SaveSessionResult {
   collection: Collection;
   links: LinkItem[];
   savedTabs: OpenTabInfo[];
+  closableTabs: OpenTabInfo[];
 }
 
 export interface StashSnapshot {

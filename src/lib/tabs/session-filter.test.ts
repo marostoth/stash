@@ -4,6 +4,7 @@ import {
   isStashableUrl,
   normalizeRawTabs,
   partitionSidebarTabs,
+  selectEligibleTabsForClose,
   selectTabsForSession,
 } from '@/lib/tabs/session-filter';
 
@@ -96,6 +97,18 @@ describe('session-filter', () => {
 
     const withPinned = selectTabsForSession(tabs, { includePinned: true });
     expect(withPinned.map((t) => t.id)).toEqual([1, 2, 4]);
+
+    // Save & Close should close duplicate copies too while still respecting includePinned
+    expect(
+      selectEligibleTabsForClose(tabs, { includePinned: false }).map(
+        (t) => t.id,
+      ),
+    ).toEqual([2, 3, 4]);
+    expect(
+      selectEligibleTabsForClose(tabs, { includePinned: true }).map(
+        (t) => t.id,
+      ),
+    ).toEqual([1, 2, 3, 4]);
   });
 
   it('formats dated session names consistently', () => {
