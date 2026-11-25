@@ -39,6 +39,7 @@ interface OpenTabsSidebarProps {
 interface TabRowProps {
   tab: OpenTabInfo;
   dimmed: boolean;
+  hoverPreviews: boolean;
   collections: readonly Collection[];
   onQuickStashTab: (tab: OpenTabInfo, collectionId: string) => Promise<void>;
 }
@@ -46,10 +47,13 @@ interface TabRowProps {
 function OpenTabRow({
   tab,
   dimmed,
+  hoverPreviews,
   collections,
   onQuickStashTab,
 }: TabRowProps) {
   const openCreateCollection = useUiStore((s) => s.openCreateCollection);
+  const schedulePreview = useUiStore((s) => s.schedulePreview);
+  const dismissPreview = useUiStore((s) => s.dismissPreview);
   const [faviconFailed, setFaviconFailed] = useState(false);
 
   const { ref, isDragging } = useDraggable({
@@ -78,7 +82,30 @@ function OpenTabRow({
     >
       <button
         type="button"
-        onClick={() => void switchToTab(tab.id)}
+        onClick={() => {
+          dismissPreview();
+          void switchToTab(tab.id);
+        }}
+        onPointerEnter={(event) => {
+          if (!hoverPreviews || isDragging) return;
+          const rect = event.currentTarget.getBoundingClientRect();
+          schedulePreview({
+            id: `tab:${tab.id}`,
+            url: tab.url,
+            title: tab.title,
+            faviconUrl: tab.favIconUrl,
+            anchor: {
+              top: rect.top,
+              right: rect.right,
+              bottom: rect.bottom,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height,
+            },
+            preferredSide: 'left',
+          });
+        }}
+        onPointerLeave={dismissPreview}
         title={`${tab.title}\n${tab.url}`}
         className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 rounded cursor-pointer"
       >
@@ -122,6 +149,7 @@ function OpenTabRow({
       {/* Hover quick actions: 1-click stash + close */}
       <div
         data-dnd-no-drag="true"
+        onPointerEnter={dismissPreview}
         className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
       >
         {collections.length === 1 && collections[0] ? (
@@ -204,6 +232,7 @@ export function OpenTabsSidebar({
   const triggerCollectionCascade = useUiStore(
     (s) => s.triggerCollectionCascade,
   );
+  const dismissPreview = useUiStore((s) => s.dismissPreview);
 
   const eligibleTabs = selectTabsForSession(tabs, {
     includePinned: settings.includePinnedInSessions,
@@ -306,7 +335,10 @@ export function OpenTabsSidebar({
       </div>
 
       {/* Scrollable Tabs List */}
-      <div className="flex-1 space-y-3 overflow-y-auto p-2.5">
+      <div
+        onScroll={dismissPreview}
+        className="flex-1 space-y-3 overflow-y-auto p-2.5"
+      >
         {tabs.length === 0 ? (
           <div className="rounded-card border border-dashed border-border px-3 py-6 text-center text-xs text-fg-muted">
             No other web tabs open in this window. Open a few sites to drag or
@@ -330,6 +362,7 @@ export function OpenTabsSidebar({
                     key={tab.id}
                     tab={tab}
                     dimmed={!settings.includePinnedInSessions}
+                    hoverPreviews={settings.hoverPreviews}
                     collections={collections}
                     onQuickStashTab={onQuickStashTab}
                   />
@@ -349,6 +382,7 @@ export function OpenTabsSidebar({
                     key={tab.id}
                     tab={tab}
                     dimmed={false}
+                    hoverPreviews={settings.hoverPreviews}
                     collections={collections}
                     onQuickStashTab={onQuickStashTab}
                   />

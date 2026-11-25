@@ -16,6 +16,7 @@ import { CollectionModal } from '@/components/workbench/collection-modal';
 import { CollectionSection } from '@/components/workbench/collection-section';
 import { DragGhost } from '@/components/workbench/drag-ghost';
 import { EmptyState } from '@/components/workbench/empty-state';
+import { LinkPreviewPopover } from '@/components/workbench/link-preview-popover';
 import { OpenTabsSidebar } from '@/components/workbench/open-tabs-sidebar';
 import { QuickEditModal } from '@/components/workbench/quick-edit-modal';
 import { TopBar } from '@/components/workbench/top-bar';
@@ -71,6 +72,7 @@ export function Workbench() {
   const setSearchQuery = useUiStore((s) => s.setSearchQuery);
   const pulseLink = useUiStore((s) => s.pulseLink);
   const settleLink = useUiStore((s) => s.settleLink);
+  const dismissPreview = useUiStore((s) => s.dismissPreview);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -95,20 +97,44 @@ export function Workbench() {
       }
 
       if (
-        event.key === 'Escape' &&
-        document.activeElement === searchInputRef.current
+        event.key === ' ' &&
+        settings.hoverPreviews &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !isEditableElement(event.target)
       ) {
-        if (searchQuery) {
-          setSearchQuery('');
-        } else {
-          searchInputRef.current?.blur();
+        const ui = useUiStore.getState();
+        const modalOpen =
+          ui.collectionModal !== null ||
+          ui.linkModal !== null ||
+          ui.settingsOpen ||
+          ui.triageCollectionId !== null;
+        if (!modalOpen && ui.hoveredPreviewCandidate) {
+          event.preventDefault();
+          ui.openPreviewImmediate(ui.hoveredPreviewCandidate);
+          return;
+        }
+      }
+
+      if (event.key === 'Escape') {
+        if (useUiStore.getState().activePreview) {
+          dismissPreview();
+          return;
+        }
+        if (document.activeElement === searchInputRef.current) {
+          if (searchQuery) {
+            setSearchQuery('');
+          } else {
+            searchInputRef.current?.blur();
+          }
         }
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [searchQuery, setSearchQuery]);
+  }, [dismissPreview, searchQuery, setSearchQuery, settings.hoverPreviews]);
 
   const revealDuplicate = useCallback(
     async (existingLinkId: string, targetCollectionId: string) => {
@@ -155,8 +181,9 @@ export function Workbench() {
   );
 
   const handleDragStart = useCallback(() => {
+    dismissPreview();
     playPickup(settings.soundEffects);
-  }, [settings.soundEffects]);
+  }, [dismissPreview, settings.soundEffects]);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -282,7 +309,10 @@ export function Workbench() {
           />
 
           <div className="flex min-h-0 flex-1 overflow-hidden">
-            <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+            <main
+              onScroll={dismissPreview}
+              className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6"
+            >
               <div className="mx-auto max-w-[1320px]">
                 {loading ? (
                   <div className="py-20 text-center font-mono text-xs text-fg-muted">
@@ -322,6 +352,7 @@ export function Workbench() {
                           forceExpanded={isSearching}
                           dragDisabled={isSearching}
                           motionMode={settings.motionMode}
+                          hoverPreviews={settings.hoverPreviews}
                         />
                       ),
                     )}
@@ -357,6 +388,11 @@ export function Workbench() {
             links={links}
             rules={rules}
             settings={settings}
+          />
+          <LinkPreviewPopover
+            hoverPreviews={settings.hoverPreviews}
+            visualPreviewsEnabled={settings.visualPreviewsEnabled}
+            motionMode={settings.motionMode}
           />
 
           <DragOverlay dropAnimation={null}>

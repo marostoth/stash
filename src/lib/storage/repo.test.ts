@@ -251,4 +251,55 @@ describe('stashRepo', () => {
     expect(remaining).toHaveLength(1);
     expect(remaining[0]?.priority).toBe(1);
   });
+
+  it('restores a deleted link with exact ID, tagsLocked, metadata, and original position (Undo)', async () => {
+    const col = await stashRepo.createCollection({ name: 'Reading' });
+    const l1 = await stashRepo.addLink({
+      collectionId: col.id,
+      url: 'https://one.dev',
+      title: 'One',
+    });
+    const l2 = await stashRepo.addLink({
+      collectionId: col.id,
+      url: 'https://two.dev',
+      title: 'Two',
+      note: 'Important essay',
+      tags: ['essay', 'favorite'],
+      tagsLocked: true,
+    });
+    const l3 = await stashRepo.addLink({
+      collectionId: col.id,
+      url: 'https://three.dev',
+      title: 'Three',
+    });
+    expect(l1.ok && l2.ok && l3.ok).toBe(true);
+    if (!l1.ok || !l2.ok || !l3.ok) return;
+
+    const deletedSnapshot = { ...l2.link };
+    expect(await stashRepo.deleteLink(l2.link.id)).toBe(true);
+    expect((await stashRepo.getLinks()).map((l) => l.id)).toEqual([
+      l1.link.id,
+      l3.link.id,
+    ]);
+
+    const restored = await stashRepo.restoreLink(deletedSnapshot);
+    expect(restored).not.toBeNull();
+    expect(restored?.id).toBe(l2.link.id);
+    expect(restored?.note).toBe('Important essay');
+    expect(restored?.tags).toEqual(['essay', 'favorite']);
+    expect(restored?.tagsLocked).toBe(true);
+    expect(restored?.order).toBe(1);
+
+    const all = await stashRepo.getLinks();
+    expect(all.map((l) => [l.id, l.order])).toEqual([
+      [l1.link.id, 0],
+      [l2.link.id, 1],
+      [l3.link.id, 2],
+    ]);
+
+    // Verify v1.4 preview settings defaults
+    const settings = await stashRepo.getSettings();
+    expect(settings.hoverPreviews).toBe(true);
+    expect(settings.visualPreviewsEnabled).toBe(false);
+  });
 });

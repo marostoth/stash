@@ -12,6 +12,7 @@ import {
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { BackupImportPanel } from '@/components/settings/backup-import-panel';
+import { PreviewsSettingsCard } from '@/components/settings/previews-settings-card';
 import { RulesManager } from '@/components/settings/rules-manager';
 import { ThemesPanel } from '@/components/settings/themes-panel';
 import { Button } from '@/components/ui/button';
@@ -314,6 +315,9 @@ export function SettingsModal({
                   </div>
                 </div>
               </div>
+
+              {/* Opt-in Hover & Visual Previews */}
+              <PreviewsSettingsCard settings={settings} settingsOpen={open} />
 
               {/* Tier 2 On-Device AI */}
               <div className="space-y-3 rounded-card border border-border bg-canvas p-4">

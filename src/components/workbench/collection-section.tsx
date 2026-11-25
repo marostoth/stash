@@ -52,6 +52,7 @@ interface CollectionSectionProps {
   forceExpanded: boolean;
   dragDisabled: boolean;
   motionMode: MotionMode;
+  hoverPreviews: boolean;
 }
 
 export function CollectionSection({
@@ -63,6 +64,7 @@ export function CollectionSection({
   forceExpanded,
   dragDisabled,
   motionMode,
+  hoverPreviews,
 }: CollectionSectionProps) {
   const openCreateLink = useUiStore((s) => s.openCreateLink);
   const openEditCollection = useUiStore((s) => s.openEditCollection);
@@ -360,6 +362,7 @@ export function CollectionSection({
                         dragDisabled={dragDisabled}
                         motionMode={motionMode}
                         cascadeActive={isCascading}
+                        hoverPreviews={hoverPreviews}
                       />
                     ))}
                   </div>

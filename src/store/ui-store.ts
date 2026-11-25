@@ -11,6 +11,26 @@ export type CollectionModalState =
   | { mode: 'edit'; collection: Collection }
   | null;
 
+export interface PreviewAnchorRect {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+export interface PreviewTarget {
+  id: string;
+  url: string;
+  title: string;
+  note?: string;
+  tags?: string[];
+  faviconUrl?: string;
+  anchor: PreviewAnchorRect;
+  preferredSide: 'bottom' | 'left';
+}
+
 interface UiStoreState {
   searchQuery: string;
   collectionModal: CollectionModalState;
@@ -21,6 +41,8 @@ interface UiStoreState {
   settledLinkId: string | null;
   taggingLinkIds: string[];
   cascadingCollectionIds: string[];
+  hoveredPreviewCandidate: PreviewTarget | null;
+  activePreview: PreviewTarget | null;
   setSearchQuery: (query: string) => void;
   openCreateCollection: () => void;
   openEditCollection: (collection: Collection) => void;
@@ -37,11 +59,24 @@ interface UiStoreState {
   addTaggingLink: (linkId: string) => void;
   removeTaggingLink: (linkId: string) => void;
   triggerCollectionCascade: (collectionId: string) => void;
+  schedulePreview: (target: PreviewTarget) => void;
+  openPreviewImmediate: (target: PreviewTarget) => void;
+  dismissPreview: () => void;
 }
+
+const HOVER_PREVIEW_DELAY_MS = 500;
 
 let pulseTimer: ReturnType<typeof setTimeout> | null = null;
 let settleTimer: ReturnType<typeof setTimeout> | null = null;
+let previewTimer: ReturnType<typeof setTimeout> | null = null;
 const cascadeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function clearPreviewTimer(): void {
+  if (previewTimer) {
+    clearTimeout(previewTimer);
+    previewTimer = null;
+  }
+}
 
 export const useUiStore = create<UiStoreState>((set) => ({
   searchQuery: '',
@@ -53,23 +88,65 @@ export const useUiStore = create<UiStoreState>((set) => ({
   settledLinkId: null,
   taggingLinkIds: [],
   cascadingCollectionIds: [],
+  hoveredPreviewCandidate: null,
+  activePreview: null,
 
   setSearchQuery: (query) => set({ searchQuery: query }),
 
-  openCreateCollection: () => set({ collectionModal: { mode: 'create' } }),
-  openEditCollection: (collection) =>
-    set({ collectionModal: { mode: 'edit', collection } }),
+  openCreateCollection: () => {
+    clearPreviewTimer();
+    set({
+      collectionModal: { mode: 'create' },
+      hoveredPreviewCandidate: null,
+      activePreview: null,
+    });
+  },
+  openEditCollection: (collection) => {
+    clearPreviewTimer();
+    set({
+      collectionModal: { mode: 'edit', collection },
+      hoveredPreviewCandidate: null,
+      activePreview: null,
+    });
+  },
   closeCollectionModal: () => set({ collectionModal: null }),
 
-  openCreateLink: (collectionId) =>
-    set({ linkModal: { mode: 'create', defaultCollectionId: collectionId } }),
-  openEditLink: (link) => set({ linkModal: { mode: 'edit', link } }),
+  openCreateLink: (collectionId) => {
+    clearPreviewTimer();
+    set({
+      linkModal: { mode: 'create', defaultCollectionId: collectionId },
+      hoveredPreviewCandidate: null,
+      activePreview: null,
+    });
+  },
+  openEditLink: (link) => {
+    clearPreviewTimer();
+    set({
+      linkModal: { mode: 'edit', link },
+      hoveredPreviewCandidate: null,
+      activePreview: null,
+    });
+  },
   closeLinkModal: () => set({ linkModal: null }),
 
-  openSettings: () => set({ settingsOpen: true }),
+  openSettings: () => {
+    clearPreviewTimer();
+    set({
+      settingsOpen: true,
+      hoveredPreviewCandidate: null,
+      activePreview: null,
+    });
+  },
   closeSettings: () => set({ settingsOpen: false }),
 
-  openTriage: (collectionId) => set({ triageCollectionId: collectionId }),
+  openTriage: (collectionId) => {
+    clearPreviewTimer();
+    set({
+      triageCollectionId: collectionId,
+      hoveredPreviewCandidate: null,
+      activePreview: null,
+    });
+  },
   closeTriage: () => set({ triageCollectionId: null }),
 
   pulseLink: (linkId) => {
@@ -136,5 +213,32 @@ export const useUiStore = create<UiStoreState>((set) => ({
       }));
     }, 520);
     cascadeTimers.set(collectionId, timer);
+  },
+
+  schedulePreview: (target) => {
+    clearPreviewTimer();
+    set({ hoveredPreviewCandidate: target });
+    previewTimer = setTimeout(() => {
+      previewTimer = null;
+      set((state) =>
+        state.hoveredPreviewCandidate?.id === target.id
+          ? { activePreview: target }
+          : state,
+      );
+    }, HOVER_PREVIEW_DELAY_MS);
+  },
+
+  openPreviewImmediate: (target) => {
+    clearPreviewTimer();
+    set({ hoveredPreviewCandidate: target, activePreview: target });
+  },
+
+  dismissPreview: () => {
+    clearPreviewTimer();
+    set((state) =>
+      state.activePreview === null && state.hoveredPreviewCandidate === null
+        ? state
+        : { hoveredPreviewCandidate: null, activePreview: null },
+    );
   },
 }));

@@ -220,6 +220,14 @@ function parseSettings(raw: unknown): StashSettings {
       typeof obj.soundEffects === 'boolean'
         ? obj.soundEffects
         : DEFAULT_SETTINGS.soundEffects,
+    hoverPreviews:
+      typeof obj.hoverPreviews === 'boolean'
+        ? obj.hoverPreviews
+        : DEFAULT_SETTINGS.hoverPreviews,
+    visualPreviewsEnabled:
+      typeof obj.visualPreviewsEnabled === 'boolean'
+        ? obj.visualPreviewsEnabled
+        : DEFAULT_SETTINGS.visualPreviewsEnabled,
     density:
       obj.density === 'compact' || obj.density === 'comfortable'
         ? obj.density

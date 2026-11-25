@@ -28,7 +28,7 @@ import {
   TAB_GROUP_COLORS,
   type ThemeDefinition,
 } from '@/lib/types/stash';
-import { sortByOrder } from '@/lib/utils/ordering';
+import { insertLinkAtIndexInList, sortByOrder } from '@/lib/utils/ordering';
 import { extractDomain, normalizeUrlForComparison } from '@/lib/utils/url';
 
 export interface BookmarkImportSummary {
@@ -229,4 +229,53 @@ export async function saveSessionCollectionInStorage(
   ]);
 
   return { collection: sessionCollection, links: sessionLinks, savedTabs };
+}
+
+export async function deleteLinkInStorage(id: string): Promise<boolean> {
+  const existing = await linksStorage.getValue();
+  const target = existing.find((item) => item.id === id);
+  if (!target) return false;
+
+  const remaining = existing.filter((item) => item.id !== id);
+  const sameColSorted = sortByOrder(
+    remaining.filter((item) => item.collectionId === target.collectionId),
+  );
+  const orderById = new Map(sameColSorted.map((item, idx) => [item.id, idx]));
+  const finalLinks = remaining.map((item) => {
+    const nextOrder = orderById.get(item.id);
+    return nextOrder !== undefined ? { ...item, order: nextOrder } : item;
+  });
+
+  await linksStorage.setValue(finalLinks);
+  return true;
+}
+
+/**
+ * Restores a previously deleted LinkItem with its exact ID, metadata, tags,
+ * tagsLocked state, and original collection order position (for 5-second Undo).
+ */
+export async function restoreLinkInStorage(
+  link: LinkItem,
+): Promise<LinkItem | null> {
+  const [collections, existingLinks] = await Promise.all([
+    collectionsStorage.getValue(),
+    linksStorage.getValue(),
+  ]);
+
+  if (!collections.some((c) => c.id === link.collectionId)) {
+    return null;
+  }
+
+  const normalized = normalizeUrlForComparison(link.url);
+  const duplicate = existingLinks.find(
+    (item) =>
+      item.id === link.id ||
+      (item.collectionId === link.collectionId &&
+        normalizeUrlForComparison(item.url) === normalized),
+  );
+  if (duplicate) return null;
+
+  const nextLinks = insertLinkAtIndexInList(existingLinks, link, link.order);
+  await linksStorage.setValue(nextLinks);
+  return nextLinks.find((item) => item.id === link.id) ?? link;
 }

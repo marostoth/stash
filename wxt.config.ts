@@ -19,6 +19,7 @@ export default defineConfig({
       'sidePanel',
     ],
     optional_permissions: ['bookmarks'],
+    optional_host_permissions: ['https://*/*', 'http://*/*'],
     action: {
       default_title: 'Open Stash Side Panel',
     },

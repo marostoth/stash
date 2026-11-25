@@ -251,6 +251,36 @@ export function playHoverRiffle(
 }
 
 /**
+ * Subtle muted mechanical discard click when deleting a link via the action drawer.
+ */
+export function playDelete(enabled?: boolean): void {
+  if (!shouldPlay(enabled)) return;
+  const ctx = getReadyContext();
+  if (!ctx) return;
+
+  try {
+    scheduleTone(ctx, {
+      type: 'triangle',
+      startFreq: 190,
+      endFreq: 58,
+      startOffsetSec: 0,
+      durationSec: 0.038,
+      gain: 0.072,
+    });
+    scheduleTone(ctx, {
+      type: 'sine',
+      startFreq: 320,
+      endFreq: 140,
+      startOffsetSec: 0.008,
+      durationSec: 0.022,
+      gain: 0.035,
+    });
+  } catch {
+    // Fail silently
+  }
+}
+
+/**
  * Soft muted low double-thump for duplicate-URL guard blocks.
  */
 export function playError(enabled?: boolean): void {

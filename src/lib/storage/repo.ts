@@ -3,8 +3,10 @@ import type { RestoreStats } from '@/lib/import-export/bundle';
 import {
   type BookmarkImportSummary,
   deleteCustomThemeInStorage,
+  deleteLinkInStorage,
   importBookmarkFoldersInStorage,
   restoreBundleInStorage,
+  restoreLinkInStorage,
   saveCustomThemeInStorage,
   saveSessionCollectionInStorage,
 } from '@/lib/storage/backup-ops';
@@ -391,23 +393,12 @@ export const stashRepo = {
     if (changed) await linksStorage.setValue(next);
   },
 
-  async deleteLink(id: string): Promise<boolean> {
-    const existing = await linksStorage.getValue();
-    const target = existing.find((item) => item.id === id);
-    if (!target) return false;
+  deleteLink(id: string): Promise<boolean> {
+    return deleteLinkInStorage(id);
+  },
 
-    const remaining = existing.filter((item) => item.id !== id);
-    const sameColSorted = sortByOrder(
-      remaining.filter((item) => item.collectionId === target.collectionId),
-    );
-    const orderById = new Map(sameColSorted.map((item, idx) => [item.id, idx]));
-    const finalLinks = remaining.map((item) => {
-      const nextOrder = orderById.get(item.id);
-      return nextOrder !== undefined ? { ...item, order: nextOrder } : item;
-    });
-
-    await linksStorage.setValue(finalLinks);
-    return true;
+  restoreLink(link: LinkItem): Promise<LinkItem | null> {
+    return restoreLinkInStorage(link);
   },
 
   async getSettings(): Promise<StashSettings> {

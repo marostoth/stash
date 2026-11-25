@@ -89,6 +89,8 @@ export interface StashSettings {
   autoTagOnSave: boolean;
   motionMode: MotionMode;
   soundEffects: boolean;
+  hoverPreviews: boolean;
+  visualPreviewsEnabled: boolean;
   density: 'compact' | 'comfortable';
 }
 
@@ -149,5 +151,7 @@ export const DEFAULT_SETTINGS: StashSettings = {
   autoTagOnSave: true,
   motionMode: 'tactile',
   soundEffects: true,
+  hoverPreviews: true,
+  visualPreviewsEnabled: false,
   density: 'comfortable',
 };

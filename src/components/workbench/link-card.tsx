@@ -1,5 +1,4 @@
 import { useSortable } from '@dnd-kit/react/sortable';
-import { Pencil } from 'lucide-react';
 import {
   motion,
   useMotionTemplate,
@@ -7,8 +6,10 @@ import {
   useSpring,
 } from 'motion/react';
 import { memo, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { CardActionDrawer } from '@/components/workbench/card-action-drawer';
 import { DropSparks } from '@/components/workbench/drop-sparks';
-import { playHoverRiffle } from '@/lib/audio/foley';
+import { playDelete, playDrop, playHoverRiffle } from '@/lib/audio/foley';
 import {
   ARCADE_HEADSHAKE_KEYFRAMES,
   ARCADE_HEADSHAKE_TRANSITION,
@@ -38,6 +39,7 @@ interface LinkCardProps {
   dragDisabled: boolean;
   motionMode: MotionMode;
   cascadeActive: boolean;
+  hoverPreviews: boolean;
 }
 
 export const LinkCard = memo(function LinkCard({
@@ -48,10 +50,14 @@ export const LinkCard = memo(function LinkCard({
   dragDisabled,
   motionMode,
   cascadeActive,
+  hoverPreviews,
 }: LinkCardProps) {
   const openEditLink = useUiStore((s) => s.openEditLink);
   const highlightedLinkId = useUiStore((s) => s.highlightedLinkId);
   const settledLinkId = useUiStore((s) => s.settledLinkId);
+  const settleLink = useUiStore((s) => s.settleLink);
+  const schedulePreview = useUiStore((s) => s.schedulePreview);
+  const dismissPreview = useUiStore((s) => s.dismissPreview);
   const isTagging = useUiStore((s) => s.taggingLinkIds.includes(link.id));
   const [faviconFailed, setFaviconFailed] = useState(false);
 
@@ -141,7 +147,55 @@ export const LinkCard = memo(function LinkCard({
   };
 
   const handleOpen = () => {
+    dismissPreview();
     void stashRepo.markLinkOpened(link.id);
+  };
+
+  const handleBodyPointerEnter = (
+    event: React.PointerEvent<HTMLAnchorElement>,
+  ) => {
+    if (!hoverPreviews || isDragging) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    schedulePreview({
+      id: `link:${link.id}`,
+      url: link.url,
+      title: link.title,
+      note: link.note || undefined,
+      tags: link.tags,
+      faviconUrl: link.faviconUrl,
+      anchor: {
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      },
+      preferredSide: 'bottom',
+    });
+  };
+
+  const handleQuickDelete = async () => {
+    const snapshot: LinkItem = { ...link, tags: [...link.tags] };
+    dismissPreview();
+    const deleted = await stashRepo.deleteLink(snapshot.id);
+    if (!deleted) return;
+
+    playDelete();
+    toast('Link removed', {
+      duration: 5000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          void stashRepo.restoreLink(snapshot).then((restored) => {
+            if (restored) {
+              playDrop();
+              settleLink(restored.id);
+            }
+          });
+        },
+      },
+    });
   };
 
   const cardAnimate =
@@ -284,6 +338,8 @@ export const LinkCard = memo(function LinkCard({
             rel={openInNewTab ? 'noopener noreferrer' : undefined}
             onClick={handleOpen}
             onContextMenu={handleContextMenu}
+            onPointerEnter={handleBodyPointerEnter}
+            onPointerLeave={dismissPreview}
             className={cn(
               'relative z-[1] flex h-full flex-col gap-2 rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
               compact ? 'p-2.5' : 'p-3.5',
@@ -355,22 +411,14 @@ export const LinkCard = memo(function LinkCard({
             )}
           </a>
 
-          {/* Hover Quick Edit Trigger */}
-          <button
-            type="button"
-            data-dnd-no-drag="true"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              openEditLink(link);
-            }}
-            aria-label={`Edit ${link.title}`}
-            title="Quick edit (or right-click card)"
-            className="absolute right-2 top-2 z-20 inline-flex h-7 w-7 items-center justify-center rounded-control border border-transparent bg-panel/90 text-fg-muted opacity-0 transition-all hover:border-border hover:text-fg focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover:opacity-100 cursor-pointer"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
+          {/* Mechanical Edit + Slide-Down Delete Drawer */}
+          <CardActionDrawer
+            linkTitle={link.title}
+            motionMode={motionMode}
+            onEnterDrawer={dismissPreview}
+            onEdit={() => openEditLink(link)}
+            onDelete={() => void handleQuickDelete()}
+          />
         </motion.div>
       )}
     </div>
