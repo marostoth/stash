@@ -302,4 +302,86 @@ describe('stashRepo', () => {
     expect(settings.hoverPreviews).toBe(true);
     expect(settings.visualPreviewsEnabled).toBe(false);
   });
+
+  it('batch-deletes links across collections and restores them intact via bulk Undo', async () => {
+    const colA = await stashRepo.createCollection({ name: 'Dev' });
+    const colB = await stashRepo.createCollection({ name: 'Reading' });
+
+    const a1 = await stashRepo.addLink({
+      collectionId: colA.id,
+      url: 'https://keep-a.dev',
+      title: 'Keep A',
+    });
+    const a2 = await stashRepo.addLink({
+      collectionId: colA.id,
+      url: 'https://dead-a.dev',
+      title: 'Dead A',
+      note: 'Old API docs',
+      tags: ['api', 'legacy'],
+      tagsLocked: true,
+    });
+    const a3 = await stashRepo.addLink({
+      collectionId: colA.id,
+      url: 'https://keep-a2.dev',
+      title: 'Keep A2',
+    });
+    const b1 = await stashRepo.addLink({
+      collectionId: colB.id,
+      url: 'https://dead-b.dev',
+      title: 'Dead B',
+      note: 'Parked blog',
+      tags: ['blog'],
+    });
+    const b2 = await stashRepo.addLink({
+      collectionId: colB.id,
+      url: 'https://keep-b.dev',
+      title: 'Keep B',
+    });
+
+    expect(a1.ok && a2.ok && a3.ok && b1.ok && b2.ok).toBe(true);
+    if (!a1.ok || !a2.ok || !a3.ok || !b1.ok || !b2.ok) return;
+
+    const removed = await stashRepo.deleteLinks([a2.link.id, b1.link.id]);
+    expect(removed.map((l) => l.id).sort()).toEqual(
+      [a2.link.id, b1.link.id].sort(),
+    );
+
+    const afterDelete = await stashRepo.getLinks();
+    expect(afterDelete.map((l) => l.id)).toEqual([
+      a1.link.id,
+      b2.link.id,
+      a3.link.id,
+    ]);
+    // Verify orders re-indexed cleanly per collection
+    const colAAfterDelete = afterDelete.filter(
+      (l) => l.collectionId === colA.id,
+    );
+    expect(colAAfterDelete.map((l) => [l.id, l.order])).toEqual([
+      [a1.link.id, 0],
+      [a3.link.id, 1],
+    ]);
+
+    const restored = await stashRepo.restoreLinks(removed);
+    expect(restored).toHaveLength(2);
+
+    const afterRestore = await stashRepo.getLinks();
+    const restoredA2 = afterRestore.find((l) => l.id === a2.link.id);
+    const restoredB1 = afterRestore.find((l) => l.id === b1.link.id);
+
+    expect(restoredA2).toMatchObject({
+      id: a2.link.id,
+      collectionId: colA.id,
+      note: 'Old API docs',
+      tags: ['api', 'legacy'],
+      tagsLocked: true,
+      order: 1,
+    });
+    expect(restoredB1).toMatchObject({
+      id: b1.link.id,
+      collectionId: colB.id,
+      note: 'Parked blog',
+      tags: ['blog'],
+      order: 0,
+    });
+  });
 });

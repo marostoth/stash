@@ -23,6 +23,7 @@ export function PreviewsSettingsCard({
   const [hasPermission, setHasPermission] = useState(false);
   const [cacheCount, setCacheCount] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const refreshState = useCallback(async () => {
     const [granted, count] = await Promise.all([
@@ -31,41 +32,70 @@ export function PreviewsSettingsCard({
     ]);
     setHasPermission(granted);
     setCacheCount(count);
+    if (granted) {
+      setLastError(null);
+    }
   }, []);
 
   useEffect(() => {
     if (!settingsOpen) return;
     void refreshState();
+    const onFocus = () => void refreshState();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, [settingsOpen, refreshState]);
 
   const effectiveVisualEnabled =
     settings.visualPreviewsEnabled && hasPermission;
 
-  const handleToggleVisualPreviews = async () => {
+  const handleToggleVisualPreviews = () => {
     if (busy) return;
     if (effectiveVisualEnabled) {
-      await stashRepo.updateSettings({ visualPreviewsEnabled: false });
-      toast.info('Visual previews turned off');
+      setBusy(true);
+      void stashRepo
+        .updateSettings({ visualPreviewsEnabled: false })
+        .then(() => toast.info('Visual previews turned off'))
+        .finally(() => setBusy(false));
       return;
     }
 
-    setBusy(true);
-    try {
-      const granted = await requestVisualPreviewPermission();
-      setHasPermission(granted);
-      if (!granted) {
-        await stashRepo.updateSettings({ visualPreviewsEnabled: false });
-        toast.info(
-          'Site access permission was not granted. Text hover previews remain active.',
-        );
-        return;
-      }
-
-      await stashRepo.updateSettings({ visualPreviewsEnabled: true });
-      toast.success('Visual previews enabled');
-    } finally {
-      setBusy(false);
+    if (hasPermission) {
+      setBusy(true);
+      setLastError(null);
+      void stashRepo
+        .updateSettings({ visualPreviewsEnabled: true })
+        .then(() => toast.success('Visual previews enabled'))
+        .finally(() => setBusy(false));
+      return;
     }
+
+    // Call permissions.request() synchronously as the VERY FIRST operation
+    // inside this click handler before any state updates or awaits.
+    const requestPromise = requestVisualPreviewPermission();
+    setBusy(true);
+    setLastError(null);
+    void requestPromise
+      .then(async (result) => {
+        setHasPermission(result.granted);
+        if (!result.granted) {
+          await stashRepo.updateSettings({ visualPreviewsEnabled: false });
+          if (result.error) {
+            setLastError(result.error);
+            toast.error(`Site access permission error: ${result.error}`);
+          } else {
+            toast.info(
+              'Site access permission was not granted. Text hover previews remain active.',
+            );
+          }
+          return;
+        }
+
+        await stashRepo.updateSettings({ visualPreviewsEnabled: true });
+        toast.success('Visual previews enabled');
+      })
+      .finally(() => {
+        setBusy(false);
+      });
   };
 
   const handleClearCache = async () => {
@@ -115,16 +145,35 @@ export function PreviewsSettingsCard({
         />
       </label>
 
-      <label className="flex cursor-pointer items-center justify-between gap-3 py-1 text-xs text-fg">
+      <div className="flex items-center justify-between gap-3 py-1 text-xs text-fg">
         <span>Visual Previews (Screenshots &amp; Site Cards)</span>
-        <input
-          type="checkbox"
+        <button
+          type="button"
+          role="switch"
+          aria-checked={effectiveVisualEnabled}
           disabled={busy}
-          checked={effectiveVisualEnabled}
-          onChange={() => void handleToggleVisualPreviews()}
-          className="h-4 w-4 accent-[var(--stash-accent)] cursor-pointer"
-        />
-      </label>
+          onClick={handleToggleVisualPreviews}
+          className={cn(
+            'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-50',
+            effectiveVisualEnabled
+              ? 'border-accent bg-accent'
+              : 'border-border bg-panel',
+          )}
+        >
+          <span
+            className={cn(
+              'pointer-events-none block h-3.5 w-3.5 rounded-full bg-canvas shadow-sm transition-transform',
+              effectiveVisualEnabled ? 'translate-x-4' : 'translate-x-0.5',
+            )}
+          />
+        </button>
+      </div>
+
+      {lastError ? (
+        <p className="rounded-control border border-danger/40 bg-danger/10 px-2.5 py-1.5 font-mono text-[11px] text-danger">
+          Chrome error: {lastError}
+        </p>
+      ) : null}
 
       <p className="text-[11px] leading-relaxed text-fg-muted">
         Opt-in local-only previews: caches compressed tab snapshots as you

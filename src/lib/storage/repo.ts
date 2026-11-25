@@ -4,9 +4,11 @@ import {
   type BookmarkImportSummary,
   deleteCustomThemeInStorage,
   deleteLinkInStorage,
+  deleteLinksInStorage,
   importBookmarkFoldersInStorage,
   restoreBundleInStorage,
   restoreLinkInStorage,
+  restoreLinksInStorage,
   saveCustomThemeInStorage,
   saveSessionCollectionInStorage,
 } from '@/lib/storage/backup-ops';
@@ -393,13 +395,13 @@ export const stashRepo = {
     if (changed) await linksStorage.setValue(next);
   },
 
-  deleteLink(id: string): Promise<boolean> {
-    return deleteLinkInStorage(id);
-  },
-
-  restoreLink(link: LinkItem): Promise<LinkItem | null> {
-    return restoreLinkInStorage(link);
-  },
+  deleteLink: (id: string): Promise<boolean> => deleteLinkInStorage(id),
+  deleteLinks: (ids: readonly string[]): Promise<LinkItem[]> =>
+    deleteLinksInStorage(ids),
+  restoreLink: (link: LinkItem): Promise<LinkItem | null> =>
+    restoreLinkInStorage(link),
+  restoreLinks: (links: readonly LinkItem[]): Promise<LinkItem[]> =>
+    restoreLinksInStorage(links),
 
   async getSettings(): Promise<StashSettings> {
     const stored = await settingsStorage.getValue();

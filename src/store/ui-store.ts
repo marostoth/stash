@@ -36,6 +36,7 @@ interface UiStoreState {
   collectionModal: CollectionModalState;
   linkModal: LinkModalState;
   settingsOpen: boolean;
+  healthCheckOpen: boolean;
   triageCollectionId: string | null;
   highlightedLinkId: string | null;
   settledLinkId: string | null;
@@ -52,6 +53,8 @@ interface UiStoreState {
   closeLinkModal: () => void;
   openSettings: () => void;
   closeSettings: () => void;
+  openHealthCheck: () => void;
+  closeHealthCheck: () => void;
   openTriage: (collectionId: string) => void;
   closeTriage: () => void;
   pulseLink: (linkId: string) => void;
@@ -83,6 +86,7 @@ export const useUiStore = create<UiStoreState>((set) => ({
   collectionModal: null,
   linkModal: null,
   settingsOpen: false,
+  healthCheckOpen: false,
   triageCollectionId: null,
   highlightedLinkId: null,
   settledLinkId: null,
@@ -138,6 +142,17 @@ export const useUiStore = create<UiStoreState>((set) => ({
     });
   },
   closeSettings: () => set({ settingsOpen: false }),
+
+  openHealthCheck: () => {
+    clearPreviewTimer();
+    set({
+      settingsOpen: false,
+      healthCheckOpen: true,
+      hoveredPreviewCandidate: null,
+      activePreview: null,
+    });
+  },
+  closeHealthCheck: () => set({ healthCheckOpen: false }),
 
   openTriage: (collectionId) => {
     clearPreviewTimer();

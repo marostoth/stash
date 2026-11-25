@@ -279,3 +279,93 @@ export async function restoreLinkInStorage(
   await linksStorage.setValue(nextLinks);
   return nextLinks.find((item) => item.id === link.id) ?? link;
 }
+
+/**
+ * Batch-deletes multiple links in a single storage write, re-indexing orders
+ * cleanly per affected collection and returning the removed snapshots for Undo.
+ */
+export async function deleteLinksInStorage(
+  ids: readonly string[],
+): Promise<LinkItem[]> {
+  if (ids.length === 0) return [];
+  const idSet = new Set(ids);
+  const existing = await linksStorage.getValue();
+
+  const removed: LinkItem[] = [];
+  const remaining: LinkItem[] = [];
+  const affectedCollections = new Set<string>();
+
+  for (const item of existing) {
+    if (idSet.has(item.id)) {
+      removed.push(item);
+      affectedCollections.add(item.collectionId);
+    } else {
+      remaining.push(item);
+    }
+  }
+
+  if (removed.length === 0) return [];
+
+  const orderById = new Map<string, number>();
+  for (const colId of affectedCollections) {
+    const colSorted = sortByOrder(
+      remaining.filter((item) => item.collectionId === colId),
+    );
+    for (let idx = 0; idx < colSorted.length; idx++) {
+      const link = colSorted[idx];
+      if (link) orderById.set(link.id, idx);
+    }
+  }
+
+  const finalLinks = remaining.map((item) => {
+    const nextOrder = orderById.get(item.id);
+    return nextOrder !== undefined ? { ...item, order: nextOrder } : item;
+  });
+
+  await linksStorage.setValue(finalLinks);
+  return sortByOrder(removed);
+}
+
+/**
+ * Restores a batch of previously deleted LinkItems in a single storage write,
+ * preserving exact IDs, collections, notes, tags, tagsLocked, and original order.
+ */
+export async function restoreLinksInStorage(
+  linksToRestore: readonly LinkItem[],
+): Promise<LinkItem[]> {
+  if (linksToRestore.length === 0) return [];
+
+  const [collections, existingLinks] = await Promise.all([
+    collectionsStorage.getValue(),
+    linksStorage.getValue(),
+  ]);
+  const validCollectionIds = new Set(collections.map((c) => c.id));
+
+  let working = [...existingLinks];
+  const restoredIds = new Set<string>();
+
+  // Restore in ascending original order per collection so indices land accurately
+  const orderedToRestore = [...linksToRestore].sort(
+    (a, b) => a.order - b.order,
+  );
+
+  for (const link of orderedToRestore) {
+    if (!validCollectionIds.has(link.collectionId)) continue;
+    const normalized = normalizeUrlForComparison(link.url);
+    const duplicate = working.find(
+      (item) =>
+        item.id === link.id ||
+        (item.collectionId === link.collectionId &&
+          normalizeUrlForComparison(item.url) === normalized),
+    );
+    if (duplicate) continue;
+
+    working = insertLinkAtIndexInList(working, link, link.order);
+    restoredIds.add(link.id);
+  }
+
+  if (restoredIds.size === 0) return [];
+
+  await linksStorage.setValue(working);
+  return working.filter((item) => restoredIds.has(item.id));
+}

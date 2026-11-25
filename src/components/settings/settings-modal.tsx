@@ -2,6 +2,7 @@ import {
   Cpu,
   Download,
   FolderSync,
+  HeartPulse,
   Palette,
   SlidersHorizontal,
   Sparkles,
@@ -65,6 +66,7 @@ export function SettingsModal({
 }: SettingsModalProps) {
   const open = useUiStore((s) => s.settingsOpen);
   const closeSettings = useUiStore((s) => s.closeSettings);
+  const openHealthCheck = useUiStore((s) => s.openHealthCheck);
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('rules');
   const [nanoStatus, setNanoStatus] =
@@ -318,6 +320,32 @@ export function SettingsModal({
 
               {/* Opt-in Hover & Visual Previews */}
               <PreviewsSettingsCard settings={settings} settingsOpen={open} />
+
+              {/* Library Maintenance */}
+              <div className="space-y-2.5 rounded-card border border-border bg-canvas p-4">
+                <div className="flex items-center gap-2">
+                  <HeartPulse className="h-4 w-4 text-accent" />
+                  <h3 className="font-mono text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
+                    Maintenance &amp; Library
+                  </h3>
+                </div>
+                <p className="text-xs leading-relaxed text-fg-muted">
+                  Run an on-demand scan to detect dead links, parked domains,
+                  root redirects, duplicates, and search/dev clutter—with safe
+                  bulk cleanup and 8-second Undo.
+                </p>
+                <div className="pt-0.5">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={openHealthCheck}
+                    className="gap-1.5"
+                  >
+                    <HeartPulse className="h-3.5 w-3.5 text-accent" />
+                    Library Health Check ({links.length} links)
+                  </Button>
+                </div>
+              </div>
 
               {/* Tier 2 On-Device AI */}
               <div className="space-y-3 rounded-card border border-border bg-canvas p-4">

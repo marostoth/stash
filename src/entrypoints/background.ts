@@ -1,3 +1,4 @@
+import { registerHealthScanPortListener } from '@/lib/health/scanner';
 import { FETCH_OG_PREVIEW_MESSAGE } from '@/lib/previews/preview-client';
 import {
   fetchAndCacheOgPreview,
@@ -5,6 +6,8 @@ import {
 } from '@/lib/previews/worker-capture';
 
 export default defineBackground(() => {
+  registerHealthScanPortListener();
+
   if (browser.sidePanel?.setPanelBehavior) {
     browser.sidePanel
       .setPanelBehavior({ openPanelOnActionClick: true })
@@ -28,19 +31,22 @@ export default defineBackground(() => {
   }
 
   if (browser.runtime?.onMessage) {
-    browser.runtime.onMessage.addListener((message: unknown) => {
-      if (
-        message &&
-        typeof message === 'object' &&
-        (message as { type?: unknown }).type === FETCH_OG_PREVIEW_MESSAGE &&
-        typeof (message as { url?: unknown }).url === 'string'
-      ) {
-        const url = (message as { url: string }).url;
-        return fetchAndCacheOgPreview(url).then((entry) => ({
-          ok: Boolean(entry),
-        }));
-      }
-      return undefined;
-    });
+    browser.runtime.onMessage.addListener(
+      (message: unknown, _sender, sendResponse) => {
+        if (
+          message &&
+          typeof message === 'object' &&
+          (message as { type?: unknown }).type === FETCH_OG_PREVIEW_MESSAGE &&
+          typeof (message as { url?: unknown }).url === 'string'
+        ) {
+          const url = (message as { url: string }).url;
+          void fetchAndCacheOgPreview(url)
+            .then((entry) => sendResponse({ ok: Boolean(entry) }))
+            .catch(() => sendResponse({ ok: false }));
+          return true;
+        }
+        return undefined;
+      },
+    );
   }
 });
