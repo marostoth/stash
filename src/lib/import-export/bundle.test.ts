@@ -186,4 +186,31 @@ describe('StashExportBundle validation & restore', () => {
     expect(reExported.settings.activeThemeId).toBe('clean-light');
     expect(reExported.customThemes.map((t) => t.id)).toEqual(['amber-crt']);
   });
+
+  it('preserves starred links and micro card density across JSON backup validation and restore', async () => {
+    const incoming = makeValidBundle();
+    const firstLink = incoming.links[0];
+    expect(firstLink).toBeDefined();
+    if (!firstLink) return;
+    incoming.links[0] = { ...firstLink, starred: true };
+    incoming.settings = { ...incoming.settings, density: 'micro' };
+
+    const validated = validateExportBundle(incoming);
+    expect(validated.ok).toBe(true);
+    if (!validated.ok) return;
+
+    expect(validated.bundle.links[0]?.starred).toBe(true);
+    expect(validated.bundle.links[1]?.starred).toBeUndefined();
+    expect(validated.bundle.settings.density).toBe('micro');
+
+    await stashRepo.restoreBundle(validated.bundle, 'replace');
+    const restored = await stashRepo.getSnapshot();
+    const reExported = buildExportBundle(restored, NOW);
+
+    expect(reExported.links.find((l) => l.id === 'link-1')?.starred).toBe(true);
+    expect(
+      reExported.links.find((l) => l.id === 'link-2')?.starred,
+    ).toBeUndefined();
+    expect(reExported.settings.density).toBe('micro');
+  });
 });

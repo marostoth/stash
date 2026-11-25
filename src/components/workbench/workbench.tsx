@@ -8,7 +8,7 @@ import {
 import { isSortable } from '@dnd-kit/react/sortable';
 import { SearchX } from 'lucide-react';
 import { MotionConfig } from 'motion/react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { Toaster, toast } from 'sonner';
 import { HealthCheckModal } from '@/components/HealthCheckModal';
 import { ReorganizeModal } from '@/components/reorganize/ReorganizeModal';
@@ -27,6 +27,7 @@ import { TriageModal } from '@/components/workbench/triage-modal';
 import { WallpaperLayer } from '@/components/workbench/wallpaper-layer';
 import { useOpenTabs } from '@/hooks/use-open-tabs';
 import { useStashData } from '@/hooks/use-stash-data';
+import { useWorkbenchShortcuts } from '@/hooks/use-workbench-shortcuts';
 import { playDrop, playError, playPickup } from '@/lib/audio/foley';
 import { isDragItemData, isDropTargetData } from '@/lib/dnd/types';
 import { resolveReducedMotionPolicy } from '@/lib/motion/physics';
@@ -36,17 +37,6 @@ import { triggerAutoTagSingleLink } from '@/lib/tagging/trigger-auto-tag';
 import { groupAndFilterCollections } from '@/lib/utils/search';
 import { useBackgroundJobsStore } from '@/store/background-jobs-store';
 import { useUiStore } from '@/store/ui-store';
-
-function isEditableElement(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  const tag = target.tagName;
-  return (
-    tag === 'INPUT' ||
-    tag === 'TEXTAREA' ||
-    tag === 'SELECT' ||
-    target.isContentEditable
-  );
-}
 
 const WORKBENCH_SENSORS = [
   PointerSensor.configure({
@@ -75,74 +65,18 @@ export function Workbench() {
   const { tabs, pinnedTabs, regularTabs, clearableCount } = useOpenTabs();
   const searchQuery = useUiStore((s) => s.searchQuery);
   const setSearchQuery = useUiStore((s) => s.setSearchQuery);
+  const starredOnly = useUiStore((s) => s.starredOnly);
+  const setStarredOnly = useUiStore((s) => s.setStarredOnly);
   const pulseLink = useUiStore((s) => s.pulseLink);
   const settleLink = useUiStore((s) => s.settleLink);
   const dismissPreview = useUiStore((s) => s.dismissPreview);
   const trayHeightPx = useBackgroundJobsStore((s) => s.trayHeightPx);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-        return;
-      }
-
-      if (
-        event.key === '/' &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !event.altKey &&
-        !isEditableElement(event.target)
-      ) {
-        event.preventDefault();
-        searchInputRef.current?.focus();
-        return;
-      }
-
-      if (
-        event.key === ' ' &&
-        settings.hoverPreviews &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !event.altKey &&
-        !isEditableElement(event.target)
-      ) {
-        const ui = useUiStore.getState();
-        const modalOpen =
-          ui.collectionModal !== null ||
-          ui.linkModal !== null ||
-          ui.settingsOpen ||
-          ui.healthCheckOpen ||
-          ui.reorganizeOpen ||
-          ui.triageOpen;
-        if (!modalOpen && ui.hoveredPreviewCandidate) {
-          event.preventDefault();
-          ui.openPreviewImmediate(ui.hoveredPreviewCandidate);
-          return;
-        }
-      }
-
-      if (event.key === 'Escape') {
-        if (useUiStore.getState().activePreview) {
-          dismissPreview();
-          return;
-        }
-        if (document.activeElement === searchInputRef.current) {
-          if (searchQuery) {
-            setSearchQuery('');
-          } else {
-            searchInputRef.current?.blur();
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [dismissPreview, searchQuery, setSearchQuery, settings.hoverPreviews]);
+  useWorkbenchShortcuts({
+    searchInputRef,
+    hoverPreviews: settings.hoverPreviews,
+  });
 
   const revealDuplicate = useCallback(
     async (existingLinkId: string, targetCollectionId: string) => {
@@ -289,13 +223,20 @@ export function Workbench() {
     [handleQuickStashTab, revealDuplicate, settings.soundEffects, settleLink],
   );
 
-  const groups = useMemo(
-    () => groupAndFilterCollections(collections, links, searchQuery),
-    [collections, links, searchQuery],
+  const starredCount = useMemo(
+    () => links.filter((link) => link.starred === true).length,
+    [links],
   );
 
-  const isSearching = searchQuery.trim().length > 0;
-  const compact = settings.density === 'compact';
+  const groups = useMemo(
+    () =>
+      groupAndFilterCollections(collections, links, searchQuery, {
+        starredOnly,
+      }),
+    [collections, links, searchQuery, starredOnly],
+  );
+
+  const isFiltering = searchQuery.trim().length > 0 || starredOnly;
   const wideBoard = settings.boardWidth === 'wide';
 
   return (
@@ -317,6 +258,7 @@ export function Workbench() {
               activeTheme={activeTheme}
               settings={settings}
               totalLinks={links.length}
+              starredCount={starredCount}
               openTabsCount={tabs.length}
             />
 
@@ -342,18 +284,31 @@ export function Workbench() {
                     <div className="mx-auto flex max-w-md flex-col items-center justify-center rounded-card border border-border bg-panel px-6 py-12 text-center">
                       <SearchX className="mb-3 h-7 w-7 text-fg-muted" />
                       <p className="text-sm font-medium text-fg">
-                        No matches for "{searchQuery.trim()}"
+                        {starredOnly && !searchQuery.trim()
+                          ? 'No starred links yet'
+                          : starredOnly
+                            ? `No starred matches for "${searchQuery.trim()}"`
+                            : `No matches for "${searchQuery.trim()}"`}
                       </p>
                       <p className="mt-1 text-xs text-fg-muted">
-                        Try searching by domain, title, tag, or note.
+                        {starredOnly && !searchQuery.trim()
+                          ? 'Star any link card to highlight it and filter it here.'
+                          : 'Try searching by domain, title, tag, or note.'}
                       </p>
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => setSearchQuery('')}
+                        onClick={() => {
+                          setSearchQuery('');
+                          setStarredOnly(false);
+                        }}
                         className="mt-4"
                       >
-                        Clear Search
+                        {starredOnly && !searchQuery.trim()
+                          ? 'Show All Links'
+                          : starredOnly
+                            ? 'Clear Filters'
+                            : 'Clear Search'}
                       </Button>
                     </div>
                   ) : (
@@ -366,11 +321,12 @@ export function Workbench() {
                             index={colIndex}
                             links={collectionLinks}
                             openInNewTab={settings.openLinkInNewTab}
-                            compact={compact}
+                            density={settings.density}
                             wideBoard={wideBoard}
-                            forceExpanded={isSearching}
-                            dragDisabled={isSearching}
+                            forceExpanded={isFiltering}
+                            dragDisabled={isFiltering}
                             motionMode={settings.motionMode}
+                            soundEffects={settings.soundEffects}
                             hoverPreviews={settings.hoverPreviews}
                           />
                         ),

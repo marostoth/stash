@@ -492,4 +492,35 @@ describe('stashRepo', () => {
     expect(updated.wallpaperBlur).toBe(8);
     expect(updated.boardWidth).toBe('wide');
   });
+
+  it('toggles link starred state cleanly via updateLink and supports micro density', async () => {
+    const col = await stashRepo.createCollection({ name: 'Favorites' });
+    const created = await stashRepo.addLink({
+      collectionId: col.id,
+      url: 'https://vitest.dev',
+      title: 'Vitest',
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    expect(created.link.starred).toBeUndefined();
+
+    const starred = await stashRepo.updateLink(created.link.id, {
+      starred: true,
+    });
+    expect(starred.ok).toBe(true);
+    if (!starred.ok) return;
+    expect(starred.link.starred).toBe(true);
+    expect(starred.link.tags).toEqual([]);
+    expect(starred.link.tagsLocked).toBeUndefined();
+
+    const unstarred = await stashRepo.updateLink(created.link.id, {
+      starred: false,
+    });
+    expect(unstarred.ok).toBe(true);
+    if (!unstarred.ok) return;
+    expect(unstarred.link.starred).toBeUndefined();
+
+    const microSettings = await stashRepo.updateSettings({ density: 'micro' });
+    expect(microSettings.density).toBe('micro');
+  });
 });

@@ -58,6 +58,7 @@ export interface LinkItem {
   note: string;
   tags: string[];
   tagsLocked?: boolean;
+  starred?: boolean;
   faviconUrl?: string;
   order: number;
   createdAt: string;
@@ -82,6 +83,7 @@ export interface CategorizationRule {
 }
 
 export type MotionMode = 'arcade' | 'tactile' | 'reduced' | 'off';
+export type CardDensity = 'micro' | 'compact' | 'comfortable';
 export type BoardWidthMode = 'standard' | 'wide';
 export type CardRadiusPreset = 'sharp' | 'standard' | 'rounded';
 export type BackdropStyle =
@@ -110,7 +112,7 @@ export interface StashSettings {
   soundEffects: boolean;
   hoverPreviews: boolean;
   visualPreviewsEnabled: boolean;
-  density: 'compact' | 'comfortable';
+  density: CardDensity;
   boardWidth: BoardWidthMode;
   customThemes?: ThemeDefinition[];
 }

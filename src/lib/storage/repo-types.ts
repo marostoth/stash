@@ -37,6 +37,7 @@ export interface AddLinkInput {
   note?: string;
   tags?: string[];
   tagsLocked?: boolean;
+  starred?: boolean;
   faviconUrl?: string;
 }
 
@@ -47,6 +48,7 @@ export interface UpdateLinkInput {
   note?: string;
   tags?: string[];
   tagsLocked?: boolean;
+  starred?: boolean;
   faviconUrl?: string;
   order?: number;
 }

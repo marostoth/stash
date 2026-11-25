@@ -40,6 +40,7 @@ import {
 import { isEligibleForAutoTag } from '@/lib/tagging/auto-tagger';
 import { getCuratedCollectionIcon } from '@/lib/themes/collection-icons';
 import {
+  type CardDensity,
   type Collection,
   type LinkItem,
   type MotionMode,
@@ -53,11 +54,12 @@ interface CollectionSectionProps {
   index: number;
   links: readonly LinkItem[];
   openInNewTab: boolean;
-  compact: boolean;
+  density: CardDensity;
   wideBoard?: boolean;
   forceExpanded: boolean;
   dragDisabled: boolean;
   motionMode: MotionMode;
+  soundEffects: boolean;
   hoverPreviews: boolean;
 }
 
@@ -66,11 +68,12 @@ export function CollectionSection({
   index,
   links,
   openInNewTab,
-  compact,
+  density,
   wideBoard = false,
   forceExpanded,
   dragDisabled,
   motionMode,
+  soundEffects,
   hoverPreviews,
 }: CollectionSectionProps) {
   const openCreateLink = useUiStore((s) => s.openCreateLink);
@@ -407,10 +410,18 @@ export function CollectionSection({
                 {links.length > 0 ? (
                   <div
                     className={cn(
-                      wideBoard
-                        ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1900px]:grid-cols-6'
-                        : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4',
-                      compact ? 'gap-2.5' : 'gap-3.5',
+                      density === 'micro' && viewMode !== 'cover'
+                        ? wideBoard
+                          ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 min-[1900px]:grid-cols-7'
+                          : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5'
+                        : wideBoard
+                          ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1900px]:grid-cols-6'
+                          : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4',
+                      density === 'micro'
+                        ? 'gap-2'
+                        : density === 'compact'
+                          ? 'gap-2.5'
+                          : 'gap-3.5',
                     )}
                   >
                     {links.map((link, cardIndex) => (
@@ -419,9 +430,10 @@ export function CollectionSection({
                         link={link}
                         index={cardIndex}
                         openInNewTab={openInNewTab}
-                        compact={compact}
+                        density={density}
                         dragDisabled={dragDisabled}
                         motionMode={motionMode}
+                        soundEffects={soundEffects}
                         cascadeActive={isCascading}
                         hoverPreviews={hoverPreviews}
                         viewMode={viewMode}

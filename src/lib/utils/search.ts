@@ -1,12 +1,42 @@
 import type { Collection, LinkItem } from '@/lib/types/stash';
 
+export interface SearchFilterOptions {
+  starredOnly?: boolean;
+}
+
+interface ParsedSearchFilter {
+  requireStarred: boolean;
+  textTerms: string[];
+}
+
+function parseSearchFilter(
+  rawQuery: string,
+  options?: SearchFilterOptions,
+): ParsedSearchFilter {
+  const tokens = rawQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  let requireStarred = Boolean(options?.starredOnly);
+  const textTerms: string[] = [];
+
+  for (const token of tokens) {
+    if (token === 'is:starred') {
+      requireStarred = true;
+    } else {
+      textTerms.push(token);
+    }
+  }
+
+  return { requireStarred, textTerms };
+}
+
 export function matchesSearchQuery(
   link: LinkItem,
   collectionName: string,
   rawQuery: string,
+  options?: SearchFilterOptions,
 ): boolean {
-  const terms = rawQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (terms.length === 0) return true;
+  const { requireStarred, textTerms } = parseSearchFilter(rawQuery, options);
+  if (requireStarred && !link.starred) return false;
+  if (textTerms.length === 0) return true;
 
   const haystack = [
     link.title,
@@ -18,7 +48,7 @@ export function matchesSearchQuery(
     .join(' ')
     .toLowerCase();
 
-  return terms.every((term) => haystack.includes(term));
+  return textTerms.every((term) => haystack.includes(term));
 }
 
 export interface FilteredCollectionGroup {
@@ -30,8 +60,10 @@ export function groupAndFilterCollections(
   collections: readonly Collection[],
   links: readonly LinkItem[],
   rawQuery: string,
+  options?: SearchFilterOptions,
 ): FilteredCollectionGroup[] {
-  const hasQuery = rawQuery.trim().length > 0;
+  const { requireStarred, textTerms } = parseSearchFilter(rawQuery, options);
+  const hasFilter = requireStarred || textTerms.length > 0;
   const linksByCollection = new Map<string, LinkItem[]>();
 
   for (const link of links) {
@@ -43,23 +75,25 @@ export function groupAndFilterCollections(
     }
   }
 
+  const normalizedCollectionQuery = textTerms.join(' ');
   const groups: FilteredCollectionGroup[] = [];
   for (const collection of collections) {
     const collectionLinks = (linksByCollection.get(collection.id) ?? []).sort(
       (a, b) => a.order - b.order,
     );
 
-    if (!hasQuery) {
+    if (!hasFilter) {
       groups.push({ collection, links: collectionLinks });
       continue;
     }
 
     const matchingLinks = collectionLinks.filter((link) =>
-      matchesSearchQuery(link, collection.name, rawQuery),
+      matchesSearchQuery(link, collection.name, rawQuery, options),
     );
-    const collectionMatchesDirectly = collection.name
-      .toLowerCase()
-      .includes(rawQuery.trim().toLowerCase());
+    const collectionMatchesDirectly =
+      !requireStarred &&
+      normalizedCollectionQuery.length > 0 &&
+      collection.name.toLowerCase().includes(normalizedCollectionQuery);
 
     if (matchingLinks.length > 0 || collectionMatchesDirectly) {
       groups.push({

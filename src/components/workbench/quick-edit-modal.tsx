@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react';
+import { Star, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -11,10 +11,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input, Select, Textarea } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { playDrop, playError } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
 import { triggerAutoTagSingleLink } from '@/lib/tagging/trigger-auto-tag';
 import type { Collection } from '@/lib/types/stash';
+import { cn } from '@/lib/utils/cn';
 import { normalizeInputUrl, parseTagsInput } from '@/lib/utils/url';
 import { useUiStore } from '@/store/ui-store';
 
@@ -34,6 +36,7 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
   const [tagsRaw, setTagsRaw] = useState('');
   const [tagsTouched, setTagsTouched] = useState(false);
   const [collectionId, setCollectionId] = useState('');
+  const [starred, setStarred] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
 
   const isEdit = modal?.mode === 'edit';
@@ -48,12 +51,14 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
       setNote(modal.link.note);
       setTagsRaw(modal.link.tags.join(', '));
       setCollectionId(modal.link.collectionId);
+      setStarred(Boolean(modal.link.starred));
     } else {
       setUrl('');
       setTitle('');
       setNote('');
       setTagsRaw('');
       setCollectionId(modal.defaultCollectionId || collections[0]?.id || '');
+      setStarred(false);
     }
   }, [modal, collections]);
 
@@ -97,6 +102,7 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
         title,
         note,
         tags: parsedTags,
+        starred,
         ...(tagsChanged ? { tagsLocked: true } : {}),
       });
 
@@ -121,6 +127,7 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
       title,
       note,
       tags: parsedTags,
+      ...(starred ? { starred: true } : {}),
       ...(hasManualTags ? { tagsLocked: true } : {}),
     });
 
@@ -273,6 +280,26 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
                 </option>
               ))}
             </Select>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-control border border-border bg-panel/60 px-3 py-2">
+            <label
+              htmlFor="link-starred"
+              className="flex items-center gap-2 text-xs text-fg select-none cursor-pointer"
+            >
+              <Star
+                className={cn(
+                  'h-3.5 w-3.5',
+                  starred ? 'fill-accent text-accent' : 'text-fg-muted',
+                )}
+              />
+              <span>Starred / Highlighted</span>
+            </label>
+            <Switch
+              id="link-starred"
+              checked={starred}
+              onCheckedChange={setStarred}
+            />
           </div>
 
           <DialogFooter className="justify-between">

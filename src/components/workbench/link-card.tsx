@@ -1,17 +1,14 @@
 import { useSortable } from '@dnd-kit/react/sortable';
-import {
-  motion,
-  useMotionTemplate,
-  useMotionValue,
-  useSpring,
-} from 'motion/react';
+import { Star } from 'lucide-react';
+import { motion } from 'motion/react';
 import { memo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { CoverCardBanner } from '@/components/CoverCardBanner';
 import { LinkFavicon } from '@/components/LinkFavicon';
 import { CardActionDrawer } from '@/components/workbench/card-action-drawer';
 import { DropSparks } from '@/components/workbench/drop-sparks';
-import { playDelete, playDrop, playHoverRiffle } from '@/lib/audio/foley';
+import { useCardFoilTilt } from '@/hooks/use-card-foil-tilt';
+import { playDelete, playDrop, playTagPop } from '@/lib/audio/foley';
 import {
   ARCADE_HEADSHAKE_KEYFRAMES,
   ARCADE_HEADSHAKE_TRANSITION,
@@ -19,9 +16,7 @@ import {
   ARCADE_SQUASH_TRANSITION,
   ARCADE_TAG_POP_SPRING,
   computeCascadeDelay,
-  computeFoilTilt,
   FOIL_PERSPECTIVE_PX,
-  FOIL_SPRING_CONFIG,
   isArcadeMotion,
   isTactileMotion,
   TACTILE_SPRING,
@@ -29,6 +24,7 @@ import {
 } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import type {
+  CardDensity,
   CollectionViewMode,
   LinkItem,
   MotionMode,
@@ -41,9 +37,10 @@ interface LinkCardProps {
   link: LinkItem;
   index: number;
   openInNewTab: boolean;
-  compact: boolean;
+  density: CardDensity;
   dragDisabled: boolean;
   motionMode: MotionMode;
+  soundEffects: boolean;
   cascadeActive: boolean;
   hoverPreviews: boolean;
   viewMode?: CollectionViewMode;
@@ -54,9 +51,10 @@ export const LinkCard = memo(function LinkCard({
   link,
   index,
   openInNewTab,
-  compact,
+  density,
   dragDisabled,
   motionMode,
+  soundEffects,
   cascadeActive,
   hoverPreviews,
   viewMode = 'compact',
@@ -78,17 +76,6 @@ export const LinkCard = memo(function LinkCard({
     }
   }, [link.tags]);
 
-  // 3D foil hover MotionValues (zero React state updates on pointer move)
-  const rawRotateX = useMotionValue(0);
-  const rawRotateY = useMotionValue(0);
-  const glareX = useMotionValue(50);
-  const glareY = useMotionValue(50);
-  const glareOpacity = useMotionValue(0);
-
-  const rotateX = useSpring(rawRotateX, FOIL_SPRING_CONFIG);
-  const rotateY = useSpring(rawRotateY, FOIL_SPRING_CONFIG);
-  const glareBackground = useMotionTemplate`radial-gradient(circle at ${glareX}% ${glareY}%, color-mix(in srgb, var(--stash-accent) 20%, transparent) 0%, color-mix(in srgb, var(--stash-accent) 6%, transparent) 38%, transparent 68%)`;
-
   const { ref, isDragging, isDropTarget } = useSortable({
     id: `link:${link.id}`,
     type: 'link',
@@ -106,47 +93,23 @@ export const LinkCard = memo(function LinkCard({
 
   const arcade = isArcadeMotion(motionMode);
   const tactile = isTactileMotion(motionMode);
+  const foil = useCardFoilTilt(arcade, isDragging);
   const isHighlighted = highlightedLinkId === link.id;
   const isSettling = tactile && settledLinkId === link.id;
   const domain = extractDomain(link.url);
 
+  const isStarred = Boolean(link.starred);
+  const isMicro = density === 'micro';
+  const isCompact = density === 'compact';
+  const showNote = density === 'comfortable' && Boolean(link.note);
   const visibleTags = link.tags.slice(0, 3);
+  const showTags = !isMicro && visibleTags.length > 0;
   const hiddenTagCount = Math.max(0, link.tags.length - visibleTags.length);
-
-  // Reset foil tilt cleanly if Arcade mode turns off or card starts dragging
-  useEffect(() => {
-    if (!arcade || isDragging) {
-      rawRotateX.set(0);
-      rawRotateY.set(0);
-      glareOpacity.set(0);
-    }
-  }, [arcade, isDragging, rawRotateX, rawRotateY, glareOpacity]);
-
-  const handlePointerEnter = () => {
-    if (!arcade) return;
-    glareOpacity.set(1);
-    playHoverRiffle();
-  };
-
-  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!arcade) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
-    const relX = (event.clientX - rect.left) / rect.width;
-    const relY = (event.clientY - rect.top) / rect.height;
-    const tilt = computeFoilTilt(relX, relY);
-    rawRotateX.set(tilt.rotateX);
-    rawRotateY.set(tilt.rotateY);
-    glareX.set(tilt.glareX);
-    glareY.set(tilt.glareY);
-  };
-
-  const handlePointerLeave = () => {
-    if (!arcade) return;
-    rawRotateX.set(0);
-    rawRotateY.set(0);
-    glareOpacity.set(0);
-  };
+  const cardPadding = isMicro
+    ? 'gap-1 px-2.5 py-2'
+    : isCompact
+      ? 'gap-1.5 px-2.5 py-2'
+      : 'gap-2 p-3.5';
 
   const handleContextMenu = (event: React.MouseEvent) => {
     event.preventDefault();
@@ -180,6 +143,16 @@ export const LinkCard = memo(function LinkCard({
       },
       preferredSide: 'bottom',
     });
+  };
+
+  const handleToggleStar = async () => {
+    const nextStarred = !isStarred;
+    const result = await stashRepo.updateLink(link.id, {
+      starred: nextStarred,
+    });
+    if (result.ok && nextStarred) {
+      playTagPop(soundEffects, motionMode);
+    }
   };
 
   const handleQuickDelete = async () => {
@@ -263,25 +236,37 @@ export const LinkCard = memo(function LinkCard({
         <div
           aria-hidden="true"
           className={cn(
-            'flex h-full flex-col gap-2 rounded-card border border-dashed border-accent/55 bg-panel/35',
-            compact ? 'p-2.5' : 'p-3.5',
+            'flex h-full flex-col rounded-card border border-dashed border-accent/55 bg-panel/35',
+            cardPadding,
           )}
         >
           <div className="invisible flex items-start gap-2.5 pr-6">
-            <div className="mt-0.5 h-7 w-7 shrink-0" />
+            <div
+              className={cn('mt-0.5 shrink-0', isMicro ? 'h-6 w-6' : 'h-7 w-7')}
+            />
             <div className="min-w-0 flex-1">
-              <div className="line-clamp-2 text-sm font-medium leading-snug">
+              <div
+                className={cn(
+                  'font-medium leading-snug',
+                  isMicro ? 'truncate text-[13px]' : 'line-clamp-2 text-sm',
+                )}
+              >
                 {link.title}
               </div>
-              <div className="mt-0.5 truncate font-mono text-[11px]">
+              <div
+                className={cn(
+                  'mt-0.5 truncate font-mono',
+                  isMicro ? 'text-[10px]' : 'text-[11px]',
+                )}
+              >
                 {domain}
               </div>
             </div>
           </div>
-          {link.note && (
+          {showNote && (
             <p className="invisible line-clamp-1 text-xs">{link.note}</p>
           )}
-          {visibleTags.length > 0 && (
+          {showTags && (
             <div className="invisible mt-auto flex flex-wrap items-center gap-1 pt-0.5">
               {visibleTags.map((tag) => (
                 <span key={tag} className="px-2 py-0.5 font-mono text-[10px]">
@@ -300,12 +285,17 @@ export const LinkCard = memo(function LinkCard({
           whileHover={tactile ? { y: -2 } : undefined}
           whileTap={tactile ? { scale: 0.98 } : undefined}
           transition={cardTransition}
-          style={arcade ? { rotateX, rotateY } : undefined}
-          onPointerEnter={handlePointerEnter}
-          onPointerMove={handlePointerMove}
-          onPointerLeave={handlePointerLeave}
+          style={
+            arcade
+              ? { rotateX: foil.rotateX, rotateY: foil.rotateY }
+              : undefined
+          }
+          onPointerEnter={foil.handlePointerEnter}
+          onPointerMove={foil.handlePointerMove}
+          onPointerLeave={foil.handlePointerLeave}
           className={cn(
             'group relative h-full rounded-card border border-border bg-card transition-colors hover:border-accent/45 hover:bg-card-hover',
+            isStarred && 'stash-card-starred',
             !dragDisabled && 'cursor-grab active:cursor-grabbing',
             isDropTarget && 'border-accent ring-2 ring-accent/40',
             isHighlighted && !arcade && 'stash-duplicate-pulse',
@@ -313,13 +303,37 @@ export const LinkCard = memo(function LinkCard({
             isTagging && arcade && 'border-accent/65',
           )}
         >
+          {/* Starred bottom hardware underglow strip (clipped cleanly to card radius) */}
+          {isStarred && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-[2] overflow-hidden rounded-card"
+            >
+              <div className="stash-card-underglow-strip absolute inset-x-0 bottom-0 h-[2px]" />
+            </div>
+          )}
+
+          {/* Idle Star badge in top-right, fades out cleanly on hover/focus-within */}
+          {isStarred && (
+            <span
+              aria-hidden="true"
+              className={cn(
+                'pointer-events-none absolute right-2 top-2 z-[12] flex items-center justify-center text-accent opacity-90 transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0',
+                viewMode === 'cover' &&
+                  'rounded-full bg-panel/80 p-1 backdrop-blur-xs',
+              )}
+            >
+              <Star className="h-3.5 w-3.5 fill-accent text-accent" />
+            </span>
+          )}
+
           {/* Arcade 3D foil sheen overlay */}
           {arcade && (
             <motion.div
               aria-hidden="true"
               style={{
-                backgroundImage: glareBackground,
-                opacity: glareOpacity,
+                backgroundImage: foil.glareBackground,
+                opacity: foil.glareOpacity,
               }}
               className="pointer-events-none absolute inset-0 z-10 rounded-card transition-opacity duration-150"
             />
@@ -349,11 +363,7 @@ export const LinkCard = memo(function LinkCard({
             onPointerLeave={dismissPreview}
             className={cn(
               'relative z-[1] flex h-full flex-col overflow-hidden rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
-              viewMode === 'cover'
-                ? 'p-0'
-                : compact
-                  ? 'gap-2 p-2.5'
-                  : 'gap-2 p-3.5',
+              viewMode === 'cover' ? 'p-0' : cardPadding,
             )}
           >
             {viewMode === 'cover' ? (
@@ -367,39 +377,61 @@ export const LinkCard = memo(function LinkCard({
 
             <div
               className={cn(
-                'flex flex-1 flex-col gap-2',
-                viewMode === 'cover' && (compact ? 'p-2.5' : 'p-3'),
+                'flex flex-1 flex-col',
+                isMicro ? 'gap-1' : isCompact ? 'gap-1.5' : 'gap-2',
+                viewMode === 'cover' &&
+                  (isMicro || isCompact ? 'px-2.5 py-2' : 'p-3'),
               )}
             >
               {/* Header: Favicon + Title */}
-              <div className="flex items-start gap-2.5 pr-6">
-                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-control border border-border bg-panel">
+              <div
+                className={cn(
+                  'flex items-start pr-6',
+                  isMicro ? 'gap-2' : 'gap-2.5',
+                )}
+              >
+                <div
+                  className={cn(
+                    'mt-0.5 flex shrink-0 items-center justify-center overflow-hidden rounded-control border border-border bg-panel',
+                    isMicro ? 'h-6 w-6' : 'h-7 w-7',
+                  )}
+                >
                   <LinkFavicon
                     url={link.url}
                     faviconUrl={link.faviconUrl}
-                    size="md"
+                    size={isMicro ? 'sm' : 'md'}
                   />
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <div className="line-clamp-2 text-sm font-medium leading-snug text-fg">
+                  <div
+                    className={cn(
+                      'font-medium leading-snug text-fg',
+                      isMicro ? 'truncate text-[13px]' : 'line-clamp-2 text-sm',
+                    )}
+                  >
                     {link.title}
                   </div>
-                  <div className="mt-0.5 truncate font-mono text-[11px] text-fg-muted">
+                  <div
+                    className={cn(
+                      'mt-0.5 truncate font-mono text-fg-muted',
+                      isMicro ? 'text-[10px]' : 'text-[11px]',
+                    )}
+                  >
                     {domain}
                   </div>
                 </div>
               </div>
 
-              {/* Optional "Why I saved this" Note */}
-              {link.note && (
+              {/* Optional "Why I saved this" Note (Comfortable density only) */}
+              {showNote && (
                 <p className="line-clamp-1 text-xs text-fg-muted">
                   {link.note}
                 </p>
               )}
 
-              {/* Optional Tag Pills (newly appearing AI tags pop in with spring) */}
-              {visibleTags.length > 0 && (
+              {/* Optional Tag Pills (Compact & Comfortable densities) */}
+              {showTags && (
                 <div className="mt-auto flex flex-wrap items-center gap-1 pt-0.5">
                   {visibleTags.map((tag) => {
                     const isNewlyAdded = !seenTagsRef.current.has(tag);
@@ -415,7 +447,10 @@ export const LinkCard = memo(function LinkCard({
                         transition={
                           arcade ? ARCADE_TAG_POP_SPRING : TAG_POP_SPRING
                         }
-                        className="rounded-pill border border-border bg-panel px-2 py-0.5 font-mono text-[10px] text-fg-muted"
+                        className={cn(
+                          'rounded-pill border border-border bg-panel py-0.5 font-mono text-[10px] text-fg-muted',
+                          isCompact ? 'px-1.5' : 'px-2',
+                        )}
                       >
                         #{tag}
                       </motion.span>
@@ -431,11 +466,13 @@ export const LinkCard = memo(function LinkCard({
             </div>
           </a>
 
-          {/* Mechanical Edit + Slide-Down Delete Drawer */}
+          {/* Mechanical Star + Edit + Slide-Down Delete Drawer */}
           <CardActionDrawer
             linkTitle={link.title}
+            starred={isStarred}
             motionMode={motionMode}
             onEnterDrawer={dismissPreview}
+            onToggleStar={() => void handleToggleStar()}
             onEdit={() => openEditLink(link)}
             onDelete={() => void handleQuickDelete()}
           />

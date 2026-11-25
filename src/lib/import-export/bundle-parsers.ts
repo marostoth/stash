@@ -85,6 +85,7 @@ export function parseLink(
     note: typeof obj.note === 'string' ? obj.note : '',
     tags: normalizeTags(rawTags),
     tagsLocked: obj.tagsLocked === true ? true : undefined,
+    starred: obj.starred === true ? true : undefined,
     faviconUrl:
       typeof obj.faviconUrl === 'string' && obj.faviconUrl.trim()
         ? obj.faviconUrl.trim()
@@ -219,7 +220,9 @@ export function parseSettings(raw: unknown): StashSettings {
         ? obj.visualPreviewsEnabled
         : DEFAULT_SETTINGS.visualPreviewsEnabled,
     density:
-      obj.density === 'compact' || obj.density === 'comfortable'
+      obj.density === 'micro' ||
+      obj.density === 'compact' ||
+      obj.density === 'comfortable'
         ? obj.density
         : DEFAULT_SETTINGS.density,
     boardWidth:

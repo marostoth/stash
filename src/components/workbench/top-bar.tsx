@@ -5,6 +5,7 @@ import {
   Plus,
   Search,
   Settings,
+  Star,
   X,
 } from 'lucide-react';
 import type * as React from 'react';
@@ -28,6 +29,7 @@ interface TopBarProps {
   activeTheme: ThemeDefinition;
   settings: StashSettings;
   totalLinks: number;
+  starredCount: number;
   openTabsCount: number;
 }
 
@@ -37,10 +39,13 @@ export function TopBar({
   activeTheme,
   settings,
   totalLinks,
+  starredCount,
   openTabsCount,
 }: TopBarProps) {
   const searchQuery = useUiStore((s) => s.searchQuery);
   const setSearchQuery = useUiStore((s) => s.setSearchQuery);
+  const starredOnly = useUiStore((s) => s.starredOnly);
+  const toggleStarredOnly = useUiStore((s) => s.toggleStarredOnly);
   const openCreateCollection = useUiStore((s) => s.openCreateCollection);
   const openSettings = useUiStore((s) => s.openSettings);
 
@@ -91,37 +96,67 @@ export function TopBar({
           )}
         </div>
 
-        {/* Live Search */}
-        <div className="relative flex-1 max-w-xl">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
-            aria-hidden="true"
-          />
-          <input
-            ref={searchInputRef}
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search links, tags, notes..."
-            aria-label="Search links, tags, and notes"
-            className="h-8 w-full rounded-control border border-border bg-canvas pl-8 pr-16 text-xs text-fg placeholder:text-fg-muted/75 transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 [&::-webkit-search-cancel-button]:hidden"
-          />
-          {searchQuery ? (
+        {/* Live Search + Starred Quick Filter */}
+        <div className="flex flex-1 max-w-xl items-center gap-2">
+          <div className="relative flex-1">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
+              aria-hidden="true"
+            />
+            <input
+              ref={searchInputRef}
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search links, tags, notes..."
+              aria-label="Search links, tags, and notes"
+              className="h-8 w-full rounded-control border border-border bg-canvas pl-8 pr-16 text-xs text-fg placeholder:text-fg-muted/75 transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 [&::-webkit-search-cancel-button]:hidden"
+            />
+            {searchQuery ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  searchInputRef.current?.focus();
+                }}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-fg-muted hover:bg-card hover:text-fg cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-border bg-panel px-1.5 py-0.5 font-mono text-[10px] text-fg-muted">
+                Ctrl+K
+              </kbd>
+            )}
+          </div>
+
+          {(starredCount > 0 || starredOnly) && (
             <button
               type="button"
-              onClick={() => {
-                setSearchQuery('');
-                searchInputRef.current?.focus();
-              }}
-              aria-label="Clear search"
-              className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-fg-muted hover:bg-card hover:text-fg cursor-pointer"
+              onClick={toggleStarredOnly}
+              aria-pressed={starredOnly}
+              aria-label={
+                starredOnly
+                  ? 'Show all links (clear Starred filter)'
+                  : `Filter to ${starredCount} starred link${starredCount === 1 ? '' : 's'}`
+              }
+              title={
+                starredOnly
+                  ? 'Showing starred links only (Esc to clear)'
+                  : 'Filter starred links'
+              }
+              className={cn(
+                'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-control border px-2.5 text-xs font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+                starredOnly
+                  ? 'border-accent/65 bg-accent/15 text-accent'
+                  : 'border-border bg-canvas text-fg-muted hover:border-accent/45 hover:text-fg',
+              )}
             >
-              <X className="h-3.5 w-3.5" />
+              <Star className="h-3.5 w-3.5 fill-accent text-accent" />
+              <span className="hidden sm:inline">Starred</span>
+              <span className="font-mono text-[11px]">{starredCount}</span>
             </button>
-          ) : (
-            <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-border bg-panel px-1.5 py-0.5 font-mono text-[10px] text-fg-muted">
-              Ctrl+K
-            </kbd>
           )}
         </div>
 

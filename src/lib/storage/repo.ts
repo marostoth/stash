@@ -69,17 +69,7 @@ import {
   normalizeUrlForComparison,
 } from '@/lib/utils/url';
 
-export type {
-  AddLinkInput,
-  AddLinkResult,
-  CreateCollectionInput,
-  MoveLinkResult,
-  SaveSessionResult,
-  StashSnapshot,
-  UpdateCollectionInput,
-  UpdateLinkInput,
-  UpdateLinkResult,
-} from '@/lib/storage/repo-types';
+export type * from '@/lib/storage/repo-types';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -257,6 +247,7 @@ export const stashRepo = {
       note: input.note?.trim() ?? '',
       tags: normalizeTags(input.tags ?? []),
       ...(input.tagsLocked === true ? { tagsLocked: true } : {}),
+      ...(input.starred === true ? { starred: true } : {}),
       faviconUrl: input.faviconUrl?.trim() || undefined,
       order: 0,
       createdAt: timestamp,
@@ -310,6 +301,13 @@ export const stashRepo = {
           : undefined
         : current.tagsLocked;
 
+    const nextStarred =
+      patch.starred !== undefined
+        ? patch.starred
+          ? true
+          : undefined
+        : current.starred;
+
     const updated: LinkItem = {
       ...current,
       collectionId: targetCollectionId,
@@ -321,6 +319,7 @@ export const stashRepo = {
       note: patch.note !== undefined ? patch.note.trim() : current.note,
       tags: patch.tags !== undefined ? normalizeTags(patch.tags) : current.tags,
       tagsLocked: nextTagsLocked,
+      starred: nextStarred,
       faviconUrl:
         patch.faviconUrl !== undefined
           ? patch.faviconUrl.trim() || undefined

@@ -249,6 +249,60 @@ html[data-theme-mode="dark"][data-backdrop="vignette"] .stash-backdrop {
     color-mix(in srgb, var(--collection-tint) 76%, transparent);
 }
 
+/* Theme-aware hardware underglow for starred link cards */
+.stash-card-starred {
+  border-color: color-mix(
+    in srgb,
+    var(--stash-accent) 55%,
+    var(--stash-border)
+  );
+  background-color: color-mix(
+    in srgb,
+    var(--stash-accent) 6%,
+    var(--stash-card)
+  );
+  box-shadow: 0 6px 20px -8px
+    color-mix(in srgb, var(--stash-accent) 45%, transparent);
+}
+
+.stash-card-starred:hover {
+  border-color: color-mix(
+    in srgb,
+    var(--stash-accent) 72%,
+    var(--stash-border)
+  );
+  background-color: color-mix(
+    in srgb,
+    var(--stash-accent) 9%,
+    var(--stash-card-hover)
+  );
+}
+
+html[data-theme-mode="light"] .stash-card-starred {
+  box-shadow: 0 6px 18px -9px
+    color-mix(in srgb, var(--stash-accent) 28%, transparent);
+}
+
+.stash-card-underglow-strip {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--stash-accent) 22%, transparent) 0%,
+    color-mix(in srgb, var(--stash-accent) 92%, transparent) 50%,
+    color-mix(in srgb, var(--stash-accent) 22%, transparent) 100%
+  );
+  box-shadow: 0 0 8px color-mix(in srgb, var(--stash-accent) 55%, transparent);
+}
+
+html[data-theme-mode="light"] .stash-card-underglow-strip {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--stash-accent) 18%, transparent) 0%,
+    color-mix(in srgb, var(--stash-accent) 78%, transparent) 50%,
+    color-mix(in srgb, var(--stash-accent) 18%, transparent) 100%
+  );
+  box-shadow: 0 0 6px color-mix(in srgb, var(--stash-accent) 30%, transparent);
+}
+
 @keyframes stash-indeterminate-slide {
   0% {
     transform: translate3d(-100%, 0, 0);

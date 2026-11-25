@@ -6,7 +6,11 @@ import {
 } from '@/components/settings/settings-section-card';
 import { Select } from '@/components/ui/input';
 import { stashRepo } from '@/lib/storage/repo';
-import type { BoardWidthMode, StashSettings } from '@/lib/types/stash';
+import type {
+  BoardWidthMode,
+  CardDensity,
+  StashSettings,
+} from '@/lib/types/stash';
 
 interface GeneralPanelProps {
   settings: StashSettings;
@@ -30,16 +34,28 @@ export function GeneralPanel({ settings, settingsOpen }: GeneralPanelProps) {
             }
           />
 
-          <SettingsToggleRow
-            id="settings-compact-density"
-            label="Compact card density"
-            checked={settings.density === 'compact'}
-            onCheckedChange={(checked) =>
-              void stashRepo.updateSettings({
-                density: checked ? 'compact' : 'comfortable',
-              })
-            }
-          />
+          <div className="flex items-center justify-between gap-3 py-1">
+            <label
+              htmlFor="settings-card-density"
+              className="text-xs text-fg select-none"
+            >
+              Card density
+            </label>
+            <Select
+              id="settings-card-density"
+              value={settings.density}
+              onChange={(e) =>
+                void stashRepo.updateSettings({
+                  density: e.target.value as CardDensity,
+                })
+              }
+              className="h-8 w-36 text-xs"
+            >
+              <option value="micro">Micro</option>
+              <option value="compact">Compact</option>
+              <option value="comfortable">Comfortable</option>
+            </Select>
+          </div>
 
           <div className="flex items-center justify-between gap-3 py-1">
             <label

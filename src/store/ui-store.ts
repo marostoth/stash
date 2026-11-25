@@ -33,6 +33,7 @@ export interface PreviewTarget {
 
 interface UiStoreState {
   searchQuery: string;
+  starredOnly: boolean;
   collectionModal: CollectionModalState;
   linkModal: LinkModalState;
   settingsOpen: boolean;
@@ -47,6 +48,8 @@ interface UiStoreState {
   hoveredPreviewCandidate: PreviewTarget | null;
   activePreview: PreviewTarget | null;
   setSearchQuery: (query: string) => void;
+  setStarredOnly: (starredOnly: boolean) => void;
+  toggleStarredOnly: () => void;
   openCreateCollection: () => void;
   openEditCollection: (collection: Collection) => void;
   closeCollectionModal: () => void;
@@ -89,6 +92,7 @@ function clearPreviewTimer(): void {
 
 export const useUiStore = create<UiStoreState>((set) => ({
   searchQuery: '',
+  starredOnly: false,
   collectionModal: null,
   linkModal: null,
   settingsOpen: false,
@@ -104,6 +108,9 @@ export const useUiStore = create<UiStoreState>((set) => ({
   activePreview: null,
 
   setSearchQuery: (query) => set({ searchQuery: query }),
+  setStarredOnly: (starredOnly) => set({ starredOnly }),
+  toggleStarredOnly: () =>
+    set((state) => ({ starredOnly: !state.starredOnly })),
 
   openCreateCollection: () => {
     clearPreviewTimer();
