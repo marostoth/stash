@@ -12,9 +12,10 @@ import { Button } from '@/components/ui/button';
 import { DetailsRow } from '@/components/workbench/details-row';
 import { stashRepo } from '@/lib/storage/repo';
 import type { LinkItem, MotionMode } from '@/lib/types/stash';
+import { cn } from '@/lib/utils/cn';
 import { normalizeStoreName } from '@/lib/utils/product-url';
 
-export type DetailsSortColumn = 'starred' | 'title' | 'store' | 'price';
+export type DetailsSortColumn = 'starred' | 'title' | 'context' | 'price';
 
 export interface DetailsSortState {
   column: DetailsSortColumn;
@@ -24,9 +25,16 @@ export interface DetailsSortState {
 export function sortDetailsLinks(
   items: readonly LinkItem[],
   sort: DetailsSortState | null,
+  options?: {
+    contextMode?: 'store' | 'collection';
+    collectionNameById?: ReadonlyMap<string, string>;
+  },
 ): LinkItem[] {
   if (!sort) return [...items];
   const factor = sort.dir === 'asc' ? 1 : -1;
+  const contextMode = options?.contextMode ?? 'store';
+  const collectionNameById = options?.collectionNameById;
+
   return [...items].sort((a, b) => {
     switch (sort.column) {
       case 'starred': {
@@ -37,10 +45,16 @@ export function sortDetailsLinks(
       }
       case 'title':
         return a.title.localeCompare(b.title) * factor;
-      case 'store': {
-        const as = normalizeStoreName(a.url, a.product?.store);
-        const bs = normalizeStoreName(b.url, b.product?.store);
-        return as.localeCompare(bs) * factor;
+      case 'context': {
+        const ac =
+          contextMode === 'collection'
+            ? (collectionNameById?.get(a.collectionId) ?? '')
+            : normalizeStoreName(a.url, a.product?.store);
+        const bc =
+          contextMode === 'collection'
+            ? (collectionNameById?.get(b.collectionId) ?? '')
+            : normalizeStoreName(b.url, b.product?.store);
+        return ac.localeCompare(bc) * factor;
       }
       case 'price': {
         const ap = a.product?.price;
@@ -48,7 +62,15 @@ export function sortDetailsLinks(
         if (ap === undefined && bp === undefined) return 0;
         if (ap === undefined) return 1;
         if (bp === undefined) return -1;
-        return (ap - bp) * factor;
+        const aq =
+          typeof a.product?.orderQty === 'number' && a.product.orderQty >= 1
+            ? Math.floor(a.product.orderQty)
+            : 1;
+        const bq =
+          typeof b.product?.orderQty === 'number' && b.product.orderQty >= 1
+            ? Math.floor(b.product.orderQty)
+            : 1;
+        return (ap * aq - bp * bq) * factor;
       }
       default:
         return 0;
@@ -132,6 +154,7 @@ export interface StoreGroupSummary {
 
 interface DetailsStoreSectionProps {
   group: StoreGroupSummary;
+  collectionNameById: ReadonlyMap<string, string>;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onOpenStoreStarred: () => void;
@@ -147,6 +170,7 @@ interface DetailsStoreSectionProps {
 
 export function DetailsStoreSection({
   group,
+  collectionNameById,
   collapsed,
   onToggleCollapse,
   onOpenStoreStarred,
@@ -179,7 +203,7 @@ export function DetailsStoreSection({
           <span className="font-mono text-[10px] text-fg-muted">
             · {group.items.length} item{group.items.length === 1 ? '' : 's'}
           </span>
-          {group.totalText && (
+          {collapsed && group.totalText && (
             <span className="rounded-pill border border-border bg-canvas px-2 py-0.25 font-mono text-[10px] text-fg">
               Total {group.totalText}
             </span>
@@ -220,6 +244,7 @@ export function DetailsStoreSection({
               <DetailsRow
                 key={link.id}
                 link={link}
+                contextLabel={collectionNameById.get(link.collectionId) ?? '—'}
                 showPriceColumn={showPriceColumn}
                 defaultCurrency={defaultCurrency}
                 openInNewTab={openInNewTab}
@@ -230,6 +255,28 @@ export function DetailsStoreSection({
               />
             ))}
           </div>
+          {showPriceColumn && group.totalText && (
+            <div
+              className={cn(
+                'grid items-center gap-3.5 border-t border-border/80 bg-panel/45 px-3 py-1.5 font-mono text-[11px]',
+                gridTemplateClass,
+              )}
+            >
+              <span
+                aria-hidden="true"
+                className="col-span-5 max-lg:col-span-4 max-md:col-span-3"
+              />
+              <div className="col-span-2 flex items-center justify-end gap-2.5 whitespace-nowrap">
+                <span className="text-[10px] uppercase tracking-wider text-fg-muted">
+                  Subtotal
+                </span>
+                <strong className="font-semibold text-fg tabular-nums">
+                  {group.totalText}
+                </strong>
+              </div>
+              <span aria-hidden="true" />
+            </div>
+          )}
         </div>
       )}
     </section>

@@ -72,7 +72,9 @@ export function QuickEditModal({
       setProductDraft(
         createProductFormDraft(modal.link.product, defaultCurrency),
       );
-      setProductOpen(Boolean(modal.link.product));
+      setProductOpen(
+        Boolean(modal.link.product) || Boolean(modal.expandProduct),
+      );
     } else {
       setUrl('');
       setTitle('');

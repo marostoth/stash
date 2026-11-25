@@ -18,6 +18,7 @@ const QTY_SAVE_DEBOUNCE_MS = 250;
 
 interface DetailsRowProps {
   link: LinkItem;
+  contextLabel?: string;
   showPriceColumn: boolean;
   defaultCurrency: string;
   openInNewTab: boolean;
@@ -40,6 +41,7 @@ function formatCapturedDate(iso?: string): string {
 
 export const DetailsRow = memo(function DetailsRow({
   link,
+  contextLabel,
   showPriceColumn,
   defaultCurrency,
   openInNewTab,
@@ -93,11 +95,22 @@ export const DetailsRow = memo(function DetailsRow({
   }, [link.id]);
 
   const storeName = normalizeStoreName(link.url, product?.store);
+  const resolvedContext = contextLabel ?? storeName;
   const specOrNote = product?.spec || link.note || '';
   const visibleTags = link.tags.slice(0, 2);
   const capturedLabel = formatCapturedDate(product?.capturedAt);
+  const resolvedCurrency = normalizeCurrencyCode(
+    product?.currency,
+    defaultCurrency,
+  );
+  const unitPrice =
+    hasPrice && product?.price !== undefined ? product.price : undefined;
+  const linePrice =
+    unitPrice !== undefined
+      ? Math.round(unitPrice * displayQty * 100) / 100
+      : undefined;
 
-  const priceTooltip =
+  const sourceLabel =
     product?.source === 'manual'
       ? capturedLabel
         ? `Manual entry · ${capturedLabel}`
@@ -107,6 +120,11 @@ export const DetailsRow = memo(function DetailsRow({
         : product?.source === 'ai'
           ? 'AI-extracted price'
           : 'Auto-extracted price';
+
+  const priceTooltip =
+    unitPrice !== undefined && displayQty > 1
+      ? `${formatPrice(unitPrice, resolvedCurrency, product?.priceIsEstimate)} × ${displayQty} · ${sourceLabel}`
+      : sourceLabel;
 
   const handleToggleStar = async () => {
     const nextStarred = !isStarred;
@@ -181,7 +199,7 @@ export const DetailsRow = memo(function DetailsRow({
     <div
       data-link-id={link.id}
       className={cn(
-        'group relative grid min-h-[36px] items-center gap-2 border-b border-border/60 px-2.5 py-1 text-xs transition-colors last:border-b-0 hover:bg-card-hover/80',
+        'group relative grid min-h-[38px] items-center gap-3.5 border-b border-border/60 px-3 py-1 text-xs transition-colors last:border-b-0 hover:bg-card-hover/80',
         gridTemplateClass,
         isStarred && 'bg-accent/[0.06]',
         isKeyboardFocused && 'bg-accent/10 ring-1 ring-inset ring-accent/70',
@@ -235,44 +253,7 @@ export const DetailsRow = memo(function DetailsRow({
         </span>
       </a>
 
-      {/* 3. Store */}
-      <span className="truncate font-mono text-[11px] text-fg-muted">
-        {storeName}
-      </span>
-
-      {/* 4. Price (auto-hidden if Space has zero priced items) */}
-      {showPriceColumn && (
-        <div
-          title={hasPrice ? priceTooltip : undefined}
-          className="flex items-center justify-end gap-1 font-mono text-[11px] tabular-nums"
-        >
-          {hasPrice && product?.price !== undefined ? (
-            <>
-              {product.source === 'manual' && (
-                <PenLine
-                  className="h-3 w-3 shrink-0 text-fg-muted/70"
-                  aria-label="Manual price entry"
-                />
-              )}
-              <span
-                className={cn(
-                  isStarred ? 'font-semibold text-fg' : 'text-fg/90',
-                )}
-              >
-                {formatPrice(
-                  product.price,
-                  normalizeCurrencyCode(product.currency, defaultCurrency),
-                  product.priceIsEstimate,
-                )}
-              </span>
-            </>
-          ) : (
-            <span className="text-fg-muted/50">—</span>
-          )}
-        </div>
-      )}
-
-      {/* 5. Spec / Note */}
+      {/* 3. Spec / Note */}
       <span
         title={specOrNote || undefined}
         className="hidden truncate text-[11px] text-fg-muted md:block"
@@ -280,7 +261,15 @@ export const DetailsRow = memo(function DetailsRow({
         {specOrNote || '—'}
       </span>
 
-      {/* 6. Tags */}
+      {/* 4. Context (Store when grouped by Collection, Collection when grouped by Store) */}
+      <span
+        title={resolvedContext}
+        className="truncate font-mono text-[11px] text-fg-muted"
+      >
+        {resolvedContext}
+      </span>
+
+      {/* 5. Tags */}
       <div className="hidden items-center gap-1 overflow-hidden lg:flex">
         {visibleTags.map((tag) => (
           <span
@@ -292,56 +281,101 @@ export const DetailsRow = memo(function DetailsRow({
         ))}
       </div>
 
-      {/* 7. Persistent Qty Stepper (on all priced rows) & Hover Actions */}
-      <div className="flex items-center justify-end gap-1">
-        {showPriceColumn && hasPrice && (
-          <div
-            className="inline-flex items-center rounded border border-border bg-panel/90 font-mono text-[10px]"
-            title="Order quantity"
-          >
-            <button
-              type="button"
-              onClick={() => handleChangeQty(-1)}
-              disabled={displayQty <= 1}
-              aria-label={`Decrease quantity for ${link.title}`}
-              className="inline-flex h-5 w-5 items-center justify-center text-fg-muted transition-colors hover:bg-card hover:text-fg disabled:opacity-35 cursor-pointer disabled:cursor-default"
+      {/* 6. Qty Stepper (before Price so Price updates dynamically beside it) */}
+      {showPriceColumn && (
+        <div className="flex items-center justify-center">
+          {hasPrice ? (
+            <div
+              className="inline-flex items-center rounded border border-border bg-panel/90 font-mono text-[10px]"
+              title="Order quantity"
             >
-              <Minus className="h-2.5 w-2.5" />
-            </button>
-            <span className="min-w-[18px] px-1 text-center text-fg tabular-nums">
-              {displayQty}
-            </span>
-            <button
-              type="button"
-              onClick={() => handleChangeQty(1)}
-              aria-label={`Increase quantity for ${link.title}`}
-              className="inline-flex h-5 w-5 items-center justify-center text-fg-muted transition-colors hover:bg-card hover:text-fg cursor-pointer"
-            >
-              <Plus className="h-2.5 w-2.5" />
-            </button>
-          </div>
-        )}
-
-        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-          <button
-            type="button"
-            onClick={() => openEditLink(link)}
-            aria-label={`Edit ${link.title}`}
-            title="Quick edit"
-            className="inline-flex h-6 w-6 items-center justify-center rounded text-fg-muted transition-colors hover:bg-panel hover:text-fg cursor-pointer"
-          >
-            <Pencil className="h-3 w-3" />
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleDelete()}
-            aria-label={`Delete ${link.title}`}
-            title="Delete link (Undo available)"
-            className="inline-flex h-6 w-6 items-center justify-center rounded text-fg-muted transition-colors hover:bg-danger/15 hover:text-danger cursor-pointer"
-          >
-            <Trash2 className="h-3 w-3" />
-          </button>
+              <button
+                type="button"
+                onClick={() => handleChangeQty(-1)}
+                disabled={displayQty <= 1}
+                aria-label={`Decrease quantity for ${link.title}`}
+                className="inline-flex h-5 w-5 items-center justify-center text-fg-muted transition-colors hover:bg-card hover:text-fg disabled:opacity-35 cursor-pointer disabled:cursor-default"
+              >
+                <Minus className="h-2.5 w-2.5" />
+              </button>
+              <span className="min-w-[18px] px-1 text-center text-fg tabular-nums">
+                {displayQty}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleChangeQty(1)}
+                aria-label={`Increase quantity for ${link.title}`}
+                className="inline-flex h-5 w-5 items-center justify-center text-fg-muted transition-colors hover:bg-card hover:text-fg cursor-pointer"
+              >
+                <Plus className="h-2.5 w-2.5" />
+              </button>
+            </div>
+          ) : (
+            <span className="font-mono text-[11px] text-fg-muted/40">—</span>
+          )}
         </div>
+      )}
+
+      {/* 7. Price (unitPrice × qty; click '—' to add a price in Quick Edit) */}
+      {showPriceColumn && (
+        <div
+          title={hasPrice ? priceTooltip : undefined}
+          className="flex items-center justify-end gap-1 font-mono text-[11px] tabular-nums"
+        >
+          {linePrice !== undefined && product ? (
+            <>
+              {product.source === 'manual' && (
+                <PenLine
+                  className="h-3 w-3 shrink-0 text-fg-muted/70"
+                  aria-label="Manual price entry"
+                />
+              )}
+              <span
+                className={cn(
+                  isStarred ? 'font-semibold text-fg' : 'text-fg/95',
+                )}
+              >
+                {formatPrice(
+                  linePrice,
+                  resolvedCurrency,
+                  product.priceIsEstimate,
+                )}
+              </span>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => openEditLink(link, { expandProduct: true })}
+              title="Click to add price"
+              aria-label={`Add price for ${link.title}`}
+              className="rounded px-1.5 py-0.5 text-fg-muted/50 transition-colors hover:bg-panel hover:text-accent cursor-pointer"
+            >
+              —
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 8. Hover Actions */}
+      <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+        <button
+          type="button"
+          onClick={() => openEditLink(link)}
+          aria-label={`Edit ${link.title}`}
+          title="Quick edit"
+          className="inline-flex h-6 w-6 items-center justify-center rounded text-fg-muted transition-colors hover:bg-panel hover:text-fg cursor-pointer"
+        >
+          <Pencil className="h-3 w-3" />
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleDelete()}
+          aria-label={`Delete ${link.title}`}
+          title="Delete link (Undo available)"
+          className="inline-flex h-6 w-6 items-center justify-center rounded text-fg-muted transition-colors hover:bg-danger/15 hover:text-danger cursor-pointer"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
       </div>
     </div>
   );

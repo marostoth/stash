@@ -40,7 +40,7 @@ export type SettingsTab =
 
 export type LinkModalState =
   | { mode: 'create'; defaultCollectionId: string }
-  | { mode: 'edit'; link: LinkItem }
+  | { mode: 'edit'; link: LinkItem; expandProduct?: boolean }
   | null;
 
 export type CollectionModalState =
@@ -99,7 +99,7 @@ interface UiStoreState {
   openEditCollection: (collection: Collection) => void;
   closeCollectionModal: () => void;
   openCreateLink: (collectionId: string) => void;
-  openEditLink: (link: LinkItem) => void;
+  openEditLink: (link: LinkItem, options?: { expandProduct?: boolean }) => void;
   closeLinkModal: () => void;
   openSettings: (tab?: SettingsTab) => void;
   setSettingsTab: (tab: SettingsTab) => void;
@@ -209,10 +209,14 @@ export const useUiStore = create<UiStoreState>((set) => ({
       activePreview: null,
     });
   },
-  openEditLink: (link) => {
+  openEditLink: (link, options) => {
     clearPreviewTimer();
     set({
-      linkModal: { mode: 'edit', link },
+      linkModal: {
+        mode: 'edit',
+        link,
+        expandProduct: options?.expandProduct,
+      },
       hoveredPreviewCandidate: null,
       activePreview: null,
     });

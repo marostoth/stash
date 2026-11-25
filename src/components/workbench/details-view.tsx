@@ -81,6 +81,12 @@ export function DetailsView({
     () => new Map(spaces.map((s) => [s.id, s])),
     [spaces],
   );
+  const collectionNameById = useMemo(
+    () => new Map(groups.map((g) => [g.collection.id, g.collection.name])),
+    [groups],
+  );
+  const contextMode: 'store' | 'collection' =
+    groupBy === 'store' ? 'collection' : 'store';
 
   const allLinks = useMemo(() => groups.flatMap((g) => g.links), [groups]);
   const showPriceColumn = useMemo(
@@ -94,8 +100,8 @@ export function DetailsView({
   );
 
   const gridTemplateClass = showPriceColumn
-    ? 'grid-cols-[26px_minmax(180px,2.1fr)_minmax(96px,0.9fr)_94px_minmax(0,1.4fr)_minmax(0,1fr)_124px] max-lg:grid-cols-[26px_minmax(160px,2fr)_minmax(90px,0.9fr)_90px_minmax(0,1.2fr)_118px] max-md:grid-cols-[26px_minmax(140px,1.8fr)_88px_84px_110px]'
-    : 'grid-cols-[26px_minmax(180px,2.2fr)_minmax(100px,0.95fr)_minmax(0,1.5fr)_minmax(0,1.1fr)_64px] max-lg:grid-cols-[26px_minmax(160px,2fr)_minmax(96px,0.95fr)_minmax(0,1.3fr)_60px] max-md:grid-cols-[26px_minmax(140px,1.8fr)_90px_56px]';
+    ? 'grid-cols-[26px_minmax(180px,2.2fr)_minmax(100px,1.2fr)_minmax(96px,0.9fr)_minmax(88px,1fr)_76px_96px_56px] max-lg:grid-cols-[26px_minmax(160px,2fr)_minmax(96px,1.1fr)_minmax(88px,0.9fr)_72px_92px_56px] max-md:grid-cols-[26px_minmax(130px,1.8fr)_minmax(76px,0.8fr)_70px_86px_52px]'
+    : 'grid-cols-[26px_minmax(180px,2.2fr)_minmax(110px,1.4fr)_minmax(96px,0.95fr)_minmax(90px,1.1fr)_56px] max-lg:grid-cols-[26px_minmax(160px,2fr)_minmax(100px,1.3fr)_minmax(90px,0.95fr)_56px] max-md:grid-cols-[26px_minmax(140px,1.8fr)_90px_52px]';
 
   const cycleSort = (column: DetailsSortColumn) => {
     setSort((prev) => {
@@ -117,7 +123,7 @@ export function DetailsView({
   const renderTableHeader = () => (
     <div
       className={cn(
-        'grid items-center gap-2 border-b border-border bg-panel/85 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wider text-fg-muted select-none',
+        'grid items-center gap-3.5 border-b border-border bg-panel/85 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-fg-muted select-none',
         gridTemplateClass,
       )}
     >
@@ -137,14 +143,17 @@ export function DetailsView({
         <span>Item</span>
         {renderSortIcon('title')}
       </button>
+      <span className="hidden md:block">Spec / Note</span>
       <button
         type="button"
-        onClick={() => cycleSort('store')}
+        onClick={() => cycleSort('context')}
         className="inline-flex items-center gap-1 text-left hover:text-fg cursor-pointer"
       >
-        <span>Store</span>
-        {renderSortIcon('store')}
+        <span>{contextMode === 'collection' ? 'Collection' : 'Store'}</span>
+        {renderSortIcon('context')}
       </button>
+      <span className="hidden lg:block">Tags</span>
+      {showPriceColumn && <span className="text-center">Qty</span>}
       {showPriceColumn && (
         <button
           type="button"
@@ -155,11 +164,7 @@ export function DetailsView({
           {renderSortIcon('price')}
         </button>
       )}
-      <span className="hidden md:block">Spec / Note</span>
-      <span className="hidden lg:block">Tags</span>
-      <span className="text-right">
-        {showPriceColumn ? 'Qty / Act' : 'Act'}
-      </span>
+      <span aria-hidden="true" />
     </div>
   );
 
@@ -177,7 +182,10 @@ export function DetailsView({
         const starredItems = items.filter((l) => l.starred === true);
         return {
           storeName,
-          items: sortDetailsLinks(items, sort),
+          items: sortDetailsLinks(items, sort, {
+            contextMode: 'collection',
+            collectionNameById,
+          }),
           starredItems,
           totalText: formatCurrencySummaries(
             summarizePrices(items, defaultCurrency),
@@ -193,7 +201,7 @@ export function DetailsView({
         if (aHasStar !== bHasStar) return bHasStar - aHasStar;
         return a.storeName.localeCompare(b.storeName);
       });
-  }, [allLinks, defaultCurrency, groupBy, sort]);
+  }, [allLinks, collectionNameById, defaultCurrency, groupBy, sort]);
 
   const spaceTotals = useMemo(
     () => summarizePrices(allLinks, defaultCurrency),
@@ -241,6 +249,7 @@ export function DetailsView({
               <DetailsStoreSection
                 key={group.storeName}
                 group={group}
+                collectionNameById={collectionNameById}
                 collapsed={collapsed}
                 onToggleCollapse={() =>
                   setCollapsedStores((prev) => ({
@@ -267,7 +276,9 @@ export function DetailsView({
           })
         : groups.map(({ collection, links: colLinks }) => {
             const isCollapsed = collection.collapsed && !isFiltering;
-            const sortedLinks = sortDetailsLinks(colLinks, sort);
+            const sortedLinks = sortDetailsLinks(colLinks, sort, {
+              contextMode: 'store',
+            });
             const CuratedIcon = getCuratedCollectionIcon(collection.icon);
             const colorHex =
               collection.tintColor ?? TAB_GROUP_COLOR_SWATCH[collection.color];
@@ -322,9 +333,9 @@ export function DetailsView({
                       </span>
                     </button>
 
-                    {totalText && (
+                    {isCollapsed && totalText && (
                       <span className="rounded-pill border border-border bg-canvas px-2 py-0.25 font-mono text-[10px] text-fg">
-                        {totalText}
+                        Total {totalText}
                       </span>
                     )}
                     {totalText && colStarred.length > 0 && (
@@ -392,6 +403,28 @@ export function DetailsView({
                             />
                           ))}
                         </div>
+                        {showPriceColumn && totalText && (
+                          <div
+                            className={cn(
+                              'grid items-center gap-3.5 border-t border-border/80 bg-panel/45 px-3 py-1.5 font-mono text-[11px]',
+                              gridTemplateClass,
+                            )}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="col-span-5 max-lg:col-span-4 max-md:col-span-3"
+                            />
+                            <div className="col-span-2 flex items-center justify-end gap-2.5 whitespace-nowrap">
+                              <span className="text-[10px] uppercase tracking-wider text-fg-muted">
+                                Subtotal
+                              </span>
+                              <strong className="font-semibold text-fg tabular-nums">
+                                {totalText}
+                              </strong>
+                            </div>
+                            <span aria-hidden="true" />
+                          </div>
+                        )}
                       </>
                     ) : (
                       <div className="px-3 py-4 text-center text-xs text-fg-muted">
@@ -404,16 +437,24 @@ export function DetailsView({
             );
           })}
 
-      {/* Details Space Summary Footer */}
+      {/* Details Space Summary Footer (aligned directly under the Price column) */}
       {showPriceColumn && spaceTotalText && (
-        <footer className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-border bg-panel/90 px-3.5 py-2 font-mono text-[11px]">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="text-fg-muted">
-              Space Total:{' '}
-              <strong className="font-semibold text-fg">
-                {spaceTotalText}
-              </strong>
-            </span>
+        <footer
+          className={cn(
+            'grid items-center gap-3.5 rounded-card border border-border bg-panel/90 px-3 py-2 font-mono text-[11px]',
+            gridTemplateClass,
+          )}
+        >
+          <div className="col-span-5 flex flex-wrap items-center gap-3 max-lg:col-span-4 max-md:col-span-3">
+            {starredAll.length > 0 && (
+              <div className="flex items-center gap-1.5 text-accent">
+                <Star className="h-3 w-3 fill-accent" />
+                <span>
+                  Starred ({starredAll.length}):{' '}
+                  <strong>{starredTotalText || '—'}</strong>
+                </span>
+              </div>
+            )}
             {unpricedCount > 0 && (
               <span className="text-[10px] text-fg-muted/85">
                 + {unpricedCount} unpriced
@@ -421,15 +462,16 @@ export function DetailsView({
             )}
           </div>
 
-          {starredAll.length > 0 && (
-            <div className="flex items-center gap-1.5 text-accent">
-              <Star className="h-3 w-3 fill-accent" />
-              <span>
-                Starred Total ({starredAll.length}):{' '}
-                <strong>{starredTotalText || '—'}</strong>
-              </span>
-            </div>
-          )}
+          <div className="col-span-2 flex items-center justify-end gap-2.5 whitespace-nowrap">
+            <span className="text-[10px] uppercase tracking-wider text-fg-muted">
+              Space Total
+            </span>
+            <strong className="font-semibold text-fg tabular-nums">
+              {spaceTotalText}
+            </strong>
+          </div>
+
+          <span aria-hidden="true" />
         </footer>
       )}
     </div>
