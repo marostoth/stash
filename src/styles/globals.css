@@ -362,3 +362,10 @@ html[data-motion="off"] .stash-phosphor-scan-beam {
     transform: none;
   }
 }
+
+/* Pause all CSS animations when the Stash tab is hidden (0% idle background CPU) */
+html[data-page-hidden="true"] *,
+html[data-page-hidden="true"] *::before,
+html[data-page-hidden="true"] *::after {
+  animation-play-state: paused;
+}

@@ -50,7 +50,7 @@ export function CardActionDrawer({
       onPointerLeave={() => setExpanded(false)}
       className="absolute right-1.5 top-1.5 z-20 flex flex-col items-end opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
     >
-      <div className="flex flex-col overflow-hidden rounded-control border border-border/80 bg-panel/95 shadow-md backdrop-blur-xs">
+      <div className="flex flex-col overflow-hidden rounded-control border border-border/80 bg-panel/95 shadow-md">
         <div className="flex items-center">
           <button
             type="button"

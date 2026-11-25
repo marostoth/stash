@@ -324,8 +324,7 @@ export const LinkCard = memo(function LinkCard({
               aria-hidden="true"
               className={cn(
                 'pointer-events-none absolute right-2 top-2 z-[12] flex items-center justify-center text-accent opacity-90 transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0',
-                viewMode === 'cover' &&
-                  'rounded-full bg-panel/80 p-1 backdrop-blur-xs',
+                viewMode === 'cover' && 'rounded-full bg-panel/95 p-1',
               )}
             >
               <Star className="h-3.5 w-3.5 fill-accent text-accent" />

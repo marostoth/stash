@@ -51,7 +51,7 @@ export function OdometerCounter({
                 animate={{ y: '0%', opacity: 1 }}
                 exit={{ y: direction > 0 ? '-90%' : '90%', opacity: 0 }}
                 transition={TACTILE_SPRING}
-                className="inline-block will-change-transform"
+                className="inline-block"
               >
                 {char}
               </motion.span>

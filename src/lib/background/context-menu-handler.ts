@@ -11,10 +11,17 @@ const COMMAND_QUICK_STASH = 'quick-stash-active-tab';
 const BADGE_SAVED_COLOR = '#00D68F';
 const BADGE_DUP_COLOR = '#94A3B8';
 const BADGE_FLASH_MS = 2000;
+const badgeResetTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function flashActionBadge(text: string, color: string, tabId?: number): void {
   const actionApi = browser.action;
   if (!actionApi?.setBadgeText) return;
+
+  const timerKey = typeof tabId === 'number' ? `tab:${tabId}` : 'global';
+  const prevTimer = badgeResetTimers.get(timerKey);
+  if (prevTimer !== undefined) {
+    clearTimeout(prevTimer);
+  }
 
   const target = typeof tabId === 'number' ? { tabId } : {};
   void actionApi
@@ -22,9 +29,11 @@ function flashActionBadge(text: string, color: string, tabId?: number): void {
     .catch(() => undefined);
   void actionApi.setBadgeText({ ...target, text }).catch(() => undefined);
 
-  setTimeout(() => {
+  const timer = setTimeout(() => {
+    badgeResetTimers.delete(timerKey);
     void actionApi.setBadgeText({ ...target, text: '' }).catch(() => undefined);
   }, BADGE_FLASH_MS);
+  badgeResetTimers.set(timerKey, timer);
 }
 
 /**

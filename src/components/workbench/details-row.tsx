@@ -1,14 +1,20 @@
 import { Minus, Pencil, PenLine, Plus, Star, Trash2 } from 'lucide-react';
-import { memo } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { LinkFavicon } from '@/components/LinkFavicon';
 import { playDelete, playDrop, playTagPop } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
-import type { LinkItem, MotionMode } from '@/lib/types/stash';
+import type { LinkItem, MotionMode, ProductMeta } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+import {
+  createDebouncedWriter,
+  type DebouncedWriter,
+} from '@/lib/utils/coalesce';
 import { formatPrice, normalizeCurrencyCode } from '@/lib/utils/price-math';
 import { normalizeStoreName } from '@/lib/utils/product-url';
 import { useUiStore } from '@/store/ui-store';
+
+const QTY_SAVE_DEBOUNCE_MS = 250;
 
 interface DetailsRowProps {
   link: LinkItem;
@@ -58,6 +64,34 @@ export const DetailsRow = memo(function DetailsRow({
     typeof product?.orderQty === 'number' && product.orderQty >= 1
       ? Math.floor(product.orderQty)
       : 1;
+  const [displayQty, setDisplayQty] = useState(qty);
+  const productRef = useRef<ProductMeta | undefined>(product);
+  productRef.current = product;
+  const qtyWriterRef = useRef<DebouncedWriter<number> | null>(null);
+
+  useEffect(() => {
+    setDisplayQty(qty);
+  }, [qty]);
+
+  useEffect(() => {
+    const linkId = link.id;
+    const writer = createDebouncedWriter<number>((nextQty) => {
+      const latestProduct = productRef.current;
+      if (!latestProduct) return;
+      void stashRepo.updateLink(linkId, {
+        product: {
+          ...latestProduct,
+          orderQty: nextQty,
+        },
+      });
+    }, QTY_SAVE_DEBOUNCE_MS);
+    qtyWriterRef.current = writer;
+    return () => {
+      writer.flush();
+      qtyWriterRef.current = null;
+    };
+  }, [link.id]);
+
   const storeName = normalizeStoreName(link.url, product?.store);
   const specOrNote = product?.spec || link.note || '';
   const visibleTags = link.tags.slice(0, 2);
@@ -82,15 +116,14 @@ export const DetailsRow = memo(function DetailsRow({
     }
   };
 
-  const handleChangeQty = async (delta: number) => {
+  const handleChangeQty = (delta: number) => {
     if (!product || !hasPrice) return;
-    const nextQty = Math.max(1, Math.min(999, qty + delta));
-    if (nextQty === qty) return;
-    await stashRepo.updateLink(link.id, {
-      product: {
-        ...product,
-        orderQty: nextQty,
-      },
+    setDisplayQty((prev) => {
+      const nextQty = Math.max(1, Math.min(999, prev + delta));
+      if (nextQty !== prev) {
+        qtyWriterRef.current?.schedule(nextQty);
+      }
+      return nextQty;
     });
   };
 
@@ -268,19 +301,19 @@ export const DetailsRow = memo(function DetailsRow({
           >
             <button
               type="button"
-              onClick={() => void handleChangeQty(-1)}
-              disabled={qty <= 1}
+              onClick={() => handleChangeQty(-1)}
+              disabled={displayQty <= 1}
               aria-label={`Decrease quantity for ${link.title}`}
               className="inline-flex h-5 w-5 items-center justify-center text-fg-muted transition-colors hover:bg-card hover:text-fg disabled:opacity-35 cursor-pointer disabled:cursor-default"
             >
               <Minus className="h-2.5 w-2.5" />
             </button>
             <span className="min-w-[18px] px-1 text-center text-fg tabular-nums">
-              {qty}
+              {displayQty}
             </span>
             <button
               type="button"
-              onClick={() => void handleChangeQty(1)}
+              onClick={() => handleChangeQty(1)}
               aria-label={`Increase quantity for ${link.title}`}
               className="inline-flex h-5 w-5 items-center justify-center text-fg-muted transition-colors hover:bg-card hover:text-fg cursor-pointer"
             >

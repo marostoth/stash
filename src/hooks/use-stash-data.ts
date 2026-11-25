@@ -18,6 +18,8 @@ import {
 } from '@/lib/types/stash';
 import { useUiStore } from '@/store/ui-store';
 
+let storagePersistRequested = false;
+
 export interface StashDataState {
   loading: boolean;
   spaces: Space[];
@@ -99,6 +101,33 @@ export function useStashData(): StashDataState {
       settings.backdropOverride,
     );
   }, [activeTheme, settings.backdropOverride]);
+
+  useEffect(() => {
+    if (!storagePersistRequested) {
+      storagePersistRequested = true;
+      if (
+        typeof navigator !== 'undefined' &&
+        typeof navigator.storage?.persist === 'function'
+      ) {
+        void navigator.storage.persist().catch(() => undefined);
+      }
+    }
+
+    if (typeof document === 'undefined') return;
+    const syncVisibility = () => {
+      if (document.hidden) {
+        document.documentElement.dataset.pageHidden = 'true';
+      } else {
+        delete document.documentElement.dataset.pageHidden;
+      }
+    };
+    syncVisibility();
+    document.addEventListener('visibilitychange', syncVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', syncVisibility);
+      delete document.documentElement.dataset.pageHidden;
+    };
+  }, []);
 
   useEffect(() => {
     setSoundEffectsEnabled(settings.soundEffects);

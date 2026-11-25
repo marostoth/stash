@@ -12,6 +12,7 @@ import { HealthCheckModal } from '@/components/HealthCheckModal';
 import { ReorganizeModal } from '@/components/reorganize/ReorganizeModal';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { Button } from '@/components/ui/button';
+import { StashErrorBoundary } from '@/components/ui/error-boundary';
 import { BackgroundJobsTray } from '@/components/workbench/background-jobs-tray';
 import { CollectionModal } from '@/components/workbench/collection-modal';
 import { CollectionSection } from '@/components/workbench/collection-section';
@@ -355,15 +356,21 @@ export function Workbench() {
             spaces={spaces}
             defaultCurrency={defaultCurrency}
           />
-          <SettingsModal
-            spaces={spaces}
-            collections={collections}
-            links={links}
-            rules={rules}
-            settings={settings}
-            allThemes={allThemes}
-            activeTheme={activeTheme}
-          />
+          <StashErrorBoundary
+            scope="Settings"
+            compact
+            onReset={() => useUiStore.getState().closeSettings()}
+          >
+            <SettingsModal
+              spaces={spaces}
+              collections={collections}
+              links={links}
+              rules={rules}
+              settings={settings}
+              allThemes={allThemes}
+              activeTheme={activeTheme}
+            />
+          </StashErrorBoundary>
           <HealthCheckModal collections={collections} links={links} />
           <ReorganizeModal
             collections={collections}

@@ -350,6 +350,8 @@ export async function downloadNanoModel(
   }
 }
 
+const NANO_ITEM_TIMEOUT_MS = 12_000;
+
 export interface NanoCategorizerSession {
   categorize: (
     target: CategorizationTarget,
@@ -402,9 +404,17 @@ export async function createNanoCategorizerSession(
       let itemSession: LanguageModelSession | null = null;
       let isClone = false;
 
+      const controller = new AbortController();
+      const onOuterAbort = () => controller.abort();
+      itemSignal?.addEventListener('abort', onOuterAbort, { once: true });
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        NANO_ITEM_TIMEOUT_MS,
+      );
+
       try {
         if (typeof baseSession.clone === 'function') {
-          itemSession = await baseSession.clone({ signal: itemSignal });
+          itemSession = await baseSession.clone({ signal: controller.signal });
           isClone = true;
         } else {
           itemSession = baseSession;
@@ -414,13 +424,15 @@ export async function createNanoCategorizerSession(
           buildPayload(target, collections),
           {
             responseConstraint: NANO_RESPONSE_CONSTRAINT,
-            signal: itemSignal,
+            signal: controller.signal,
           },
         );
         return parseNanoResponse(rawText, collections);
       } catch {
         return null;
       } finally {
+        clearTimeout(timeoutId);
+        itemSignal?.removeEventListener('abort', onOuterAbort);
         if (isClone) {
           itemSession?.destroy();
         }

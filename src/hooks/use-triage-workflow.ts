@@ -103,7 +103,12 @@ export function useTriageWorkflow(
   }, []);
 
   useEffect(() => {
-    if (!triageOpen) return;
+    if (!triageOpen) {
+      if (!analyzing) {
+        disposeWarmNanoSession();
+      }
+      return;
+    }
     if (settings.enableOnDeviceAi) {
       void prewarmNanoCategorizer(true);
     }
@@ -113,7 +118,7 @@ export function useTriageWorkflow(
     if (job?.status === 'ready') {
       useBackgroundJobsStore.getState().removeJob('triage');
     }
-  }, [settings.enableOnDeviceAi, triageOpen]);
+  }, [analyzing, settings.enableOnDeviceAi, triageOpen]);
 
   useEffect(() => {
     if (!triageCollectionId || !sessionCollection) {

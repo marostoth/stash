@@ -19,8 +19,13 @@ import type {
   ThemeDefinition,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+import {
+  createDebouncedWriter,
+  type DebouncedWriter,
+} from '@/lib/utils/coalesce';
 
 const MAX_WALLPAPER_BYTES = 25 * 1024 * 1024;
+const SLIDER_SAVE_DEBOUNCE_MS = 150;
 
 interface BackdropStudioCardProps {
   activeTheme: ThemeDefinition;
@@ -36,6 +41,35 @@ export function BackdropStudioCard({
     useState<StoredWallpaper | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [dimDraft, setDimDraft] = useState(settings.wallpaperDim);
+  const [blurDraft, setBlurDraft] = useState(settings.wallpaperBlur);
+  const dimWriterRef = useRef<DebouncedWriter<number> | null>(null);
+  const blurWriterRef = useRef<DebouncedWriter<number> | null>(null);
+
+  useEffect(() => {
+    setDimDraft(settings.wallpaperDim);
+  }, [settings.wallpaperDim]);
+
+  useEffect(() => {
+    setBlurDraft(settings.wallpaperBlur);
+  }, [settings.wallpaperBlur]);
+
+  useEffect(() => {
+    const dimWriter = createDebouncedWriter<number>((nextDim) => {
+      void stashRepo.updateSettings({ wallpaperDim: nextDim });
+    }, SLIDER_SAVE_DEBOUNCE_MS);
+    const blurWriter = createDebouncedWriter<number>((nextBlur) => {
+      void stashRepo.updateSettings({ wallpaperBlur: nextBlur });
+    }, SLIDER_SAVE_DEBOUNCE_MS);
+    dimWriterRef.current = dimWriter;
+    blurWriterRef.current = blurWriter;
+    return () => {
+      dimWriter.flush();
+      blurWriter.flush();
+      dimWriterRef.current = null;
+      blurWriterRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -273,7 +307,7 @@ export function BackdropStudioCard({
                 <div className="flex items-center justify-between text-fg-muted">
                   <span>Dim Overlay</span>
                   <span className="font-mono text-[10px] text-fg">
-                    {settings.wallpaperDim}%
+                    {dimDraft}%
                   </span>
                 </div>
                 <input
@@ -281,13 +315,13 @@ export function BackdropStudioCard({
                   min={0}
                   max={85}
                   step={5}
-                  value={settings.wallpaperDim}
+                  value={dimDraft}
                   disabled={!settings.wallpaperEnabled}
-                  onChange={(e) =>
-                    void stashRepo.updateSettings({
-                      wallpaperDim: Number(e.target.value),
-                    })
-                  }
+                  onChange={(e) => {
+                    const nextDim = Number(e.target.value);
+                    setDimDraft(nextDim);
+                    dimWriterRef.current?.schedule(nextDim);
+                  }}
                   className="w-full cursor-pointer accent-[var(--stash-accent)]"
                 />
               </label>
@@ -296,7 +330,7 @@ export function BackdropStudioCard({
                 <div className="flex items-center justify-between text-fg-muted">
                   <span>Blur</span>
                   <span className="font-mono text-[10px] text-fg">
-                    {settings.wallpaperBlur}px
+                    {blurDraft}px
                   </span>
                 </div>
                 <input
@@ -304,13 +338,13 @@ export function BackdropStudioCard({
                   min={0}
                   max={24}
                   step={1}
-                  value={settings.wallpaperBlur}
+                  value={blurDraft}
                   disabled={!settings.wallpaperEnabled}
-                  onChange={(e) =>
-                    void stashRepo.updateSettings({
-                      wallpaperBlur: Number(e.target.value),
-                    })
-                  }
+                  onChange={(e) => {
+                    const nextBlur = Number(e.target.value);
+                    setBlurDraft(nextBlur);
+                    blurWriterRef.current?.schedule(nextBlur);
+                  }}
                   className="w-full cursor-pointer accent-[var(--stash-accent)]"
                 />
               </label>
