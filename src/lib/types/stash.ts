@@ -77,7 +77,7 @@ export interface CategorizationRule {
   };
 }
 
-export type MotionMode = 'tactile' | 'reduced' | 'off';
+export type MotionMode = 'arcade' | 'tactile' | 'reduced' | 'off';
 
 export interface StashSettings {
   activeThemeId: string;

@@ -24,6 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { OdometerCounter } from '@/components/ui/odometer-counter';
 import { LinkCard } from '@/components/workbench/link-card';
 import { useAutoTagSweep } from '@/hooks/use-auto-tag-sweep';
 import { COLLAPSE_SPRING } from '@/lib/motion/physics';
@@ -66,6 +67,12 @@ export function CollectionSection({
   const openCreateLink = useUiStore((s) => s.openCreateLink);
   const openEditCollection = useUiStore((s) => s.openEditCollection);
   const openTriage = useUiStore((s) => s.openTriage);
+  const triggerCollectionCascade = useUiStore(
+    (s) => s.triggerCollectionCascade,
+  );
+  const isCascading = useUiStore((s) =>
+    s.cascadingCollectionIds.includes(collection.id),
+  );
   const autoTag = useAutoTagSweep(collection.id);
   const untaggedCount = links.filter(isEligibleForAutoTag).length;
 
@@ -100,6 +107,9 @@ export function CollectionSection({
   const colorHex = TAB_GROUP_COLOR_SWATCH[collection.color];
 
   const handleToggleCollapse = () => {
+    if (collection.collapsed) {
+      triggerCollectionCascade(collection.id);
+    }
     void stashRepo.toggleCollectionCollapsed(collection.id);
   };
 
@@ -186,7 +196,7 @@ export function CollectionSection({
                 {collection.name}
               </h2>
               <span className="shrink-0 rounded-pill border border-border bg-panel px-2 py-0.5 font-mono text-[10px] text-fg-muted">
-                {links.length}
+                <OdometerCounter value={links.length} motionMode={motionMode} />
               </span>
               {collection.isSession && (
                 <span className="hidden shrink-0 rounded-pill border border-accent/55 bg-accent/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-accent sm:inline-block">
@@ -349,6 +359,7 @@ export function CollectionSection({
                         compact={compact}
                         dragDisabled={dragDisabled}
                         motionMode={motionMode}
+                        cascadeActive={isCascading}
                       />
                     ))}
                   </div>

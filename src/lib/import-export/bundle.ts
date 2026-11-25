@@ -210,6 +210,7 @@ function parseSettings(raw: unknown): StashSettings {
         ? obj.autoTagOnSave
         : DEFAULT_SETTINGS.autoTagOnSave,
     motionMode:
+      obj.motionMode === 'arcade' ||
       obj.motionMode === 'tactile' ||
       obj.motionMode === 'reduced' ||
       obj.motionMode === 'off'

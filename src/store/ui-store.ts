@@ -19,6 +19,8 @@ interface UiStoreState {
   triageCollectionId: string | null;
   highlightedLinkId: string | null;
   settledLinkId: string | null;
+  taggingLinkIds: string[];
+  cascadingCollectionIds: string[];
   setSearchQuery: (query: string) => void;
   openCreateCollection: () => void;
   openEditCollection: (collection: Collection) => void;
@@ -32,10 +34,14 @@ interface UiStoreState {
   closeTriage: () => void;
   pulseLink: (linkId: string) => void;
   settleLink: (linkId: string) => void;
+  addTaggingLink: (linkId: string) => void;
+  removeTaggingLink: (linkId: string) => void;
+  triggerCollectionCascade: (collectionId: string) => void;
 }
 
 let pulseTimer: ReturnType<typeof setTimeout> | null = null;
 let settleTimer: ReturnType<typeof setTimeout> | null = null;
+const cascadeTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export const useUiStore = create<UiStoreState>((set) => ({
   searchQuery: '',
@@ -45,6 +51,8 @@ export const useUiStore = create<UiStoreState>((set) => ({
   triageCollectionId: null,
   highlightedLinkId: null,
   settledLinkId: null,
+  taggingLinkIds: [],
+  cascadingCollectionIds: [],
 
   setSearchQuery: (query) => set({ searchQuery: query }),
 
@@ -89,6 +97,44 @@ export const useUiStore = create<UiStoreState>((set) => ({
         state.settledLinkId === linkId ? { settledLinkId: null } : state,
       );
       settleTimer = null;
+    }, 420);
+  },
+
+  addTaggingLink: (linkId) =>
+    set((state) =>
+      state.taggingLinkIds.includes(linkId)
+        ? state
+        : { taggingLinkIds: [...state.taggingLinkIds, linkId] },
+    ),
+
+  removeTaggingLink: (linkId) =>
+    set((state) => ({
+      taggingLinkIds: state.taggingLinkIds.filter((id) => id !== linkId),
+    })),
+
+  triggerCollectionCascade: (collectionId) => {
+    const existing = cascadeTimers.get(collectionId);
+    if (existing) clearTimeout(existing);
+
+    set((state) =>
+      state.cascadingCollectionIds.includes(collectionId)
+        ? state
+        : {
+            cascadingCollectionIds: [
+              ...state.cascadingCollectionIds,
+              collectionId,
+            ],
+          },
+    );
+
+    const timer = setTimeout(() => {
+      cascadeTimers.delete(collectionId);
+      set((state) => ({
+        cascadingCollectionIds: state.cascadingCollectionIds.filter(
+          (id) => id !== collectionId,
+        ),
+      }));
     }, 520);
+    cascadeTimers.set(collectionId, timer);
   },
 }));

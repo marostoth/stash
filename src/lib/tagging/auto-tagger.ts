@@ -36,7 +36,12 @@ export interface AutoTagSweepResult {
   total: number;
 }
 
-export interface BatchAutoTagOptions {
+export interface AutoTagLifecycleHooks {
+  onLinkStart?: (linkId: string) => void;
+  onLinkEnd?: (linkId: string, tags: string[] | null) => void;
+}
+
+export interface BatchAutoTagOptions extends AutoTagLifecycleHooks {
   collectionId?: string;
   signal?: AbortSignal;
   onProgress?: (progress: AutoTagProgress) => void;
@@ -250,6 +255,7 @@ async function resolveSamplingParams(
  */
 export async function autoTagSingleLink(
   linkId: string,
+  hooks?: AutoTagLifecycleHooks,
 ): Promise<string[] | null> {
   const settings = await stashRepo.getSettings();
   if (!settings.autoTagOnSave) return null;
@@ -270,6 +276,8 @@ export async function autoTagSingleLink(
   const existingTags = extractTopExistingTags(snapshot.links, 50);
 
   let session: LanguageModelSession | null = null;
+  let appliedTags: string[] | null = null;
+  hooks?.onLinkStart?.(linkId);
   try {
     const sampling = await resolveSamplingParams(lm);
     session = await lm.create({
@@ -287,11 +295,13 @@ export async function autoTagSingleLink(
     if (tags.length === 0) return null;
 
     const updated = await stashRepo.applyAutoTagsIfEligible(linkId, tags);
-    return updated ? updated.tags : null;
+    appliedTags = updated ? updated.tags : null;
+    return appliedTags;
   } catch {
     return null;
   } finally {
     session?.destroy();
+    hooks?.onLinkEnd?.(linkId, appliedTags);
   }
 }
 
@@ -302,7 +312,7 @@ export async function autoTagSingleLink(
 export async function runBatchAutoTagSweep(
   options: BatchAutoTagOptions = {},
 ): Promise<AutoTagSweepResult> {
-  const { collectionId, signal, onProgress } = options;
+  const { collectionId, signal, onProgress, onLinkStart, onLinkEnd } = options;
 
   const lm = getLanguageModel();
   if (!lm) {
@@ -356,6 +366,8 @@ export async function runBatchAutoTagSweep(
       const collectionName = collectionNameById.get(link.collectionId) ?? '';
       let itemSession: LanguageModelSession | null = null;
       let isClone = false;
+      let appliedTags: string[] | null = null;
+      onLinkStart?.(link.id);
 
       try {
         if (typeof baseSession.clone === 'function') {
@@ -390,6 +402,7 @@ export async function runBatchAutoTagSweep(
 
         const updated = await stashRepo.applyAutoTagsIfEligible(link.id, tags);
         if (updated) {
+          appliedTags = updated.tags;
           tagged += 1;
         } else {
           skipped += 1;
@@ -408,6 +421,7 @@ export async function runBatchAutoTagSweep(
         if (isClone) {
           itemSession?.destroy();
         }
+        onLinkEnd?.(link.id, appliedTags);
       }
     }
 

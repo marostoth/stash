@@ -13,7 +13,7 @@ import {
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { playDrop, playError } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
-import { autoTagSingleLink } from '@/lib/tagging/auto-tagger';
+import { triggerAutoTagSingleLink } from '@/lib/tagging/trigger-auto-tag';
 import type { Collection } from '@/lib/types/stash';
 import { normalizeInputUrl, parseTagsInput } from '@/lib/utils/url';
 import { useUiStore } from '@/store/ui-store';
@@ -134,7 +134,7 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
     toast.success('Link stashed');
     closeLinkModal();
     if (!hasManualTags) {
-      void autoTagSingleLink(result.link.id);
+      void triggerAutoTagSingleLink(result.link.id);
     }
   };
 

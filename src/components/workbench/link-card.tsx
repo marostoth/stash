@@ -1,12 +1,29 @@
 import { useSortable } from '@dnd-kit/react/sortable';
 import { Pencil } from 'lucide-react';
-import { motion } from 'motion/react';
-import { memo, useEffect, useRef, useState } from 'react';
 import {
+  motion,
+  useMotionTemplate,
+  useMotionValue,
+  useSpring,
+} from 'motion/react';
+import { memo, useEffect, useRef, useState } from 'react';
+import { DropSparks } from '@/components/workbench/drop-sparks';
+import { playHoverRiffle } from '@/lib/audio/foley';
+import {
+  ARCADE_HEADSHAKE_KEYFRAMES,
+  ARCADE_HEADSHAKE_TRANSITION,
+  ARCADE_SQUASH_KEYFRAMES,
+  ARCADE_SQUASH_TRANSITION,
+  ARCADE_TAG_POP_SPRING,
+  computeCascadeDelay,
+  computeFoilTilt,
+  FOIL_PERSPECTIVE_PX,
+  FOIL_SPRING_CONFIG,
+  isArcadeMotion,
   isTactileMotion,
   TACTILE_SPRING,
   TAG_POP_SPRING,
-} from '@/lib/motion/physics';
+} from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import type { LinkItem, MotionMode } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
@@ -20,6 +37,7 @@ interface LinkCardProps {
   compact: boolean;
   dragDisabled: boolean;
   motionMode: MotionMode;
+  cascadeActive: boolean;
 }
 
 export const LinkCard = memo(function LinkCard({
@@ -29,20 +47,32 @@ export const LinkCard = memo(function LinkCard({
   compact,
   dragDisabled,
   motionMode,
+  cascadeActive,
 }: LinkCardProps) {
   const openEditLink = useUiStore((s) => s.openEditLink);
   const highlightedLinkId = useUiStore((s) => s.highlightedLinkId);
   const settledLinkId = useUiStore((s) => s.settledLinkId);
+  const isTagging = useUiStore((s) => s.taggingLinkIds.includes(link.id));
   const [faviconFailed, setFaviconFailed] = useState(false);
 
-  // Track which tags were already rendered so only newly appearing tags (e.g. from Nano) pop in
+  // Track previously rendered tags so only newly arriving AI tags pop in
   const seenTagsRef = useRef<Set<string>>(new Set(link.tags));
-
   useEffect(() => {
     for (const tag of link.tags) {
       seenTagsRef.current.add(tag);
     }
   }, [link.tags]);
+
+  // 3D foil hover MotionValues (zero React state updates on pointer move)
+  const rawRotateX = useMotionValue(0);
+  const rawRotateY = useMotionValue(0);
+  const glareX = useMotionValue(50);
+  const glareY = useMotionValue(50);
+  const glareOpacity = useMotionValue(0);
+
+  const rotateX = useSpring(rawRotateX, FOIL_SPRING_CONFIG);
+  const rotateY = useSpring(rawRotateY, FOIL_SPRING_CONFIG);
+  const glareBackground = useMotionTemplate`radial-gradient(circle at ${glareX}% ${glareY}%, color-mix(in srgb, var(--stash-accent) 20%, transparent) 0%, color-mix(in srgb, var(--stash-accent) 6%, transparent) 38%, transparent 68%)`;
 
   const { ref, isDragging, isDropTarget } = useSortable({
     id: `link:${link.id}`,
@@ -59,6 +89,7 @@ export const LinkCard = memo(function LinkCard({
     },
   });
 
+  const arcade = isArcadeMotion(motionMode);
   const tactile = isTactileMotion(motionMode);
   const isHighlighted = highlightedLinkId === link.id;
   const isSettling = tactile && settledLinkId === link.id;
@@ -69,6 +100,41 @@ export const LinkCard = memo(function LinkCard({
   const visibleTags = link.tags.slice(0, 3);
   const hiddenTagCount = Math.max(0, link.tags.length - visibleTags.length);
 
+  // Reset foil tilt cleanly if Arcade mode turns off or card starts dragging
+  useEffect(() => {
+    if (!arcade || isDragging) {
+      rawRotateX.set(0);
+      rawRotateY.set(0);
+      glareOpacity.set(0);
+    }
+  }, [arcade, isDragging, rawRotateX, rawRotateY, glareOpacity]);
+
+  const handlePointerEnter = () => {
+    if (!arcade) return;
+    glareOpacity.set(1);
+    playHoverRiffle();
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!arcade) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const relX = (event.clientX - rect.left) / rect.width;
+    const relY = (event.clientY - rect.top) / rect.height;
+    const tilt = computeFoilTilt(relX, relY);
+    rawRotateX.set(tilt.rotateX);
+    rawRotateY.set(tilt.rotateY);
+    glareX.set(tilt.glareX);
+    glareY.set(tilt.glareY);
+  };
+
+  const handlePointerLeave = () => {
+    if (!arcade) return;
+    rawRotateX.set(0);
+    rawRotateY.set(0);
+    glareOpacity.set(0);
+  };
+
   const handleContextMenu = (event: React.MouseEvent) => {
     event.preventDefault();
     openEditLink(link);
@@ -78,9 +144,60 @@ export const LinkCard = memo(function LinkCard({
     void stashRepo.markLinkOpened(link.id);
   };
 
+  const cardAnimate =
+    isHighlighted && arcade
+      ? {
+          ...ARCADE_HEADSHAKE_KEYFRAMES,
+          opacity: 1,
+          y: 0,
+          rotate: 0,
+          scale: 1,
+          scaleX: 1,
+          scaleY: 1,
+        }
+      : isSettling && arcade
+        ? {
+            ...ARCADE_SQUASH_KEYFRAMES,
+            opacity: 1,
+            x: 0,
+            y: 0,
+            rotate: 0,
+          }
+        : isSettling
+          ? {
+              scale: [1.035, 0.985, 1],
+              y: [-3, 0, 0],
+              opacity: 1,
+              x: 0,
+              rotate: 0,
+            }
+          : {
+              opacity: 1,
+              x: 0,
+              y: 0,
+              rotate: 0,
+              scale: 1,
+              scaleX: 1,
+              scaleY: 1,
+            };
+
+  const cardTransition =
+    isHighlighted && arcade
+      ? ARCADE_HEADSHAKE_TRANSITION
+      : isSettling && arcade
+        ? ARCADE_SQUASH_TRANSITION
+        : arcade && cascadeActive
+          ? { ...TACTILE_SPRING, delay: computeCascadeDelay(index) }
+          : TACTILE_SPRING;
+
   return (
     /* Outer wrapper strictly owns @dnd-kit/react ref & transforms — never apply Motion transforms here */
-    <div ref={ref} data-link-id={link.id} className="relative h-full">
+    <div
+      ref={ref}
+      data-link-id={link.id}
+      style={arcade ? { perspective: FOIL_PERSPECTIVE_PX } : undefined}
+      className="relative h-full"
+    >
       {isDragging ? (
         <div
           aria-hidden="true"
@@ -115,21 +232,51 @@ export const LinkCard = memo(function LinkCard({
         </div>
       ) : (
         <motion.div
-          animate={
-            isSettling
-              ? { scale: [1.035, 0.985, 1], y: [-3, 0, 0] }
-              : { scale: 1, y: 0 }
+          initial={
+            arcade && cascadeActive ? { opacity: 0, y: 12, rotate: -2 } : false
           }
+          animate={cardAnimate}
           whileHover={tactile ? { y: -2 } : undefined}
           whileTap={tactile ? { scale: 0.98 } : undefined}
-          transition={TACTILE_SPRING}
+          transition={cardTransition}
+          style={arcade ? { rotateX, rotateY } : undefined}
+          onPointerEnter={handlePointerEnter}
+          onPointerMove={handlePointerMove}
+          onPointerLeave={handlePointerLeave}
           className={cn(
             'group relative h-full rounded-card border border-border bg-card transition-colors hover:border-accent/45 hover:bg-card-hover',
             !dragDisabled && 'cursor-grab active:cursor-grabbing',
             isDropTarget && 'border-accent ring-2 ring-accent/40',
-            isHighlighted && 'stash-duplicate-pulse',
+            isHighlighted && !arcade && 'stash-duplicate-pulse',
+            isHighlighted && arcade && 'border-danger ring-2 ring-danger/45',
+            isTagging && arcade && 'border-accent/65',
           )}
         >
+          {/* Arcade 3D foil sheen overlay */}
+          {arcade && (
+            <motion.div
+              aria-hidden="true"
+              style={{
+                backgroundImage: glareBackground,
+                opacity: glareOpacity,
+              }}
+              className="pointer-events-none absolute inset-0 z-10 rounded-card transition-opacity duration-150"
+            />
+          )}
+
+          {/* Arcade live AI phosphor scan beam while Gemini Nano is tagging */}
+          {arcade && isTagging && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-card"
+            >
+              <div className="stash-phosphor-scan-beam absolute inset-y-0 w-1/2" />
+            </div>
+          )}
+
+          {/* Arcade impact sparks on card drop */}
+          <DropSparks active={arcade && isSettling} />
+
           <a
             href={link.url}
             draggable={false}
@@ -138,7 +285,7 @@ export const LinkCard = memo(function LinkCard({
             onClick={handleOpen}
             onContextMenu={handleContextMenu}
             className={cn(
-              'flex h-full flex-col gap-2 rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+              'relative z-[1] flex h-full flex-col gap-2 rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
               compact ? 'p-2.5' : 'p-3.5',
             )}
           >
@@ -190,7 +337,9 @@ export const LinkCard = memo(function LinkCard({
                           : false
                       }
                       animate={{ scale: 1, opacity: 1 }}
-                      transition={TAG_POP_SPRING}
+                      transition={
+                        arcade ? ARCADE_TAG_POP_SPRING : TAG_POP_SPRING
+                      }
                       className="rounded-pill border border-border bg-panel px-2 py-0.5 font-mono text-[10px] text-fg-muted"
                     >
                       #{tag}
@@ -218,7 +367,7 @@ export const LinkCard = memo(function LinkCard({
             }}
             aria-label={`Edit ${link.title}`}
             title="Quick edit (or right-click card)"
-            className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-control border border-transparent bg-panel/90 text-fg-muted opacity-0 transition-all hover:border-border hover:text-fg focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover:opacity-100 cursor-pointer"
+            className="absolute right-2 top-2 z-20 inline-flex h-7 w-7 items-center justify-center rounded-control border border-transparent bg-panel/90 text-fg-muted opacity-0 transition-all hover:border-border hover:text-fg focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover:opacity-100 cursor-pointer"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>

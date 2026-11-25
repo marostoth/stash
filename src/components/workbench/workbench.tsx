@@ -27,7 +27,7 @@ import { isDragItemData, isDropTargetData } from '@/lib/dnd/types';
 import { resolveReducedMotionPolicy } from '@/lib/motion/physics';
 import { stashRepo } from '@/lib/storage/repo';
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
-import { autoTagSingleLink } from '@/lib/tagging/auto-tagger';
+import { triggerAutoTagSingleLink } from '@/lib/tagging/trigger-auto-tag';
 import { groupAndFilterCollections } from '@/lib/utils/search';
 import { useUiStore } from '@/store/ui-store';
 
@@ -146,12 +146,12 @@ export function Workbench() {
       }
 
       await stashRepo.updateCollection(collectionId, { collapsed: false });
-      playDrop(settings.soundEffects);
+      playDrop(settings.soundEffects, settings.motionMode);
       settleLink(result.link.id);
       toast.success(`Stashed "${result.link.title}"`);
-      void autoTagSingleLink(result.link.id);
+      void triggerAutoTagSingleLink(result.link.id);
     },
-    [revealDuplicate, settings.soundEffects, settleLink],
+    [revealDuplicate, settings.motionMode, settings.soundEffects, settleLink],
   );
 
   const handleDragStart = useCallback(() => {

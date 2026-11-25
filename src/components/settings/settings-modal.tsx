@@ -270,6 +270,7 @@ export function SettingsModal({
                     }
                     className="h-8 w-36 text-xs"
                   >
+                    <option value="arcade">Arcade</option>
                     <option value="tactile">Tactile</option>
                     <option value="reduced">Reduced</option>
                     <option value="off">Off</option>

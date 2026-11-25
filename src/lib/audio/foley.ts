@@ -1,7 +1,18 @@
+import {
+  createComboTracker,
+  createCooldownGate,
+  HOVER_RIFFLE_COOLDOWN_MS,
+} from '@/lib/audio/combo';
+import type { MotionMode } from '@/lib/types/stash';
+
 type AudioContextCtor = new () => AudioContext;
 
 let sharedContext: AudioContext | null = null;
 let globalSoundEnabled = true;
+let globalMotionMode: MotionMode = 'tactile';
+
+const comboTracker = createComboTracker();
+const hoverRiffleGate = createCooldownGate(HOVER_RIFFLE_COOLDOWN_MS);
 
 function getAudioContextConstructor(): AudioContextCtor | undefined {
   const g = globalThis as {
@@ -34,13 +45,24 @@ export function setSoundEffectsEnabled(enabled: boolean): void {
   globalSoundEnabled = enabled;
 }
 
+export function setFoleyMotionMode(mode: MotionMode): void {
+  globalMotionMode = mode;
+}
+
 export function resetFoleyContextForTests(): void {
   sharedContext = null;
   globalSoundEnabled = true;
+  globalMotionMode = 'tactile';
+  comboTracker.reset();
+  hoverRiffleGate.reset();
 }
 
 function shouldPlay(enabled?: boolean): boolean {
   return enabled ?? globalSoundEnabled;
+}
+
+function isArcade(mode?: MotionMode): boolean {
+  return (mode ?? globalMotionMode) === 'arcade';
 }
 
 function scheduleTone(
@@ -68,7 +90,7 @@ function scheduleTone(
   );
 
   amp.gain.setValueAtTime(0.0001, now);
-  amp.gain.linearRampToValueAtTime(options.gain, now + 0.003);
+  amp.gain.linearRampToValueAtTime(options.gain, now + 0.0025);
   amp.gain.exponentialRampToValueAtTime(0.0001, end);
 
   osc.connect(amp);
@@ -110,25 +132,28 @@ export function playPickup(enabled?: boolean): void {
 
 /**
  * Crisp, muted card-snap / thud on successful drop or manual link save.
+ * In Arcade mode, rapid consecutive drops escalate musically up a pentatonic scale.
  */
-export function playDrop(enabled?: boolean): void {
+export function playDrop(enabled?: boolean, mode?: MotionMode): void {
   if (!shouldPlay(enabled)) return;
   const ctx = getReadyContext();
   if (!ctx) return;
 
+  const pitch = isArcade(mode) ? comboTracker.next().multiplier : 1;
+
   try {
     scheduleTone(ctx, {
       type: 'sine',
-      startFreq: 175,
-      endFreq: 62,
+      startFreq: 175 * pitch,
+      endFreq: 62 * pitch,
       startOffsetSec: 0,
       durationSec: 0.046,
       gain: 0.095,
     });
     scheduleTone(ctx, {
       type: 'triangle',
-      startFreq: 860,
-      endFreq: 380,
+      startFreq: 860 * pitch,
+      endFreq: 380 * pitch,
       startOffsetSec: 0,
       durationSec: 0.018,
       gain: 0.042,
@@ -139,32 +164,89 @@ export function playDrop(enabled?: boolean): void {
 }
 
 /**
- * Clean, subtle two-note ascending phosphor chime for Save Session or Auto-Tag completion.
+ * Clean, subtle ascending phosphor chime for Save Session or Auto-Tag completion.
+ * In Arcade mode, scales musically with the active combo tracker.
  */
-export function playSessionFreeze(enabled?: boolean): void {
+export function playSessionFreeze(enabled?: boolean, mode?: MotionMode): void {
   if (!shouldPlay(enabled)) return;
   const ctx = getReadyContext();
   if (!ctx) return;
 
+  const pitch = isArcade(mode) ? comboTracker.next().multiplier : 1;
+
   try {
     scheduleTone(ctx, {
       type: 'sine',
-      startFreq: 659.25,
-      endFreq: 659.25,
+      startFreq: 659.25 * pitch,
+      endFreq: 659.25 * pitch,
       startOffsetSec: 0,
       durationSec: 0.052,
       gain: 0.062,
     });
     scheduleTone(ctx, {
       type: 'sine',
-      startFreq: 987.77,
-      endFreq: 987.77,
+      startFreq: 987.77 * pitch,
+      endFreq: 987.77 * pitch,
       startOffsetSec: 0.042,
       durationSec: 0.06,
       gain: 0.068,
     });
   } catch {
     // Fail silently
+  }
+}
+
+/**
+ * Crisp phosphor combo ping when AI auto-tags land on a card in Arcade mode.
+ */
+export function playTagPop(enabled?: boolean, mode?: MotionMode): void {
+  if (!shouldPlay(enabled) || !isArcade(mode)) return;
+  const ctx = getReadyContext();
+  if (!ctx) return;
+
+  const pitch = comboTracker.next().multiplier;
+
+  try {
+    scheduleTone(ctx, {
+      type: 'sine',
+      startFreq: 740 * pitch,
+      endFreq: 880 * pitch,
+      startOffsetSec: 0,
+      durationSec: 0.04,
+      gain: 0.048,
+    });
+  } catch {
+    // Fail silently
+  }
+}
+
+/**
+ * Whisper-quiet (~10ms envelope, 45ms cooldown) card-riffle tick on pointer-enter.
+ * Strictly gated to Arcade mode + soundEffects enabled.
+ */
+export function playHoverRiffle(
+  enabled?: boolean,
+  mode?: MotionMode,
+  nowMs?: number,
+): boolean {
+  if (!shouldPlay(enabled) || !isArcade(mode)) return false;
+  if (!hoverRiffleGate.tryAcquire(nowMs)) return false;
+
+  const ctx = getReadyContext();
+  if (!ctx) return false;
+
+  try {
+    scheduleTone(ctx, {
+      type: 'triangle',
+      startFreq: 940,
+      endFreq: 460,
+      startOffsetSec: 0,
+      durationSec: 0.01,
+      gain: 0.03,
+    });
+    return true;
+  } catch {
+    return false;
   }
 }
 

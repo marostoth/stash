@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { playSessionFreeze } from '@/lib/audio/foley';
+import { playSessionFreeze, playTagPop } from '@/lib/audio/foley';
 import {
   type AutoTagProgress,
   runBatchAutoTagSweep,
 } from '@/lib/tagging/auto-tagger';
+import { useUiStore } from '@/store/ui-store';
 
 export interface AutoTagSweepController {
   running: boolean;
@@ -36,10 +37,18 @@ export function useAutoTagSweep(collectionId?: string): AutoTagSweepController {
     setProgress(null);
 
     try {
+      const { addTaggingLink, removeTaggingLink } = useUiStore.getState();
       const result = await runBatchAutoTagSweep({
         collectionId,
         signal: controller.signal,
         onProgress: setProgress,
+        onLinkStart: (id) => addTaggingLink(id),
+        onLinkEnd: (id, tags) => {
+          removeTaggingLink(id);
+          if (tags && tags.length > 0) {
+            playTagPop();
+          }
+        },
       });
 
       if (result.status === 'unavailable') {

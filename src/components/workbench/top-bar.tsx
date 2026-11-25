@@ -16,6 +16,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { OdometerCounter } from '@/components/ui/odometer-counter';
 import { stashRepo } from '@/lib/storage/repo';
 import type { StashSettings, ThemeDefinition } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
@@ -82,7 +83,10 @@ export function TopBar({
           </span>
           {totalLinks > 0 && (
             <span className="hidden rounded-pill border border-border bg-canvas px-2 py-0.5 font-mono text-[10px] text-fg-muted md:inline-block">
-              {totalLinks}
+              <OdometerCounter
+                value={totalLinks}
+                motionMode={settings.motionMode}
+              />
             </span>
           )}
         </div>

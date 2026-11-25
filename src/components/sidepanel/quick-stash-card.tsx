@@ -9,7 +9,7 @@ import type { CategorizationSuggestion } from '@/lib/categorizer/types';
 import { stashRepo } from '@/lib/storage/repo';
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
 import { closeTabs } from '@/lib/tabs/tab-actions';
-import { autoTagSingleLink } from '@/lib/tagging/auto-tagger';
+import { triggerAutoTagSingleLink } from '@/lib/tagging/trigger-auto-tag';
 import {
   type CategorizationRule,
   type Collection,
@@ -171,7 +171,7 @@ export function QuickStashCard({
       setTagsEditedByUser(false);
 
       if (!shouldLockTags && submittedTags.length === 0) {
-        void autoTagSingleLink(result.link.id);
+        void triggerAutoTagSingleLink(result.link.id);
       }
 
       if (settings.closeTabOnQuickStash) {

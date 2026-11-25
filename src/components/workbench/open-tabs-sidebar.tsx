@@ -201,6 +201,9 @@ export function OpenTabsSidebar({
   onQuickStashTab,
 }: OpenTabsSidebarProps) {
   const [saving, setSaving] = useState(false);
+  const triggerCollectionCascade = useUiStore(
+    (s) => s.triggerCollectionCascade,
+  );
 
   const eligibleTabs = selectTabsForSession(tabs, {
     includePinned: settings.includePinnedInSessions,
@@ -222,14 +225,16 @@ export function OpenTabsSidebar({
         return;
       }
 
+      triggerCollectionCascade(saved.collection.id);
+
       if (closeAfterSave) {
         await closeTabs(saved.savedTabs.map((t) => t.id));
-        playSessionFreeze(settings.soundEffects);
+        playSessionFreeze(settings.soundEffects, settings.motionMode);
         toast.success(
           `Saved & closed ${saved.links.length} tab${saved.links.length === 1 ? '' : 's'} into "${saved.collection.name}"`,
         );
       } else {
-        playSessionFreeze(settings.soundEffects);
+        playSessionFreeze(settings.soundEffects, settings.motionMode);
         toast.success(
           `Saved ${saved.links.length} tab${saved.links.length === 1 ? '' : 's'} into "${saved.collection.name}"`,
         );
