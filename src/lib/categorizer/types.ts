@@ -43,25 +43,38 @@ export interface LanguageModelAvailabilityOptions {
   expectedOutputs?: LanguageModelExpectedIO[];
 }
 
+export interface LanguageModelParams {
+  defaultTopK: number;
+  maxTopK: number;
+  defaultTemperature: number;
+  maxTemperature: number;
+}
+
 export interface LanguageModelCreateOptions
   extends LanguageModelAvailabilityOptions {
   initialPrompts?: Array<{
     role: 'system' | 'user' | 'assistant';
     content: string;
   }>;
+  temperature?: number;
+  topK?: number;
+  signal?: AbortSignal;
   monitor?: (monitor: LanguageModelDownloadMonitor) => void;
 }
 
 export interface LanguageModelPromptOptions {
   responseConstraint?: Record<string, unknown>;
+  signal?: AbortSignal;
 }
 
 export interface LanguageModelSession {
   prompt(input: string, options?: LanguageModelPromptOptions): Promise<string>;
+  clone?(options?: { signal?: AbortSignal }): Promise<LanguageModelSession>;
   destroy(): void;
 }
 
 export interface LanguageModelAPI {
   availability(options?: LanguageModelAvailabilityOptions): Promise<string>;
+  params?(): Promise<LanguageModelParams>;
   create(options?: LanguageModelCreateOptions): Promise<LanguageModelSession>;
 }

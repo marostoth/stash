@@ -24,6 +24,7 @@ import { useStashData } from '@/hooks/use-stash-data';
 import { isDragItemData, isDropTargetData } from '@/lib/dnd/types';
 import { stashRepo } from '@/lib/storage/repo';
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
+import { autoTagSingleLink } from '@/lib/tagging/auto-tagger';
 import { groupAndFilterCollections } from '@/lib/utils/search';
 import { useUiStore } from '@/store/ui-store';
 
@@ -141,6 +142,7 @@ export function Workbench() {
 
       await stashRepo.updateCollection(collectionId, { collapsed: false });
       toast.success(`Stashed "${result.link.title}"`);
+      void autoTagSingleLink(result.link.id);
     },
     [revealDuplicate],
   );
@@ -319,6 +321,7 @@ export function Workbench() {
         <QuickEditModal collections={collections} />
         <SettingsModal
           collections={collections}
+          links={links}
           rules={rules}
           settings={settings}
           allThemes={allThemes}

@@ -10,7 +10,9 @@ import {
   Pencil,
   Plus,
   Sparkles,
+  Tag,
   Trash2,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -22,11 +24,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LinkCard } from '@/components/workbench/link-card';
+import { useAutoTagSweep } from '@/hooks/use-auto-tag-sweep';
 import { stashRepo } from '@/lib/storage/repo';
 import {
   wakeUpCollectionInNewWindow,
   wakeUpCollectionInTabGroup,
 } from '@/lib/tabs/tab-actions';
+import { isEligibleForAutoTag } from '@/lib/tagging/auto-tagger';
 import {
   type Collection,
   type LinkItem,
@@ -57,6 +61,8 @@ export function CollectionSection({
   const openCreateLink = useUiStore((s) => s.openCreateLink);
   const openEditCollection = useUiStore((s) => s.openEditCollection);
   const openTriage = useUiStore((s) => s.openTriage);
+  const autoTag = useAutoTagSweep(collection.id);
+  const untaggedCount = links.filter(isEligibleForAutoTag).length;
 
   const {
     ref: sortableRef,
@@ -178,7 +184,7 @@ export function CollectionSection({
                 {links.length}
               </span>
               {collection.isSession && (
-                <span className="hidden shrink-0 rounded-pill border border-accent/35 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent sm:inline-block">
+                <span className="hidden shrink-0 rounded-pill border border-accent/55 bg-accent/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-accent sm:inline-block">
                   SESSION
                 </span>
               )}
@@ -191,13 +197,45 @@ export function CollectionSection({
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
+            {autoTag.running ? (
+              <div className="inline-flex h-7 items-center gap-1.5 rounded-control border border-accent/45 bg-panel px-2 font-mono text-[11px] text-fg">
+                <span>
+                  Tagging {autoTag.progress?.current ?? 1} /{' '}
+                  {autoTag.progress?.total ?? untaggedCount}...
+                </span>
+                <button
+                  type="button"
+                  onClick={autoTag.cancel}
+                  aria-label="Cancel auto-tagging"
+                  title="Cancel"
+                  className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] text-fg-muted transition-colors hover:bg-card hover:text-danger cursor-pointer"
+                >
+                  <X className="h-3 w-3" />
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              untaggedCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void autoTag.start()}
+                  title={`Auto-tag ${untaggedCount} untagged link${untaggedCount === 1 ? '' : 's'} with on-device AI`}
+                  className="h-7 gap-1 px-2 text-xs text-fg/80 hover:text-accent"
+                >
+                  <Tag className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline">Auto-Tag</span>
+                </Button>
+              )
+            )}
+
             {collection.isSession && links.length > 0 && (
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => openTriage(collection.id)}
                 title="Auto-categorize and file links from this session"
-                className="h-7 gap-1 border-accent/40 px-2 text-xs text-accent hover:bg-accent/10"
+                className="h-7 gap-1 border-accent/45 px-2 text-xs text-accent hover:bg-accent/10"
               >
                 <Sparkles className="h-3.5 w-3.5" />
                 <span>Auto-Categorize</span>
@@ -210,7 +248,7 @@ export function CollectionSection({
                 size="sm"
                 onClick={() => void handleWakeUp()}
                 title="Open all links in a Chrome Tab Group"
-                className="h-7 gap-1 px-2 text-xs"
+                className="h-7 gap-1 border-fg-muted/30 px-2 text-xs text-fg hover:border-accent/50"
               >
                 <span>Wake Up</span>
                 <ArrowUpRight className="h-3.5 w-3.5 text-accent" />
@@ -221,7 +259,7 @@ export function CollectionSection({
               variant="ghost"
               size="sm"
               onClick={() => openCreateLink(collection.id)}
-              className="h-7 gap-1 px-2 text-xs"
+              className="h-7 gap-1 px-2 text-xs text-fg/85 hover:text-fg"
             >
               <Plus className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Add Link</span>

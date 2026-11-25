@@ -31,6 +31,7 @@ export interface AddLinkInput {
   title?: string;
   note?: string;
   tags?: string[];
+  tagsLocked?: boolean;
   faviconUrl?: string;
 }
 
@@ -40,6 +41,7 @@ export interface UpdateLinkInput {
   title?: string;
   note?: string;
   tags?: string[];
+  tagsLocked?: boolean;
   faviconUrl?: string;
   order?: number;
 }

@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { stashRepo } from '@/lib/storage/repo';
+import { autoTagSingleLink } from '@/lib/tagging/auto-tagger';
 import type { Collection } from '@/lib/types/stash';
 import { normalizeInputUrl, parseTagsInput } from '@/lib/utils/url';
 import { useUiStore } from '@/store/ui-store';
@@ -29,6 +30,7 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const [tagsRaw, setTagsRaw] = useState('');
+  const [tagsTouched, setTagsTouched] = useState(false);
   const [collectionId, setCollectionId] = useState('');
   const [urlError, setUrlError] = useState<string | null>(null);
 
@@ -37,6 +39,7 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
   useEffect(() => {
     if (!modal) return;
     setUrlError(null);
+    setTagsTouched(false);
     if (modal.mode === 'edit') {
       setUrl(modal.link.url);
       setTitle(modal.link.title);
@@ -80,12 +83,18 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
     if (!collectionId) return;
 
     if (modal?.mode === 'edit') {
+      const tagsChanged =
+        tagsTouched ||
+        parsedTags.length !== modal.link.tags.length ||
+        parsedTags.some((tag, idx) => tag !== modal.link.tags[idx]);
+
       const result = await stashRepo.updateLink(modal.link.id, {
         collectionId,
         url: normalizedUrl,
         title,
         note,
         tags: parsedTags,
+        ...(tagsChanged ? { tagsLocked: true } : {}),
       });
 
       if (!result.ok) {
@@ -102,12 +111,14 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
       return;
     }
 
+    const hasManualTags = parsedTags.length > 0;
     const result = await stashRepo.addLink({
       collectionId,
       url: normalizedUrl,
       title,
       note,
       tags: parsedTags,
+      ...(hasManualTags ? { tagsLocked: true } : {}),
     });
 
     if (!result.ok) {
@@ -117,6 +128,9 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
 
     toast.success('Link stashed');
     closeLinkModal();
+    if (!hasManualTags) {
+      void autoTagSingleLink(result.link.id);
+    }
   };
 
   const handleDelete = async () => {
@@ -214,7 +228,10 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
             <Input
               id="link-tags"
               value={tagsRaw}
-              onChange={(e) => setTagsRaw(e.target.value)}
+              onChange={(e) => {
+                setTagsRaw(e.target.value);
+                setTagsTouched(true);
+              }}
               placeholder="docs, hardware, reference"
               className="font-mono text-xs"
             />

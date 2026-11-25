@@ -53,6 +53,7 @@ export interface LinkItem {
   title: string;
   note: string;
   tags: string[];
+  tagsLocked?: boolean;
   faviconUrl?: string;
   order: number;
   createdAt: string;
@@ -83,6 +84,7 @@ export interface StashSettings {
   closeTabOnQuickStash: boolean;
   openTabsSidebarVisible: boolean;
   enableOnDeviceAi: boolean;
+  autoTagOnSave: boolean;
   density: 'compact' | 'comfortable';
 }
 
@@ -140,5 +142,6 @@ export const DEFAULT_SETTINGS: StashSettings = {
   closeTabOnQuickStash: false,
   openTabsSidebarVisible: true,
   enableOnDeviceAi: true,
+  autoTagOnSave: true,
   density: 'comfortable',
 };

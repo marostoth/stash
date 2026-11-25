@@ -105,7 +105,10 @@ function OpenTabRow({
                 aria-label="Pinned tab"
               />
             )}
-            <span className="truncate text-xs font-medium text-fg">
+            <span
+              title={tab.title}
+              className="truncate text-xs font-medium text-fg"
+            >
               {tab.title}
             </span>
           </div>

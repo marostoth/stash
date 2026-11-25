@@ -5,6 +5,8 @@ import {
   Palette,
   SlidersHorizontal,
   Sparkles,
+  Tag,
+  X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -19,15 +21,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useAutoTagSweep } from '@/hooks/use-auto-tag-sweep';
 import {
   checkNanoAvailability,
   downloadNanoModel,
 } from '@/lib/categorizer/nano-engine';
 import type { NanoAvailabilityStatus } from '@/lib/categorizer/types';
 import { stashRepo } from '@/lib/storage/repo';
+import { filterEligibleLinks } from '@/lib/tagging/auto-tagger';
 import type {
   CategorizationRule,
   Collection,
+  LinkItem,
   StashSettings,
   ThemeDefinition,
 } from '@/lib/types/stash';
@@ -36,6 +41,7 @@ import { useUiStore } from '@/store/ui-store';
 
 interface SettingsModalProps {
   collections: readonly Collection[];
+  links: readonly LinkItem[];
   rules: readonly CategorizationRule[];
   settings: StashSettings;
   allThemes: readonly ThemeDefinition[];
@@ -46,6 +52,7 @@ type SettingsTab = 'rules' | 'backup' | 'themes' | 'general';
 
 export function SettingsModal({
   collections,
+  links,
   rules,
   settings,
   allThemes,
@@ -58,6 +65,8 @@ export function SettingsModal({
   const [nanoStatus, setNanoStatus] =
     useState<NanoAvailabilityStatus>('unavailable');
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const autoTagAll = useAutoTagSweep();
+  const untaggedCount = filterEligibleLinks(links).length;
 
   useEffect(() => {
     if (!open) return;
@@ -281,8 +290,53 @@ export function SettingsModal({
                   />
                 </label>
 
-                {nanoStatus === 'downloadable' && (
-                  <div className="pt-1">
+                <label className="flex cursor-pointer items-center justify-between gap-3 text-xs text-fg">
+                  <span>Auto-tag manually added links</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.autoTagOnSave}
+                    onChange={() =>
+                      void stashRepo.updateSettings({
+                        autoTagOnSave: !settings.autoTagOnSave,
+                      })
+                    }
+                    className="h-4 w-4 accent-[var(--stash-accent)] cursor-pointer"
+                  />
+                </label>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {autoTagAll.running ? (
+                    <div className="inline-flex h-8 items-center gap-2 rounded-control border border-accent/45 bg-panel px-2.5 font-mono text-xs text-fg">
+                      <span>
+                        Tagging {autoTagAll.progress?.current ?? 1} /{' '}
+                        {autoTagAll.progress?.total ?? untaggedCount}...
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={autoTagAll.cancel}
+                        className="h-6 gap-1 px-1.5 text-[11px] hover:text-danger"
+                      >
+                        <X className="h-3 w-3" />
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={
+                        untaggedCount === 0 || nanoStatus !== 'available'
+                      }
+                      onClick={() => void autoTagAll.start()}
+                      className="gap-1.5"
+                    >
+                      <Tag className="h-3.5 w-3.5 text-accent" />
+                      Auto-Tag All Untagged ({untaggedCount})
+                    </Button>
+                  )}
+
+                  {nanoStatus === 'downloadable' && (
                     <Button
                       variant="primary"
                       size="sm"
@@ -294,8 +348,8 @@ export function SettingsModal({
                         ? `Downloading model (${downloadProgress}%)...`
                         : 'Enable On-Device AI (Download Model)'}
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           )}

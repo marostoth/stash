@@ -124,10 +124,10 @@ export function TopBar({
         {/* Actions */}
         <div className="flex shrink-0 items-center gap-1.5">
           <Button
-            variant="primary"
+            variant="secondary"
             size="sm"
             onClick={openCreateCollection}
-            className="gap-1"
+            className="gap-1 border-accent/45 text-accent hover:bg-accent/10"
           >
             <Plus className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Collection</span>

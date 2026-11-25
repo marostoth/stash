@@ -8,6 +8,7 @@ import type { CategorizationSuggestion } from '@/lib/categorizer/types';
 import { stashRepo } from '@/lib/storage/repo';
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
 import { closeTabs } from '@/lib/tabs/tab-actions';
+import { autoTagSingleLink } from '@/lib/tagging/auto-tagger';
 import {
   type CategorizationRule,
   type Collection,
@@ -38,6 +39,7 @@ export function QuickStashCard({
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('');
   const [note, setNote] = useState('');
   const [tagsRaw, setTagsRaw] = useState('');
+  const [tagsEditedByUser, setTagsEditedByUser] = useState(false);
   const [suggestion, setSuggestion] = useState<CategorizationSuggestion | null>(
     null,
   );
@@ -57,6 +59,7 @@ export function QuickStashCard({
     setFaviconFailed(false);
     setNote('');
     setTagsRaw('');
+    setTagsEditedByUser(false);
     setSuggestion(null);
 
     if (!activeTab) return;
@@ -142,12 +145,15 @@ export function QuickStashCard({
 
     setSaving(true);
     try {
+      const submittedTags = parseTagsInput(tagsRaw);
+      const shouldLockTags = tagsEditedByUser || submittedTags.length > 0;
       const result = await stashRepo.addLink({
         collectionId: targetId,
         url: activeTab.url,
         title: activeTab.title,
         note,
-        tags: parseTagsInput(tagsRaw),
+        tags: submittedTags,
+        ...(shouldLockTags ? { tagsLocked: true } : {}),
         faviconUrl: activeTab.favIconUrl,
       });
 
@@ -159,6 +165,11 @@ export function QuickStashCard({
       toast.success('Tab stashed');
       setNote('');
       setTagsRaw('');
+      setTagsEditedByUser(false);
+
+      if (!shouldLockTags && submittedTags.length === 0) {
+        void autoTagSingleLink(result.link.id);
+      }
 
       if (settings.closeTabOnQuickStash) {
         await closeTabs([activeTab.id]);
@@ -332,7 +343,10 @@ export function QuickStashCard({
         />
         <Input
           value={tagsRaw}
-          onChange={(e) => setTagsRaw(e.target.value)}
+          onChange={(e) => {
+            setTagsRaw(e.target.value);
+            setTagsEditedByUser(true);
+          }}
           placeholder="Tags: docs, hardware..."
           aria-label="Tags"
           className="h-8 font-mono text-[11px]"

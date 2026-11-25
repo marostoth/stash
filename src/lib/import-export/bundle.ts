@@ -113,6 +113,7 @@ function parseLink(raw: unknown, fallbackOrder: number): LinkItem | null {
         : obj.url.trim(),
     note: typeof obj.note === 'string' ? obj.note : '',
     tags: normalizeTags(rawTags),
+    tagsLocked: obj.tagsLocked === true ? true : undefined,
     faviconUrl:
       typeof obj.faviconUrl === 'string' && obj.faviconUrl.trim()
         ? obj.faviconUrl.trim()
@@ -204,6 +205,10 @@ function parseSettings(raw: unknown): StashSettings {
       typeof obj.enableOnDeviceAi === 'boolean'
         ? obj.enableOnDeviceAi
         : DEFAULT_SETTINGS.enableOnDeviceAi,
+    autoTagOnSave:
+      typeof obj.autoTagOnSave === 'boolean'
+        ? obj.autoTagOnSave
+        : DEFAULT_SETTINGS.autoTagOnSave,
     density:
       obj.density === 'compact' || obj.density === 'comfortable'
         ? obj.density

@@ -258,6 +258,7 @@ export const stashRepo = {
       title: input.title?.trim() || extractDomain(trimmedUrl),
       note: input.note?.trim() ?? '',
       tags: normalizeTags(input.tags ?? []),
+      ...(input.tagsLocked === true ? { tagsLocked: true } : {}),
       faviconUrl: input.faviconUrl?.trim() || undefined,
       order: 0,
       createdAt: timestamp,
@@ -304,6 +305,13 @@ export const stashRepo = {
       nextOrder = targetMax + 1;
     }
 
+    const nextTagsLocked =
+      patch.tagsLocked !== undefined
+        ? patch.tagsLocked
+          ? true
+          : undefined
+        : current.tagsLocked;
+
     const updated: LinkItem = {
       ...current,
       collectionId: targetCollectionId,
@@ -314,6 +322,7 @@ export const stashRepo = {
           : current.title,
       note: patch.note !== undefined ? patch.note.trim() : current.note,
       tags: patch.tags !== undefined ? normalizeTags(patch.tags) : current.tags,
+      tagsLocked: nextTagsLocked,
       faviconUrl:
         patch.faviconUrl !== undefined
           ? patch.faviconUrl.trim() || undefined
@@ -326,6 +335,30 @@ export const stashRepo = {
       existing.map((item) => (item.id === id ? updated : item)),
     );
     return { ok: true, link: updated };
+  },
+
+  async applyAutoTagsIfEligible(
+    id: string,
+    tags: readonly string[],
+  ): Promise<LinkItem | null> {
+    const cleaned = normalizeTags(tags).slice(0, 3);
+    if (cleaned.length === 0) return null;
+
+    const existing = await linksStorage.getValue();
+    const current = existing.find((item) => item.id === id);
+    if (!current || current.tagsLocked || current.tags.length > 0) {
+      return null;
+    }
+
+    const updated: LinkItem = {
+      ...current,
+      tags: cleaned,
+      updatedAt: nowIso(),
+    };
+    await linksStorage.setValue(
+      existing.map((item) => (item.id === id ? updated : item)),
+    );
+    return updated;
   },
 
   async moveOrReorderLink(
