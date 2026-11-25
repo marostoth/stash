@@ -67,6 +67,9 @@ export const LinkCard = memo(function LinkCard({
   const schedulePreview = useUiStore((s) => s.schedulePreview);
   const dismissPreview = useUiStore((s) => s.dismissPreview);
   const isTagging = useUiStore((s) => s.taggingLinkIds.includes(link.id));
+  const isKeyboardFocused = useUiStore(
+    (s) => s.keyboardFocusedLinkId === link.id,
+  );
 
   // Track previously rendered tags so only newly arriving AI tags pop in
   const seenTagsRef = useRef<Set<string>>(new Set(link.tags));
@@ -298,6 +301,8 @@ export const LinkCard = memo(function LinkCard({
             isStarred && 'stash-card-starred',
             !dragDisabled && 'cursor-grab active:cursor-grabbing',
             isDropTarget && 'border-accent ring-2 ring-accent/40',
+            isKeyboardFocused &&
+              'border-accent ring-2 ring-accent/75 ring-offset-2 ring-offset-canvas',
             isHighlighted && !arcade && 'stash-duplicate-pulse',
             isHighlighted && arcade && 'border-danger ring-2 ring-danger/45',
             isTagging && arcade && 'border-accent/65',

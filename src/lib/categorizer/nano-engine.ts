@@ -6,6 +6,12 @@ import {
   stripJsonFences,
 } from '@/lib/categorizer/nano-helpers';
 
+export {
+  acquireWarmNanoSession,
+  disposeWarmNanoSession,
+  prewarmNanoCategorizer,
+  releaseWarmNanoSession,
+} from '@/lib/categorizer/nano-prewarm';
 export { findBestExistingCollectionMatch };
 
 import type {

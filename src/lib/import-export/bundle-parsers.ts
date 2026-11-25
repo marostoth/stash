@@ -229,6 +229,10 @@ export function parseSettings(raw: unknown): StashSettings {
       obj.boardWidth === 'standard' || obj.boardWidth === 'wide'
         ? obj.boardWidth
         : DEFAULT_SETTINGS.boardWidth,
+    lastBackupAt:
+      typeof obj.lastBackupAt === 'string' && obj.lastBackupAt.trim()
+        ? obj.lastBackupAt.trim()
+        : undefined,
     customThemes: [],
   };
 }

@@ -8,7 +8,7 @@ import {
 import { isSortable } from '@dnd-kit/react/sortable';
 import { SearchX } from 'lucide-react';
 import { MotionConfig } from 'motion/react';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Toaster, toast } from 'sonner';
 import { HealthCheckModal } from '@/components/HealthCheckModal';
 import { ReorganizeModal } from '@/components/reorganize/ReorganizeModal';
@@ -73,10 +73,18 @@ export function Workbench() {
   const trayHeightPx = useBackgroundJobsStore((s) => s.trayHeightPx);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  useWorkbenchShortcuts({
-    searchInputRef,
-    hoverPreviews: settings.hoverPreviews,
-  });
+  // Hydrate initial search query when opened from Chrome's `s <query>` omnibox
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const initialQuery = params.get('q')?.trim();
+    if (!initialQuery) return;
+    setSearchQuery(initialQuery);
+    params.delete('q');
+    const cleanSearch = params.toString();
+    const nextUrl = `${window.location.pathname}${cleanSearch ? `?${cleanSearch}` : ''}${window.location.hash}`;
+    window.history.replaceState(null, '', nextUrl);
+    searchInputRef.current?.focus();
+  }, [setSearchQuery]);
 
   const revealDuplicate = useCallback(
     async (existingLinkId: string, targetCollectionId: string) => {
@@ -237,6 +245,21 @@ export function Workbench() {
   );
 
   const isFiltering = searchQuery.trim().length > 0 || starredOnly;
+  const visibleLinks = useMemo(
+    () =>
+      groups.flatMap((group) =>
+        !group.collection.collapsed || isFiltering ? group.links : [],
+      ),
+    [groups, isFiltering],
+  );
+
+  useWorkbenchShortcuts({
+    searchInputRef,
+    hoverPreviews: settings.hoverPreviews,
+    visibleLinks,
+    openLinkInNewTab: settings.openLinkInNewTab,
+  });
+
   const wideBoard = settings.boardWidth === 'wide';
 
   return (

@@ -97,7 +97,7 @@ function readExtensionVersion(): string {
   } catch {
     // Fallback outside extension runtime
   }
-  return 'v1.9.0';
+  return 'v1.11.0';
 }
 
 export function SettingsModal({
@@ -276,7 +276,11 @@ export function SettingsModal({
               onOpenReorganize={openReorganize}
             />
           ) : (
-            <BackupImportPanel />
+            <BackupImportPanel
+              settings={settings}
+              linkCount={links.length}
+              collectionCount={collections.length}
+            />
           )}
         </div>
       </DialogContent>

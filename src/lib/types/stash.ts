@@ -114,6 +114,7 @@ export interface StashSettings {
   visualPreviewsEnabled: boolean;
   density: CardDensity;
   boardWidth: BoardWidthMode;
+  lastBackupAt?: string;
   customThemes?: ThemeDefinition[];
 }
 

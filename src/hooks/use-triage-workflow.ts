@@ -3,8 +3,12 @@ import { toast } from 'sonner';
 import { playDelete } from '@/lib/audio/foley';
 import { categorizeLink } from '@/lib/categorizer/categorizer';
 import {
+  acquireWarmNanoSession,
   createNanoCategorizerSession,
+  disposeWarmNanoSession,
   type NanoCategorizerSession,
+  prewarmNanoCategorizer,
+  releaseWarmNanoSession,
 } from '@/lib/categorizer/nano-engine';
 import { evaluateTier1Rules } from '@/lib/categorizer/rules-engine';
 import type { CategorizationSuggestion } from '@/lib/categorizer/types';
@@ -94,18 +98,22 @@ export function useTriageWorkflow(
       cancelAnalysisRef.current = true;
       abortControllerRef.current?.abort();
       abortControllerRef.current = null;
+      disposeWarmNanoSession();
     };
   }, []);
 
   useEffect(() => {
     if (!triageOpen) return;
+    if (settings.enableOnDeviceAi) {
+      void prewarmNanoCategorizer(true);
+    }
     const job = useBackgroundJobsStore
       .getState()
       .jobs.find((j) => j.id === 'triage');
     if (job?.status === 'ready') {
       useBackgroundJobsStore.getState().removeJob('triage');
     }
-  }, [triageOpen]);
+  }, [settings.enableOnDeviceAi, triageOpen]);
 
   useEffect(() => {
     if (!triageCollectionId || !sessionCollection) {
@@ -150,6 +158,7 @@ export function useTriageWorkflow(
       const nextRows: TriageRow[] = [];
       const validDestIds = new Set(destinationCollections.map((c) => c.id));
       let nanoSession: NanoCategorizerSession | null = null;
+      let borrowedWarmSession = false;
       let triedCreateNano = false;
 
       try {
@@ -174,8 +183,8 @@ export function useTriageWorkflow(
             onCancel: cancelAndClear,
           });
 
-          // Tier 1 rules run instantly (0ms); lazily create ONE base Nano session
-          // only on the first link that misses all Tier 1 rules.
+          // Tier 1 rules run instantly (0ms); lazily reuse a warm Nano session
+          // (or create ONE base session) only on the first link that misses Tier 1 rules.
           const ruleHit = evaluateTier1Rules(
             { url: link.url, title: link.title },
             rules,
@@ -187,9 +196,15 @@ export function useTriageWorkflow(
           } else {
             if (settings.enableOnDeviceAi && !triedCreateNano) {
               triedCreateNano = true;
-              nanoSession = await createNanoCategorizerSession(
-                controller.signal,
-              );
+              const warm = await acquireWarmNanoSession(controller.signal);
+              if (warm) {
+                nanoSession = warm;
+                borrowedWarmSession = true;
+              } else {
+                nanoSession = await createNanoCategorizerSession(
+                  controller.signal,
+                );
+              }
             }
             if (cancelAnalysisRef.current || controller.signal.aborted) break;
             suggestion = await categorizeLink(
@@ -218,7 +233,11 @@ export function useTriageWorkflow(
           });
         }
       } finally {
-        nanoSession?.destroy();
+        if (borrowedWarmSession) {
+          releaseWarmNanoSession(nanoSession);
+        } else {
+          nanoSession?.destroy();
+        }
         if (abortControllerRef.current === controller) {
           abortControllerRef.current = null;
         }

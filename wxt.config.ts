@@ -17,9 +17,27 @@ export default defineConfig({
       'tabs',
       'tabGroups',
       'sidePanel',
+      'contextMenus',
     ],
     optional_permissions: ['bookmarks'],
     optional_host_permissions: ['https://*/*', 'http://*/*'],
+    omnibox: {
+      keyword: 's',
+    },
+    commands: {
+      'open-stash-sidepanel': {
+        suggested_key: {
+          default: 'Alt+Shift+S',
+        },
+        description: 'Open Stash Side Panel',
+      },
+      'quick-stash-active-tab': {
+        suggested_key: {
+          default: 'Alt+Shift+D',
+        },
+        description: 'Quick-stash active tab',
+      },
+    },
     action: {
       default_title: 'Open Stash Side Panel',
     },

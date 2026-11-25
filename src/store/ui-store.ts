@@ -34,6 +34,7 @@ export interface PreviewTarget {
 interface UiStoreState {
   searchQuery: string;
   starredOnly: boolean;
+  keyboardFocusedLinkId: string | null;
   collectionModal: CollectionModalState;
   linkModal: LinkModalState;
   settingsOpen: boolean;
@@ -50,6 +51,7 @@ interface UiStoreState {
   setSearchQuery: (query: string) => void;
   setStarredOnly: (starredOnly: boolean) => void;
   toggleStarredOnly: () => void;
+  setKeyboardFocusedLinkId: (linkId: string | null) => void;
   openCreateCollection: () => void;
   openEditCollection: (collection: Collection) => void;
   closeCollectionModal: () => void;
@@ -93,6 +95,7 @@ function clearPreviewTimer(): void {
 export const useUiStore = create<UiStoreState>((set) => ({
   searchQuery: '',
   starredOnly: false,
+  keyboardFocusedLinkId: null,
   collectionModal: null,
   linkModal: null,
   settingsOpen: false,
@@ -107,10 +110,16 @@ export const useUiStore = create<UiStoreState>((set) => ({
   hoveredPreviewCandidate: null,
   activePreview: null,
 
-  setSearchQuery: (query) => set({ searchQuery: query }),
-  setStarredOnly: (starredOnly) => set({ starredOnly }),
+  setSearchQuery: (query) =>
+    set({ searchQuery: query, keyboardFocusedLinkId: null }),
+  setStarredOnly: (starredOnly) =>
+    set({ starredOnly, keyboardFocusedLinkId: null }),
   toggleStarredOnly: () =>
-    set((state) => ({ starredOnly: !state.starredOnly })),
+    set((state) => ({
+      starredOnly: !state.starredOnly,
+      keyboardFocusedLinkId: null,
+    })),
+  setKeyboardFocusedLinkId: (linkId) => set({ keyboardFocusedLinkId: linkId }),
 
   openCreateCollection: () => {
     clearPreviewTimer();

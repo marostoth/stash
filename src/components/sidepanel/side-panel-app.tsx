@@ -6,13 +6,17 @@ import {
   X,
 } from 'lucide-react';
 import { MotionConfig } from 'motion/react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Toaster } from 'sonner';
 import { LinkFavicon } from '@/components/LinkFavicon';
 import { QuickStashCard } from '@/components/sidepanel/quick-stash-card';
 import { Button } from '@/components/ui/button';
 import { useActiveTab } from '@/hooks/use-active-tab';
 import { useStashData } from '@/hooks/use-stash-data';
+import {
+  disposeWarmNanoSession,
+  prewarmNanoCategorizer,
+} from '@/lib/categorizer/nano-engine';
 import { resolveReducedMotionPolicy } from '@/lib/motion/physics';
 import { stashRepo } from '@/lib/storage/repo';
 import { getCuratedCollectionIcon } from '@/lib/themes/collection-icons';
@@ -25,6 +29,16 @@ export function SidePanelApp() {
   const { activeTab, loading: loadingTab } = useActiveTab();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+
+  // Quietly pre-warm Gemini Nano when Side Panel mounts so quick-stash AI feels instant
+  useEffect(() => {
+    if (settings.enableOnDeviceAi) {
+      void prewarmNanoCategorizer(true);
+    }
+    return () => {
+      disposeWarmNanoSession();
+    };
+  }, [settings.enableOnDeviceAi]);
 
   const groups = useMemo(
     () => groupAndFilterCollections(collections, links, searchQuery),

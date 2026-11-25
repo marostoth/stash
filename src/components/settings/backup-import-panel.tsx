@@ -1,15 +1,23 @@
 import {
   Bookmark,
+  Check,
+  Copy,
   Download,
   FileCode2,
   FolderSync,
   Loader2,
+  Sparkles,
   Upload,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { SettingsSectionCard } from '@/components/settings/settings-section-card';
 import { Button } from '@/components/ui/button';
+import {
+  type AiAuditPromptMode,
+  buildAiAuditPrompt,
+} from '@/lib/import-export/ai-audit-prompt';
+import { getBackupStaleness } from '@/lib/import-export/backup-status';
 import { parseNetscapeBookmarksHtml } from '@/lib/import-export/bookmarks-html';
 import {
   buildExportBundle,
@@ -21,11 +29,23 @@ import {
   triggerFileDownload,
 } from '@/lib/import-export/chrome-bookmarks';
 import { stashRepo } from '@/lib/storage/repo';
-import type { StashExportBundle } from '@/lib/types/stash';
+import type { StashExportBundle, StashSettings } from '@/lib/types/stash';
+import { cn } from '@/lib/utils/cn';
 
-export function BackupImportPanel() {
+interface BackupImportPanelProps {
+  settings: StashSettings;
+  linkCount: number;
+  collectionCount: number;
+}
+
+export function BackupImportPanel({
+  settings,
+  linkCount,
+  collectionCount,
+}: BackupImportPanelProps) {
   const jsonInputRef = useRef<HTMLInputElement | null>(null);
   const htmlInputRef = useRef<HTMLInputElement | null>(null);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [pendingBundle, setPendingBundle] = useState<StashExportBundle | null>(
     null,
@@ -33,14 +53,49 @@ export function BackupImportPanel() {
   const [busyAction, setBusyAction] = useState<
     'merge' | 'replace' | 'chrome' | 'html' | null
   >(null);
+  const [promptMode, setPromptMode] = useState<AiAuditPromptMode>('audit');
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
   const busy = busyAction !== null;
 
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current);
+      }
+    };
+  }, []);
+
+  const staleness = getBackupStaleness(settings.lastBackupAt, linkCount);
+
   const handleExportJson = async () => {
+    const exportedAt = new Date().toISOString();
     const snapshot = await stashRepo.getSnapshot();
-    const bundle = buildExportBundle(snapshot);
+    const bundle = buildExportBundle(snapshot, exportedAt);
     const filename = formatBackupFilename();
     triggerFileDownload(filename, `${JSON.stringify(bundle, null, 2)}\n`);
+    await stashRepo.updateSettings({ lastBackupAt: exportedAt });
     toast.success(`Exported ${filename}`);
+  };
+
+  const handleCopyAuditPrompt = async () => {
+    const prompt = buildAiAuditPrompt(promptMode, {
+      linkCount,
+      collectionCount,
+    });
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopiedPrompt(true);
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current);
+      }
+      copiedTimerRef.current = setTimeout(() => {
+        setCopiedPrompt(false);
+        copiedTimerRef.current = null;
+      }, 2200);
+      toast.success('AI audit prompt copied to clipboard');
+    } catch {
+      toast.error('Could not access clipboard.');
+    }
   };
 
   const handleSelectBackupFile = async (
@@ -138,6 +193,18 @@ export function BackupImportPanel() {
         title="JSON Backup & Restore"
         subtitle="Export your entire Stash library—collections, links, notes, tags, rules, settings, and custom themes—as a single portable JSON file."
         badge={{ label: 'Schema v1', tone: 'neutral' }}
+        headerAction={
+          <span
+            className={cn(
+              'rounded-pill border px-2 py-0.5 font-mono text-[10px]',
+              staleness.isStale
+                ? 'border-amber-500/40 bg-amber-500/15 text-amber-400'
+                : 'border-border bg-panel text-fg-muted',
+            )}
+          >
+            {staleness.label}
+          </span>
+        }
       >
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -211,6 +278,72 @@ export function BackupImportPanel() {
             </div>
           </div>
         )}
+      </SettingsSectionCard>
+
+      {/* AI Library Audit (External LLM) */}
+      <SettingsSectionCard
+        icon={<Sparkles className="h-4 w-4" />}
+        title="AI Library Audit (External LLM)"
+        subtitle="Use Gemini, Claude, or ChatGPT to audit dead links, modernize outdated tools, or rebalance your collections without breaking Stash's schema."
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <fieldset
+            aria-label="AI audit prompt mode"
+            className="inline-flex rounded-control border border-border bg-panel p-0.5"
+          >
+            <button
+              type="button"
+              aria-pressed={promptMode === 'audit'}
+              onClick={() => setPromptMode('audit')}
+              className={cn(
+                'rounded-[calc(var(--stash-radius-control)-2px)] px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer',
+                promptMode === 'audit'
+                  ? 'bg-accent text-accent-fg'
+                  : 'text-fg-muted hover:text-fg',
+              )}
+            >
+              Full Audit &amp; Modernize
+            </button>
+            <button
+              type="button"
+              aria-pressed={promptMode === 'reorganize'}
+              onClick={() => setPromptMode('reorganize')}
+              className={cn(
+                'rounded-[calc(var(--stash-radius-control)-2px)] px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer',
+                promptMode === 'reorganize'
+                  ? 'bg-accent text-accent-fg'
+                  : 'text-fg-muted hover:text-fg',
+              )}
+            >
+              Reorganize Only
+            </button>
+          </fieldset>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void handleCopyAuditPrompt()}
+            className="gap-1.5 border-accent/45 text-accent hover:bg-accent/10"
+          >
+            {copiedPrompt ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+            {copiedPrompt ? 'Copied!' : 'Copy AI Audit Prompt'}
+          </Button>
+        </div>
+
+        <div className="space-y-1">
+          <p className="font-mono text-[10px] text-fg-muted">
+            Export JSON → Copy Prompt → Drop both into Gemini/Claude → Import
+            (Replace).
+          </p>
+          <p className="text-[11px] text-fg-muted/85">
+            Tip: You can remove any private or internal URLs from your exported
+            JSON before uploading it to an external LLM.
+          </p>
+        </div>
       </SettingsSectionCard>
 
       {/* Bookmark Importers */}

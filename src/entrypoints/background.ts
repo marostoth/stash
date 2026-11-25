@@ -1,3 +1,5 @@
+import { registerContextMenuAndCommands } from '@/lib/background/context-menu-handler';
+import { registerOmniboxHandler } from '@/lib/background/omnibox-handler';
 import { registerHealthScanPortListener } from '@/lib/health/scanner';
 import { FETCH_OG_PREVIEW_MESSAGE } from '@/lib/previews/preview-client';
 import {
@@ -7,6 +9,8 @@ import {
 
 export default defineBackground(() => {
   registerHealthScanPortListener();
+  registerOmniboxHandler();
+  registerContextMenuAndCommands();
 
   if (browser.sidePanel?.setPanelBehavior) {
     browser.sidePanel

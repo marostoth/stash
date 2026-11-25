@@ -5,6 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { playDrop, playError } from '@/lib/audio/foley';
 import { categorizeLink } from '@/lib/categorizer/categorizer';
+import {
+  acquireWarmNanoSession,
+  type NanoCategorizerSession,
+  releaseWarmNanoSession,
+} from '@/lib/categorizer/nano-engine';
 import type { CategorizationSuggestion } from '@/lib/categorizer/types';
 import { stashRepo } from '@/lib/storage/repo';
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
@@ -68,15 +73,22 @@ export function QuickStashCard({
     let cancelled = false;
     setCategorizing(true);
 
-    categorizeLink(
-      { url: activeTab.url, title: activeTab.title },
-      {
-        rules,
-        collections,
-        enableOnDeviceAi: settings.enableOnDeviceAi,
-      },
-    )
-      .then((result) => {
+    const runSuggestion = async () => {
+      let warmSession: NanoCategorizerSession | null = null;
+      try {
+        if (settings.enableOnDeviceAi) {
+          warmSession = await acquireWarmNanoSession();
+        }
+        if (cancelled) return;
+        const result = await categorizeLink(
+          { url: activeTab.url, title: activeTab.title },
+          {
+            rules,
+            collections,
+            enableOnDeviceAi: settings.enableOnDeviceAi,
+            nanoSession: warmSession,
+          },
+        );
         if (cancelled) return;
         setSuggestion(result);
         if (result.collectionId) {
@@ -90,10 +102,13 @@ export function QuickStashCard({
         if (result.summaryNote) {
           setNote(result.summaryNote);
         }
-      })
-      .finally(() => {
+      } finally {
+        releaseWarmNanoSession(warmSession);
         if (!cancelled) setCategorizing(false);
-      });
+      }
+    };
+
+    void runSuggestion();
 
     return () => {
       cancelled = true;
