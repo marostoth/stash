@@ -11,6 +11,7 @@ import { MotionConfig } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Toaster, toast } from 'sonner';
 import { HealthCheckModal } from '@/components/HealthCheckModal';
+import { ReorganizeModal } from '@/components/reorganize/ReorganizeModal';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { Button } from '@/components/ui/button';
 import { CollectionModal } from '@/components/workbench/collection-modal';
@@ -385,6 +386,11 @@ export function Workbench() {
             activeTheme={activeTheme}
           />
           <HealthCheckModal collections={collections} links={links} />
+          <ReorganizeModal
+            collections={collections}
+            links={links}
+            settings={settings}
+          />
           <TriageModal
             collections={collections}
             links={links}

@@ -67,6 +67,7 @@ export function SettingsModal({
   const open = useUiStore((s) => s.settingsOpen);
   const closeSettings = useUiStore((s) => s.closeSettings);
   const openHealthCheck = useUiStore((s) => s.openHealthCheck);
+  const openReorganize = useUiStore((s) => s.openReorganize);
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('rules');
   const [nanoStatus, setNanoStatus] =
@@ -334,7 +335,7 @@ export function SettingsModal({
                   root redirects, duplicates, and search/dev clutter—with safe
                   bulk cleanup and 8-second Undo.
                 </p>
-                <div className="pt-0.5">
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
                   <Button
                     variant="secondary"
                     size="sm"
@@ -344,7 +345,28 @@ export function SettingsModal({
                     <HeartPulse className="h-3.5 w-3.5 text-accent" />
                     Library Health Check ({links.length} links)
                   </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={nanoStatus !== 'available' || links.length === 0}
+                    onClick={openReorganize}
+                    className="gap-1.5"
+                    title={
+                      nanoStatus !== 'available'
+                        ? 'Requires Chrome on-device Gemini Nano (enable below)'
+                        : 'Restructure collections with 2-pass on-device AI'
+                    }
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-accent" />
+                    Smart Reorganize (AI)
+                  </Button>
                 </div>
+                {nanoStatus !== 'available' ? (
+                  <p className="font-mono text-[10px] text-fg-muted">
+                    Smart Reorganize requires Chrome&apos;s on-device Gemini
+                    Nano model (status: {nanoStatus}).
+                  </p>
+                ) : null}
               </div>
 
               {/* Tier 2 On-Device AI */}

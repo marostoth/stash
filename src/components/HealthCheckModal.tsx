@@ -1,11 +1,13 @@
 import {
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   Download,
   HeartPulse,
   Layers,
   ScanSearch,
   ShieldAlert,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
@@ -47,7 +49,9 @@ export function HealthCheckModal({
 }: HealthCheckModalProps) {
   const open = useUiStore((s) => s.healthCheckOpen);
   const closeHealthCheck = useUiStore((s) => s.closeHealthCheck);
+  const openReorganize = useUiStore((s) => s.openReorganize);
   const [removing, setRemoving] = useState(false);
+  const [didCleanup, setDidCleanup] = useState(false);
 
   const {
     hasPermission,
@@ -156,6 +160,7 @@ export function HealthCheckModal({
         return next;
       });
       playDelete();
+      setDidCleanup(true);
 
       const count = removed.length;
       toast(`Removed ${count} link${count === 1 ? '' : 's'}`, {
@@ -367,6 +372,18 @@ export function HealthCheckModal({
           </div>
 
           <div className="flex items-center gap-2">
+            {(hasScanned || didCleanup) && !scanning ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={openReorganize}
+                className="gap-1.5"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-accent" />
+                Next: Smart Reorganize
+                <ArrowRight className="h-3 w-3" />
+              </Button>
+            ) : null}
             <Button variant="ghost" size="sm" onClick={closeHealthCheck}>
               Close
             </Button>

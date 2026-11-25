@@ -1,5 +1,6 @@
 import type { ImportedBookmarkFolder } from '@/lib/import-export/bookmarks-html';
 import type { RestoreStats } from '@/lib/import-export/bundle';
+import type { LibraryBoardState } from '@/lib/reorganize/plan';
 import {
   type BookmarkImportSummary,
   deleteCustomThemeInStorage,
@@ -18,6 +19,10 @@ import {
   linksStorage,
   settingsStorage,
 } from '@/lib/storage/items';
+import {
+  applyReorganizationInStorage,
+  restoreLibrarySnapshotInStorage,
+} from '@/lib/storage/reorganize-ops';
 import {
   type AddLinkInput,
   type AddLinkResult,
@@ -484,9 +489,12 @@ export const stashRepo = {
     return restoreBundleInStorage(current, bundle, mode);
   },
 
-  importBookmarkFolders(
+  importBookmarkFolders: (
     folders: readonly ImportedBookmarkFolder[],
-  ): Promise<BookmarkImportSummary> {
-    return importBookmarkFoldersInStorage(folders);
-  },
+  ): Promise<BookmarkImportSummary> => importBookmarkFoldersInStorage(folders),
+  applyReorganization: (
+    nextState: LibraryBoardState,
+  ): Promise<LibraryBoardState> => applyReorganizationInStorage(nextState),
+  restoreLibrarySnapshot: (snapshot: LibraryBoardState): Promise<void> =>
+    restoreLibrarySnapshotInStorage(snapshot),
 };

@@ -70,6 +70,8 @@ export interface LanguageModelPromptOptions {
 export interface LanguageModelSession {
   prompt(input: string, options?: LanguageModelPromptOptions): Promise<string>;
   clone?(options?: { signal?: AbortSignal }): Promise<LanguageModelSession>;
+  measureInputUsage?(input: string): Promise<number>;
+  inputQuota?: number;
   destroy(): void;
 }
 

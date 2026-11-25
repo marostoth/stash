@@ -384,4 +384,64 @@ describe('stashRepo', () => {
       order: 0,
     });
   });
+
+  it('atomically applies reorganization and restores exact pre-reorganize board snapshot on Undo', async () => {
+    const colImported = await stashRepo.createCollection({
+      name: 'Imported Bookmarks',
+    });
+    const l1 = await stashRepo.addLink({
+      collectionId: colImported.id,
+      url: 'https://github.com/wxt-dev/wxt',
+      title: 'WXT',
+      note: 'Great MV3 tool',
+      tags: ['mv3'],
+      tagsLocked: true,
+    });
+    const l2 = await stashRepo.addLink({
+      collectionId: colImported.id,
+      url: 'https://figma.com',
+      title: 'Figma',
+    });
+    expect(l1.ok && l2.ok).toBe(true);
+    if (!l1.ok || !l2.ok) return;
+
+    const now = new Date().toISOString();
+    const newCol = {
+      id: 'reorg-dev',
+      name: 'Dev & Design',
+      color: 'cyan' as const,
+      order: 0,
+      collapsed: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const previousSnapshot = await stashRepo.applyReorganization({
+      collections: [newCol],
+      links: [
+        { ...l1.link, collectionId: newCol.id, order: 0 },
+        { ...l2.link, collectionId: newCol.id, order: 1 },
+      ],
+    });
+
+    expect((await stashRepo.getCollections()).map((c) => c.name)).toEqual([
+      'Dev & Design',
+    ]);
+    expect(
+      (await stashRepo.getLinks()).every((l) => l.collectionId === newCol.id),
+    ).toBe(true);
+
+    // Undo restores exact original collections and link metadata
+    await stashRepo.restoreLibrarySnapshot(previousSnapshot);
+    const restoredCols = await stashRepo.getCollections();
+    const restoredLinks = await stashRepo.getLinks();
+
+    expect(restoredCols.map((c) => c.id)).toEqual([colImported.id]);
+    expect(restoredLinks.find((l) => l.id === l1.link.id)).toMatchObject({
+      collectionId: colImported.id,
+      note: 'Great MV3 tool',
+      tags: ['mv3'],
+      tagsLocked: true,
+    });
+  });
 });
