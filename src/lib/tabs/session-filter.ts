@@ -9,6 +9,7 @@ export interface OpenTabInfo {
   favIconUrl?: string;
   pinned: boolean;
   active: boolean;
+  audible?: boolean;
 }
 
 export interface RawTabLike {
@@ -21,6 +22,7 @@ export interface RawTabLike {
   favIconUrl?: string;
   pinned?: boolean;
   active?: boolean;
+  audible?: boolean;
 }
 
 const EXCLUDED_PROTOCOLS = new Set([
@@ -70,6 +72,7 @@ export function normalizeRawTabs(
           : undefined,
       pinned: Boolean(tab.pinned),
       active: Boolean(tab.active),
+      audible: Boolean(tab.audible),
     });
   }
   return result.sort((a, b) => a.index - b.index);

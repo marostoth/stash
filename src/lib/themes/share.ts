@@ -27,6 +27,9 @@ const VALID_BACKDROP_STYLES = new Set<BackdropStyle>([
   'dot-matrix',
   'grid',
   'ambient-glow',
+  'vignette',
+  'mesh-glow',
+  'noise-grain',
 ]);
 
 export interface CompactThemeSharePayload {

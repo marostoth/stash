@@ -1,6 +1,7 @@
-import { Check, CheckCircle2, Sparkles, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Loader2, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { AiActivityPanel } from '@/components/ui/ai-activity-panel';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -10,7 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input, Select } from '@/components/ui/input';
+import { Select } from '@/components/ui/input';
+import { TriageRowCard } from '@/components/workbench/triage-row-card';
 import { categorizeLink } from '@/lib/categorizer/categorizer';
 import type { CategorizationSuggestion } from '@/lib/categorizer/types';
 import { stashRepo } from '@/lib/storage/repo';
@@ -20,7 +22,7 @@ import type {
   LinkItem,
   StashSettings,
 } from '@/lib/types/stash';
-import { extractDomain, getMonogram, normalizeTags } from '@/lib/utils/url';
+import { normalizeTags } from '@/lib/utils/url';
 import { useUiStore } from '@/store/ui-store';
 
 interface TriageModalProps {
@@ -50,7 +52,13 @@ export function TriageModal({
 
   const [rows, setRows] = useState<TriageRow[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeProgress, setAnalyzeProgress] = useState<{
+    current: number;
+    total: number;
+    title: string;
+  } | null>(null);
   const [applying, setApplying] = useState(false);
+  const cancelAnalysisRef = useRef(false);
   const [deleteEmptySession, setDeleteEmptySession] = useState(true);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [editingCustomRowId, setEditingCustomRowId] = useState<string | null>(
@@ -86,13 +94,24 @@ export function TriageModal({
       return;
     }
 
-    let cancelled = false;
+    cancelAnalysisRef.current = false;
     setAnalyzing(true);
+    setAnalyzeProgress({
+      current: 0,
+      total: sessionLinks.length,
+      title: sessionLinks[0]?.title ?? '',
+    });
 
     const runCategorization = async () => {
       const nextRows: TriageRow[] = [];
-      for (const link of sessionLinks) {
-        if (cancelled) return;
+      for (let i = 0; i < sessionLinks.length; i++) {
+        const link = sessionLinks[i];
+        if (!link || cancelAnalysisRef.current) break;
+        setAnalyzeProgress({
+          current: i,
+          total: sessionLinks.length,
+          title: link.title,
+        });
         const suggestion = await categorizeLink(
           { url: link.url, title: link.title },
           {
@@ -101,22 +120,27 @@ export function TriageModal({
             enableOnDeviceAi: settings.enableOnDeviceAi,
           },
         );
+        if (cancelAnalysisRef.current) break;
         const defaultDest =
           suggestion.collectionId ??
           (suggestion.suggestedNewCollection
             ? `${NEW_PREFIX}${suggestion.suggestedNewCollection}`
             : '');
         nextRows.push({ link, suggestion, destination: defaultDest });
+        setAnalyzeProgress({
+          current: i + 1,
+          total: sessionLinks.length,
+          title: link.title,
+        });
       }
-      if (!cancelled) {
-        setRows(nextRows);
-        setAnalyzing(false);
-      }
+      setRows(nextRows);
+      setAnalyzing(false);
+      setAnalyzeProgress(null);
     };
 
     void runCategorization();
     return () => {
-      cancelled = true;
+      cancelAnalysisRef.current = true;
     };
   }, [
     triageCollectionId,
@@ -332,138 +356,53 @@ export function TriageModal({
 
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {analyzing ? (
-            <div className="py-12 text-center font-mono text-xs text-fg-muted">
-              Categorizing {sessionLinks.length} saved tab
-              {sessionLinks.length === 1 ? '' : 's'}...
+            <div className="py-3">
+              <AiActivityPanel
+                title={`Categorizing ${analyzeProgress?.current ?? 0} / ${analyzeProgress?.total ?? sessionLinks.length} links...`}
+                subtitle={
+                  analyzeProgress?.title ||
+                  'Checking local rules and on-device Gemini Nano...'
+                }
+                progress={
+                  analyzeProgress
+                    ? {
+                        current: analyzeProgress.current,
+                        total: analyzeProgress.total,
+                      }
+                    : null
+                }
+                showElapsed
+                skeletonRows={Math.min(4, Math.max(2, sessionLinks.length))}
+                onCancel={() => {
+                  cancelAnalysisRef.current = true;
+                }}
+              />
             </div>
           ) : rows.length === 0 ? (
             <div className="py-10 text-center text-xs text-fg-muted">
               This session has no links to categorize.
             </div>
           ) : (
-            rows.map(({ link, suggestion, destination }) => {
-              const isCreatingCustom = editingCustomRowId === link.id;
-              const isNewDest = destination.startsWith(NEW_PREFIX);
-              return (
-                <div
-                  key={link.id}
-                  className="flex flex-col gap-2.5 rounded-card border border-border bg-canvas p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                    <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-panel font-mono text-[10px] font-semibold text-accent">
-                      {link.faviconUrl ? (
-                        <img
-                          src={link.faviconUrl}
-                          alt=""
-                          width={14}
-                          height={14}
-                          className="h-3.5 w-3.5 object-contain"
-                        />
-                      ) : (
-                        <span>{getMonogram(link.title, link.url)}</span>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-xs font-medium text-fg">
-                        {link.title}
-                      </div>
-                      <div className="truncate font-mono text-[10px] text-fg-muted">
-                        {extractDomain(link.url)}
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-1">
-                        {suggestion.source === 'rule' && (
-                          <span className="rounded-pill border border-accent/35 bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent">
-                            Rule: {suggestion.matchedRuleName}
-                          </span>
-                        )}
-                        {suggestion.source === 'nano' && (
-                          <span className="rounded-pill border border-accent/35 bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent">
-                            On-Device AI
-                          </span>
-                        )}
-                        {isNewDest && (
-                          <span className="rounded-pill border border-accent/40 bg-panel px-1.5 py-0.5 font-mono text-[10px] text-accent">
-                            New category
-                          </span>
-                        )}
-                        {suggestion.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded-pill border border-border bg-panel px-1.5 py-0.5 font-mono text-[10px] text-fg-muted"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="w-full shrink-0 sm:w-56">
-                    {isCreatingCustom ? (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          value={customDraft}
-                          onChange={(e) => setCustomDraft(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              commitCustomCategory(link.id);
-                            } else if (e.key === 'Escape') {
-                              setEditingCustomRowId(null);
-                            }
-                          }}
-                          placeholder="Category name..."
-                          className="h-8 text-xs"
-                          autoFocus
-                        />
-                        <Button
-                          variant="primary"
-                          size="icon"
-                          className="h-8 w-8 shrink-0"
-                          aria-label="Confirm new category"
-                          onClick={() => commitCustomCategory(link.id)}
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0"
-                          aria-label="Cancel new category"
-                          onClick={() => setEditingCustomRowId(null)}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <Select
-                        aria-label={`Destination for ${link.title}`}
-                        value={destination}
-                        onChange={(e) =>
-                          handleChangeDestination(link.id, e.target.value)
-                        }
-                        className="h-8 text-xs"
-                      >
-                        <option value="">Keep in session</option>
-                        {availableNewCategories.map((name) => (
-                          <option key={name} value={`${NEW_PREFIX}${name}`}>
-                            + Create &ldquo;{name}&rdquo;
-                          </option>
-                        ))}
-                        {destinationCollections.map((col) => (
-                          <option key={col.id} value={col.id}>
-                            {col.name}
-                          </option>
-                        ))}
-                        <option value={CREATE_CUSTOM_SENTINEL}>
-                          + Custom new category...
-                        </option>
-                      </Select>
-                    )}
-                  </div>
-                </div>
-              );
-            })
+            rows.map(({ link, suggestion, destination }) => (
+              <TriageRowCard
+                key={link.id}
+                link={link}
+                suggestion={suggestion}
+                destination={destination}
+                newPrefix={NEW_PREFIX}
+                createCustomSentinel={CREATE_CUSTOM_SENTINEL}
+                isCreatingCustom={editingCustomRowId === link.id}
+                customDraft={customDraft}
+                availableNewCategories={availableNewCategories}
+                destinationCollections={destinationCollections}
+                onChangeCustomDraft={setCustomDraft}
+                onCommitCustomCategory={() => commitCustomCategory(link.id)}
+                onCancelCustomCategory={() => setEditingCustomRowId(null)}
+                onChangeDestination={(value) =>
+                  handleChangeDestination(link.id, value)
+                }
+              />
+            ))
           )}
         </div>
 
@@ -489,8 +428,12 @@ export function TriageModal({
               onClick={() => void handleAcceptAll()}
               className="gap-1.5"
             >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Accept All ({assignedCount})
+              {applying ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              )}
+              {applying ? 'Applying...' : `Accept All (${assignedCount})`}
             </Button>
           </div>
         </DialogFooter>

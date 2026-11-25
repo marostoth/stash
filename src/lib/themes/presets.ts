@@ -32,7 +32,14 @@ export const BACKDROP_STYLE_OPTIONS: ReadonlyArray<{
   { id: 'dot-matrix', label: 'Dot Matrix' },
   { id: 'grid', label: 'Subtle Grid' },
   { id: 'ambient-glow', label: 'Ambient Glow' },
+  { id: 'vignette', label: 'Soft Vignette' },
+  { id: 'mesh-glow', label: 'Mesh Glow' },
+  { id: 'noise-grain', label: 'Fine Grain' },
 ];
+
+export const VALID_BACKDROP_STYLE_SET = new Set<string>(
+  BACKDROP_STYLE_OPTIONS.map((o) => o.id),
+);
 
 export function inferCardRadiusPreset(cardRadiusCss: string): CardRadiusPreset {
   const px = Number.parseFloat(cardRadiusCss);
@@ -121,7 +128,7 @@ export const OSCILLOSCOPE_THEME: ThemeDefinition = {
   isBuiltIn: true,
   mode: 'dark',
   cardRadius: 'standard',
-  backdropStyle: 'dot-matrix',
+  backdropStyle: 'ambient-glow',
   colors: {
     canvas: '#0E1013',
     panel: '#15181D',

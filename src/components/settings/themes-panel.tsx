@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { BackdropStudioCard } from '@/components/settings/backdrop-studio-card';
 import { ThemeStudio } from '@/components/themes/ThemeStudio';
 import { Button } from '@/components/ui/button';
 import { triggerFileDownload } from '@/lib/import-export/chrome-bookmarks';
@@ -24,15 +25,20 @@ import {
   parseAndValidateThemeShareInput,
 } from '@/lib/themes/share';
 import { serializeThemeForExport } from '@/lib/themes/theme-validator';
-import type { ThemeDefinition } from '@/lib/types/stash';
+import type { StashSettings, ThemeDefinition } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 
 interface ThemesPanelProps {
   allThemes: readonly ThemeDefinition[];
   activeTheme: ThemeDefinition;
+  settings: StashSettings;
 }
 
-export function ThemesPanel({ allThemes, activeTheme }: ThemesPanelProps) {
+export function ThemesPanel({
+  allThemes,
+  activeTheme,
+  settings,
+}: ThemesPanelProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -133,6 +139,8 @@ export function ThemesPanel({ allThemes, activeTheme }: ThemesPanelProps) {
 
   return (
     <div className="space-y-4">
+      <BackdropStudioCard activeTheme={activeTheme} settings={settings} />
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-fg-muted">
           Pick a built-in skin, duplicate any theme to remix live in Theme

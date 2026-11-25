@@ -83,10 +83,22 @@ export interface CategorizationRule {
 
 export type MotionMode = 'arcade' | 'tactile' | 'reduced' | 'off';
 export type CardRadiusPreset = 'sharp' | 'standard' | 'rounded';
-export type BackdropStyle = 'flat' | 'dot-matrix' | 'grid' | 'ambient-glow';
+export type BackdropStyle =
+  | 'flat'
+  | 'dot-matrix'
+  | 'grid'
+  | 'ambient-glow'
+  | 'vignette'
+  | 'mesh-glow'
+  | 'noise-grain';
+export type BackdropOverride = 'theme' | BackdropStyle;
 
 export interface StashSettings {
   activeThemeId: string;
+  backdropOverride: BackdropOverride;
+  wallpaperEnabled: boolean;
+  wallpaperDim: number;
+  wallpaperBlur: number;
   openLinkInNewTab: boolean;
   includePinnedInSessions: boolean;
   closeTabOnQuickStash: boolean;
@@ -160,6 +172,10 @@ export interface StashExportBundle {
 
 export const DEFAULT_SETTINGS: StashSettings = {
   activeThemeId: 'oscilloscope',
+  backdropOverride: 'theme',
+  wallpaperEnabled: false,
+  wallpaperDim: 45,
+  wallpaperBlur: 4,
   openLinkInNewTab: true,
   includePinnedInSessions: false,
   closeTabOnQuickStash: false,

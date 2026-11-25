@@ -63,6 +63,18 @@ describe('themes/share', () => {
     expect(imported1.theme.colors.accent).toBe('#6366F1');
     expect(imported1.theme.cardRadius).toBe('rounded');
     expect(imported1.theme.backdropStyle).toBe('ambient-glow');
+
+    for (const style of ['vignette', 'mesh-glow', 'noise-grain'] as const) {
+      const codeForStyle = encodeThemeShareCode({
+        ...MIDNIGHT_INDIGO_THEME,
+        backdropStyle: style,
+      });
+      const parsedStyle = parseAndValidateThemeShareInput(codeForStyle);
+      expect(parsedStyle.ok).toBe(true);
+      if (parsedStyle.ok) {
+        expect(parsedStyle.theme.backdropStyle).toBe(style);
+      }
+    }
   });
 
   it('rejects invalid hex values, bad enums, empty names, and malformed payloads', () => {

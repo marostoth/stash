@@ -1,5 +1,7 @@
 import { BUILT_IN_THEMES } from '@/lib/themes/built-in-themes';
+import { VALID_BACKDROP_STYLE_SET } from '@/lib/themes/presets';
 import type {
+  BackdropStyle,
   ThemeColors,
   ThemeDefinition,
   ThemeFonts,
@@ -106,11 +108,9 @@ export function validateThemeDefinition(raw: unknown): ThemeValidationResult {
       ? obj.cardRadius
       : undefined;
   const backdropStyle =
-    obj.backdropStyle === 'flat' ||
-    obj.backdropStyle === 'dot-matrix' ||
-    obj.backdropStyle === 'grid' ||
-    obj.backdropStyle === 'ambient-glow'
-      ? obj.backdropStyle
+    typeof obj.backdropStyle === 'string' &&
+    VALID_BACKDROP_STYLE_SET.has(obj.backdropStyle)
+      ? (obj.backdropStyle as BackdropStyle)
       : undefined;
 
   return {

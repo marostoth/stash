@@ -73,12 +73,19 @@ export function useStashData(): StashDataState {
   const activeTheme = resolveTheme(settings.activeThemeId, customThemes);
 
   useEffect(() => {
-    applyThemeToDocument(activeTheme);
-  }, [activeTheme]);
+    applyThemeToDocument(
+      activeTheme,
+      document.documentElement,
+      settings.backdropOverride,
+    );
+  }, [activeTheme, settings.backdropOverride]);
 
   useEffect(() => {
     setSoundEffectsEnabled(settings.soundEffects);
     setFoleyMotionMode(settings.motionMode);
+    if (typeof document !== 'undefined') {
+      document.documentElement.dataset.motion = settings.motionMode;
+    }
   }, [settings.soundEffects, settings.motionMode]);
 
   return {

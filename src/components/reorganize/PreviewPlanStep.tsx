@@ -1,4 +1,10 @@
-import { Check, ChevronDown, ChevronRight, FolderTree } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  FolderTree,
+  Loader2,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/input';
@@ -179,7 +185,11 @@ export function PreviewPlanStep({
           onClick={onApply}
           className="gap-1.5"
         >
-          <Check className="h-3.5 w-3.5" />
+          {applying ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Check className="h-3.5 w-3.5" />
+          )}
           {applying ? 'Applying...' : 'Apply Reorganization'}
         </Button>
       </div>

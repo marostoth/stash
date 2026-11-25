@@ -3,12 +3,12 @@ import {
   Download,
   FolderSync,
   HeartPulse,
+  Loader2,
   Palette,
   SlidersHorizontal,
   Sparkles,
   Tag,
   Volume2,
-  X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ import { BackupImportPanel } from '@/components/settings/backup-import-panel';
 import { PreviewsSettingsCard } from '@/components/settings/previews-settings-card';
 import { RulesManager } from '@/components/settings/rules-manager';
 import { ThemesPanel } from '@/components/settings/themes-panel';
+import { InlineProgressPill } from '@/components/ui/ai-activity-panel';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -186,7 +187,11 @@ export function SettingsModal({
           ) : activeTab === 'backup' ? (
             <BackupImportPanel />
           ) : activeTab === 'themes' ? (
-            <ThemesPanel allThemes={allThemes} activeTheme={activeTheme} />
+            <ThemesPanel
+              allThemes={allThemes}
+              activeTheme={activeTheme}
+              settings={settings}
+            />
           ) : (
             <div className="space-y-4">
               {/* General Behavior */}
@@ -427,21 +432,13 @@ export function SettingsModal({
 
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   {autoTagAll.running ? (
-                    <div className="inline-flex h-8 items-center gap-2 rounded-control border border-accent/45 bg-panel px-2.5 font-mono text-xs text-fg">
-                      <span>
-                        Tagging {autoTagAll.progress?.current ?? 1} /{' '}
-                        {autoTagAll.progress?.total ?? untaggedCount}...
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={autoTagAll.cancel}
-                        className="h-6 gap-1 px-1.5 text-[11px] hover:text-danger"
-                      >
-                        <X className="h-3 w-3" />
-                        Cancel
-                      </Button>
-                    </div>
+                    <InlineProgressPill
+                      label={`Tagging ${autoTagAll.progress?.current ?? 1} / ${autoTagAll.progress?.total ?? untaggedCount}...`}
+                      current={autoTagAll.progress?.current ?? 1}
+                      total={autoTagAll.progress?.total ?? untaggedCount}
+                      onCancel={autoTagAll.cancel}
+                      className="h-8 px-2.5 text-xs"
+                    />
                   ) : (
                     <Button
                       variant="secondary"
@@ -464,13 +461,32 @@ export function SettingsModal({
                       disabled={downloadProgress !== null}
                       onClick={() => void handleDownloadModel()}
                     >
-                      <Download className="h-3.5 w-3.5" />
+                      {downloadProgress !== null ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Download className="h-3.5 w-3.5" />
+                      )}
                       {downloadProgress !== null
                         ? `Downloading model (${downloadProgress}%)...`
                         : 'Enable On-Device AI (Download Model)'}
                     </Button>
                   )}
                 </div>
+
+                {downloadProgress !== null ? (
+                  <div className="space-y-1 pt-1">
+                    <div className="flex items-center justify-between font-mono text-[10px] text-fg-muted">
+                      <span>Downloading Chrome Gemini Nano model...</span>
+                      <span>{downloadProgress}%</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-panel">
+                      <div
+                        className="h-full rounded-full bg-accent transition-[width] duration-150"
+                        style={{ width: `${Math.min(100, downloadProgress)}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           )}

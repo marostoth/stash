@@ -1,4 +1,11 @@
-import { Download, FolderKanban, Layers, Sparkles } from 'lucide-react';
+import {
+  Download,
+  FolderKanban,
+  Layers,
+  Loader2,
+  Sparkles,
+} from 'lucide-react';
+import { AiActivityPanel } from '@/components/ui/ai-activity-panel';
 import { Button } from '@/components/ui/button';
 import type { Collection } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
@@ -12,6 +19,7 @@ interface ScopeStepProps {
   removeEmptySources: boolean;
   keepExistingTargets: boolean;
   scopedLinksCount: number;
+  scopedDomainsCount: number;
   nanoReady: boolean;
   proposing: boolean;
   errorMessage: string | null;
@@ -23,6 +31,7 @@ interface ScopeStepProps {
   onToggleKeepExistingTargets: () => void;
   onExportBackup: () => void;
   onPropose: () => void;
+  onCancelPropose: () => void;
 }
 
 export function ScopeStep({
@@ -34,6 +43,7 @@ export function ScopeStep({
   removeEmptySources,
   keepExistingTargets,
   scopedLinksCount,
+  scopedDomainsCount,
   nanoReady,
   proposing,
   errorMessage,
@@ -45,6 +55,7 @@ export function ScopeStep({
   onToggleKeepExistingTargets,
   onExportBackup,
   onPropose,
+  onCancelPropose,
 }: ScopeStepProps) {
   return (
     <div className="space-y-4">
@@ -192,10 +203,21 @@ export function ScopeStep({
         </p>
       ) : null}
 
+      {proposing ? (
+        <AiActivityPanel
+          title="Gemini Nano is designing categories..."
+          subtitle={`Analyzing ${scopedLinksCount} ${scopedLinksCount === 1 ? 'link' : 'links'} across ${scopedDomainsCount} ${scopedDomainsCount === 1 ? 'domain' : 'domains'} locally on-device`}
+          showElapsed
+          skeletonRows={4}
+          onCancel={onCancelPropose}
+        />
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
         <Button
           variant="secondary"
           size="sm"
+          disabled={proposing}
           onClick={onExportBackup}
           className="gap-1.5"
         >
@@ -210,9 +232,13 @@ export function ScopeStep({
           onClick={onPropose}
           className="gap-1.5"
         >
-          <Sparkles className="h-3.5 w-3.5" />
+          {proposing ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Sparkles className="h-3.5 w-3.5" />
+          )}
           {proposing
-            ? 'Analyzing Library...'
+            ? 'Proposing Categories...'
             : `Propose Categories (${scopedLinksCount} ${scopedLinksCount === 1 ? 'link' : 'links'})`}
         </Button>
       </div>

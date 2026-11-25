@@ -1,27 +1,41 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { filterClearableTabs } from '@/lib/tabs/clearFilter';
 import {
+  normalizeRawTabs,
   type OpenTabInfo,
   partitionSidebarTabs,
+  type RawTabLike,
 } from '@/lib/tabs/session-filter';
-import { getCurrentWindowTabs } from '@/lib/tabs/tab-actions';
+import {
+  getCurrentTabId,
+  getRawCurrentWindowTabs,
+} from '@/lib/tabs/tab-actions';
 
 export interface OpenTabsState {
   tabs: OpenTabInfo[];
   pinnedTabs: OpenTabInfo[];
   regularTabs: OpenTabInfo[];
+  clearableCount: number;
   loading: boolean;
   refresh: () => Promise<void>;
 }
 
 export function useOpenTabs(): OpenTabsState {
-  const [tabs, setTabs] = useState<OpenTabInfo[]>([]);
+  const [rawTabs, setRawTabs] = useState<RawTabLike[]>([]);
+  const [currentTabId, setCurrentTabId] = useState<number | undefined>(
+    undefined,
+  );
   const [loading, setLoading] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const next = await getCurrentWindowTabs();
-      setTabs(next);
+      const [nextRaw, nextCurrentId] = await Promise.all([
+        getRawCurrentWindowTabs(),
+        getCurrentTabId(),
+      ]);
+      setRawTabs(nextRaw);
+      setCurrentTabId(nextCurrentId);
     } catch (error: unknown) {
       console.warn('Stash: failed to query open tabs', error);
     } finally {
@@ -68,12 +82,18 @@ export function useOpenTabs(): OpenTabsState {
     };
   }, [refresh]);
 
+  const tabs = useMemo(() => normalizeRawTabs(rawTabs), [rawTabs]);
   const { pinned, regular } = useMemo(() => partitionSidebarTabs(tabs), [tabs]);
+  const clearableCount = useMemo(
+    () => filterClearableTabs(rawTabs, { currentTabId }).tabsToClose.length,
+    [rawTabs, currentTabId],
+  );
 
   return {
     tabs,
     pinnedTabs: pinned,
     regularTabs: regular,
+    clearableCount,
     loading,
     refresh,
   };

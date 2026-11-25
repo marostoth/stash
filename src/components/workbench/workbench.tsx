@@ -23,6 +23,7 @@ import { OpenTabsSidebar } from '@/components/workbench/open-tabs-sidebar';
 import { QuickEditModal } from '@/components/workbench/quick-edit-modal';
 import { TopBar } from '@/components/workbench/top-bar';
 import { TriageModal } from '@/components/workbench/triage-modal';
+import { WallpaperLayer } from '@/components/workbench/wallpaper-layer';
 import { useOpenTabs } from '@/hooks/use-open-tabs';
 import { useStashData } from '@/hooks/use-stash-data';
 import { playDrop, playError, playPickup } from '@/lib/audio/foley';
@@ -69,7 +70,7 @@ export function Workbench() {
     allThemes,
     activeTheme,
   } = useStashData();
-  const { tabs, pinnedTabs, regularTabs } = useOpenTabs();
+  const { tabs, pinnedTabs, regularTabs, clearableCount } = useOpenTabs();
   const searchQuery = useUiStore((s) => s.searchQuery);
   const setSearchQuery = useUiStore((s) => s.setSearchQuery);
   const pulseLink = useUiStore((s) => s.pulseLink);
@@ -300,79 +301,84 @@ export function Workbench() {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="stash-backdrop flex h-screen flex-col overflow-hidden text-fg">
-          <TopBar
-            searchInputRef={searchInputRef}
-            allThemes={allThemes}
-            activeTheme={activeTheme}
-            settings={settings}
-            totalLinks={links.length}
-            openTabsCount={tabs.length}
-          />
+        <div className="stash-backdrop relative flex h-screen flex-col overflow-hidden text-fg">
+          <WallpaperLayer settings={settings} />
 
-          <div className="flex min-h-0 flex-1 overflow-hidden">
-            <main
-              onScroll={dismissPreview}
-              className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6"
-            >
-              <div className="mx-auto max-w-[1320px]">
-                {loading ? (
-                  <div className="py-20 text-center font-mono text-xs text-fg-muted">
-                    Loading workspace...
-                  </div>
-                ) : collections.length === 0 ? (
-                  <EmptyState />
-                ) : groups.length === 0 ? (
-                  <div className="mx-auto flex max-w-md flex-col items-center justify-center rounded-card border border-border bg-panel px-6 py-12 text-center">
-                    <SearchX className="mb-3 h-7 w-7 text-fg-muted" />
-                    <p className="text-sm font-medium text-fg">
-                      No matches for "{searchQuery.trim()}"
-                    </p>
-                    <p className="mt-1 text-xs text-fg-muted">
-                      Try searching by domain, title, tag, or note.
-                    </p>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setSearchQuery('')}
-                      className="mt-4"
-                    >
-                      Clear Search
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-8">
-                    {groups.map(
-                      ({ collection, links: collectionLinks }, colIndex) => (
-                        <CollectionSection
-                          key={collection.id}
-                          collection={collection}
-                          index={colIndex}
-                          links={collectionLinks}
-                          openInNewTab={settings.openLinkInNewTab}
-                          compact={compact}
-                          forceExpanded={isSearching}
-                          dragDisabled={isSearching}
-                          motionMode={settings.motionMode}
-                          hoverPreviews={settings.hoverPreviews}
-                        />
-                      ),
-                    )}
-                  </div>
-                )}
-              </div>
-            </main>
+          <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
+            <TopBar
+              searchInputRef={searchInputRef}
+              allThemes={allThemes}
+              activeTheme={activeTheme}
+              settings={settings}
+              totalLinks={links.length}
+              openTabsCount={tabs.length}
+            />
 
-            {settings.openTabsSidebarVisible && (
-              <OpenTabsSidebar
-                tabs={tabs}
-                pinnedTabs={pinnedTabs}
-                regularTabs={regularTabs}
-                collections={collections}
-                settings={settings}
-                onQuickStashTab={handleQuickStashTab}
-              />
-            )}
+            <div className="flex min-h-0 flex-1 overflow-hidden">
+              <main
+                onScroll={dismissPreview}
+                className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6"
+              >
+                <div className="mx-auto max-w-[1320px]">
+                  {loading ? (
+                    <div className="py-20 text-center font-mono text-xs text-fg-muted">
+                      Loading workspace...
+                    </div>
+                  ) : collections.length === 0 ? (
+                    <EmptyState />
+                  ) : groups.length === 0 ? (
+                    <div className="mx-auto flex max-w-md flex-col items-center justify-center rounded-card border border-border bg-panel px-6 py-12 text-center">
+                      <SearchX className="mb-3 h-7 w-7 text-fg-muted" />
+                      <p className="text-sm font-medium text-fg">
+                        No matches for "{searchQuery.trim()}"
+                      </p>
+                      <p className="mt-1 text-xs text-fg-muted">
+                        Try searching by domain, title, tag, or note.
+                      </p>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setSearchQuery('')}
+                        className="mt-4"
+                      >
+                        Clear Search
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-8">
+                      {groups.map(
+                        ({ collection, links: collectionLinks }, colIndex) => (
+                          <CollectionSection
+                            key={collection.id}
+                            collection={collection}
+                            index={colIndex}
+                            links={collectionLinks}
+                            openInNewTab={settings.openLinkInNewTab}
+                            compact={compact}
+                            forceExpanded={isSearching}
+                            dragDisabled={isSearching}
+                            motionMode={settings.motionMode}
+                            hoverPreviews={settings.hoverPreviews}
+                          />
+                        ),
+                      )}
+                    </div>
+                  )}
+                </div>
+              </main>
+
+              {settings.openTabsSidebarVisible && (
+                <OpenTabsSidebar
+                  tabs={tabs}
+                  pinnedTabs={pinnedTabs}
+                  regularTabs={regularTabs}
+                  clearableCount={clearableCount}
+                  collections={collections}
+                  settings={settings}
+                  onQuickStashTab={handleQuickStashTab}
+                />
+              )}
+            </div>
           </div>
 
           <CollectionModal />

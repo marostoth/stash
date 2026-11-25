@@ -5,6 +5,7 @@ import {
   Download,
   HeartPulse,
   Layers,
+  Loader2,
   ScanSearch,
   ShieldAlert,
   Sparkles,
@@ -17,6 +18,7 @@ import {
   HealthGroupSection,
   type HealthTriageRow,
 } from '@/components/health/health-group-section';
+import { AiActivityPanel } from '@/components/ui/ai-activity-panel';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -74,9 +76,10 @@ export function HealthCheckModal({
 
   const clutterFindings = useMemo(() => detectClutter(links), [links]);
 
-  const { deadRows, reviewRows, clutterRows } = useMemo(() => {
+  const { deadRows, reviewRows, clutterRows, healthyRows } = useMemo(() => {
     const dead: HealthTriageRow[] = [];
     const review: HealthTriageRow[] = [];
+    const healthy: HealthTriageRow[] = [];
     const deadIds = new Set<string>();
 
     for (const link of links) {
@@ -91,6 +94,12 @@ export function HealthCheckModal({
         dead.push({ link, collectionName, reason: scanItem.reason });
       } else if (scanItem.status === 'needs_review') {
         review.push({ link, collectionName, reason: scanItem.reason });
+      } else {
+        healthy.push({
+          link,
+          collectionName,
+          reason: scanItem.httpStatus ? `${scanItem.httpStatus} OK` : 'OK',
+        });
       }
     }
 
@@ -107,7 +116,12 @@ export function HealthCheckModal({
       });
     }
 
-    return { deadRows: dead, reviewRows: review, clutterRows: clutter };
+    return {
+      deadRows: dead,
+      reviewRows: review,
+      clutterRows: clutter,
+      healthyRows: healthy,
+    };
   }, [links, urlResults, clutterFindings, collectionNameById]);
 
   const handleExportBackup = async () => {
@@ -185,10 +199,7 @@ export function HealthCheckModal({
 
   const totalFindings =
     deadRows.length + reviewRows.length + clutterRows.length;
-  const progressPct =
-    progress && progress.total > 0
-      ? Math.min(100, Math.round((progress.scanned / progress.total) * 100))
-      : 0;
+  const scannedTotal = deadRows.length + reviewRows.length + healthyRows.length;
 
   return (
     <Dialog
@@ -255,21 +266,26 @@ export function HealthCheckModal({
           </div>
 
           {scanning && progress ? (
-            <div className="mt-3 space-y-1.5">
-              <div className="flex items-center justify-between font-mono text-[11px] text-fg-muted">
-                <span>
-                  {progress.refiningAi
-                    ? 'Checking borderline pages with on-device AI...'
-                    : `Scanned ${progress.scanned} / ${progress.total}...`}
-                </span>
-                <span>{progressPct}%</span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-canvas">
-                <div
-                  className="h-full rounded-full bg-accent transition-[width] duration-150"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
+            <div className="mt-3">
+              <AiActivityPanel
+                title={
+                  progress.refiningAi
+                    ? 'Checking borderline pages with Gemini Nano...'
+                    : `Scanning library (${progress.scanned} / ${progress.total})...`
+                }
+                subtitle={
+                  progress.refiningAi
+                    ? 'Verifying suspicious HTTP 200 pages locally on-device'
+                    : 'Checking HTTP status, redirects, and parked domains in batches of 5'
+                }
+                progress={
+                  progress.refiningAi
+                    ? null
+                    : { current: progress.scanned, total: progress.total }
+                }
+                showElapsed
+                onCancel={cancelScan}
+              />
             </div>
           ) : null}
 
@@ -302,6 +318,28 @@ export function HealthCheckModal({
           {hasScanned && wasCanceled ? (
             <div className="rounded-control border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
               Scan canceled early — showing partial results collected so far.
+            </div>
+          ) : null}
+
+          {hasScanned && !scanning ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-card border border-border bg-canvas px-3.5 py-2 font-mono text-[11px] text-fg-muted">
+              <span className="text-fg">
+                Scanned <strong>{scannedTotal}</strong>
+              </span>
+              <span>·</span>
+              <span className="text-accent">{healthyRows.length} healthy</span>
+              <span>·</span>
+              <span className={deadRows.length > 0 ? 'text-danger' : undefined}>
+                {deadRows.length} dead
+              </span>
+              <span>·</span>
+              <span
+                className={reviewRows.length > 0 ? 'text-amber-400' : undefined}
+              >
+                {reviewRows.length} review
+              </span>
+              <span>·</span>
+              <span>{clutterRows.length} clutter</span>
             </div>
           ) : null}
 
@@ -356,6 +394,21 @@ export function HealthCheckModal({
                 onSelectAll={handleSelectAll}
                 onSelectNone={handleSelectNone}
               />
+
+              {hasScanned && healthyRows.length > 0 ? (
+                <HealthGroupSection
+                  title="Healthy Links"
+                  description="Responded cleanly (200 OK) with no soft-404, parked-domain, or root-redirect signals. Collapsed and unchecked by default."
+                  tone="neutral"
+                  icon={<CheckCircle2 className="h-3.5 w-3.5 text-accent" />}
+                  rows={healthyRows}
+                  selectedIds={selectedIds}
+                  defaultExpanded={false}
+                  onToggleItem={handleToggleItem}
+                  onSelectAll={handleSelectAll}
+                  onSelectNone={handleSelectNone}
+                />
+              ) : null}
             </>
           )}
         </div>
@@ -400,8 +453,14 @@ export function HealthCheckModal({
               onClick={() => void handleRemoveSelected()}
               className="gap-1.5"
             >
-              <Trash2 className="h-3.5 w-3.5" />
-              Remove Selected ({selectedIds.size})
+              {removing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+              {removing
+                ? 'Removing...'
+                : `Remove Selected (${selectedIds.size})`}
             </Button>
           </div>
         </div>

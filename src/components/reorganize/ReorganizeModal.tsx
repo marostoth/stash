@@ -1,10 +1,10 @@
-import { Sparkles, X } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { CategoryCheckpoint } from '@/components/reorganize/CategoryCheckpoint';
 import { PreviewPlanStep } from '@/components/reorganize/PreviewPlanStep';
 import { ScopeStep } from '@/components/reorganize/ScopeStep';
-import { Button } from '@/components/ui/button';
+import { AiActivityPanel } from '@/components/ui/ai-activity-panel';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,7 @@ import {
 import { stashRepo } from '@/lib/storage/repo';
 import type { Collection, LinkItem, StashSettings } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+import { extractDomain } from '@/lib/utils/url';
 import { useUiStore } from '@/store/ui-store';
 
 interface ReorganizeModalProps {
@@ -145,6 +146,14 @@ export function ReorganizeModal({
     if (mode === 'full') return [...links];
     return links.filter((l) => selectedCollectionIds.has(l.collectionId));
   }, [mode, links, selectedCollectionIds]);
+
+  const scopedDomainsCount = useMemo(() => {
+    const domains = new Set<string>();
+    for (const link of scopedLinks) {
+      domains.add(extractDomain(link.url).toLowerCase());
+    }
+    return domains.size;
+  }, [scopedLinks]);
 
   const untouchedCollectionNames = useMemo(() => {
     if (mode !== 'collections' || !keepExistingTargets) return [];
@@ -330,14 +339,6 @@ export function ReorganizeModal({
     }
   };
 
-  const sortPct =
-    sortProgress && sortProgress.total > 0
-      ? Math.min(
-          100,
-          Math.round((sortProgress.completed / sortProgress.total) * 100),
-        )
-      : 0;
-
   return (
     <Dialog
       open={open}
@@ -389,6 +390,7 @@ export function ReorganizeModal({
               removeEmptySources={removeEmptySources}
               keepExistingTargets={keepExistingTargets}
               scopedLinksCount={scopedLinks.length}
+              scopedDomainsCount={scopedDomainsCount}
               nanoReady={nanoReady}
               proposing={proposing}
               errorMessage={errorMessage}
@@ -411,6 +413,10 @@ export function ReorganizeModal({
               }
               onExportBackup={() => void handleExportBackup()}
               onPropose={() => void runPass1()}
+              onCancelPropose={() => {
+                abortRef.current?.abort();
+                setProposing(false);
+              }}
             />
           ) : step === 'checkpoint' ? (
             <CategoryCheckpoint
@@ -433,36 +439,29 @@ export function ReorganizeModal({
                 ])
               }
               onRegenerate={() => void runPass1()}
+              onCancelRegenerate={() => {
+                abortRef.current?.abort();
+                setProposing(false);
+              }}
               onBack={() => setStep('scope')}
               onStartSort={() => void runPass2()}
             />
           ) : step === 'sorting' ? (
-            <div className="flex flex-col items-center justify-center space-y-4 py-10 text-center">
-              <Sparkles className="h-7 w-7 animate-pulse text-accent" />
-              <div className="space-y-1">
-                <p className="font-mono text-sm font-semibold text-fg">
-                  Sorting {sortProgress?.completed ?? 0} /{' '}
-                  {sortProgress?.total ?? scopedLinks.length}...
-                </p>
-                <p className="max-w-md truncate text-xs text-fg-muted">
-                  {sortProgress?.currentTitle || 'Preparing Gemini Nano...'}
-                </p>
-              </div>
-              <div className="h-2 w-full max-w-md overflow-hidden rounded-full bg-canvas">
-                <div
-                  className="h-full rounded-full bg-accent transition-[width] duration-150"
-                  style={{ width: `${sortPct}%` }}
-                />
-              </div>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => abortRef.current?.abort()}
-                className="gap-1.5"
-              >
-                <X className="h-3.5 w-3.5" />
-                Cancel Sorting
-              </Button>
+            <div className="py-4">
+              <AiActivityPanel
+                title={`Sorting ${sortProgress?.completed ?? 0} / ${sortProgress?.total ?? scopedLinks.length} links...`}
+                subtitle={
+                  sortProgress?.currentTitle || 'Preparing Gemini Nano...'
+                }
+                progress={{
+                  current: sortProgress?.completed ?? 0,
+                  total: sortProgress?.total ?? scopedLinks.length,
+                }}
+                showElapsed
+                skeletonRows={4}
+                cancelLabel="Cancel Sorting"
+                onCancel={() => abortRef.current?.abort()}
+              />
             </div>
           ) : (
             <PreviewPlanStep

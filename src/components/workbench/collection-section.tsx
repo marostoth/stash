@@ -14,12 +14,12 @@ import {
   Sparkles,
   Tag,
   Trash2,
-  X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { CSSProperties } from 'react';
 import { toast } from 'sonner';
 import { CollectionAppearancePopover } from '@/components/CollectionAppearancePopover';
+import { InlineProgressPill } from '@/components/ui/ai-activity-panel';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -251,22 +251,12 @@ export function CollectionSection({
 
           <div className="flex shrink-0 items-center gap-1">
             {autoTag.running ? (
-              <div className="inline-flex h-7 items-center gap-1.5 rounded-control border border-accent/45 bg-panel px-2 font-mono text-[11px] text-fg">
-                <span>
-                  Tagging {autoTag.progress?.current ?? 1} /{' '}
-                  {autoTag.progress?.total ?? untaggedCount}...
-                </span>
-                <button
-                  type="button"
-                  onClick={autoTag.cancel}
-                  aria-label="Cancel auto-tagging"
-                  title="Cancel"
-                  className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] text-fg-muted transition-colors hover:bg-card hover:text-danger cursor-pointer"
-                >
-                  <X className="h-3 w-3" />
-                  Cancel
-                </button>
-              </div>
+              <InlineProgressPill
+                label={`Tagging ${autoTag.progress?.current ?? 1} / ${autoTag.progress?.total ?? untaggedCount}...`}
+                current={autoTag.progress?.current ?? 1}
+                total={autoTag.progress?.total ?? untaggedCount}
+                onCancel={autoTag.cancel}
+              />
             ) : (
               untaggedCount > 0 && (
                 <Button

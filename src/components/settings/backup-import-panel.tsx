@@ -3,6 +3,7 @@ import {
   Download,
   FileCode2,
   FolderSync,
+  Loader2,
   Upload,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -28,7 +29,10 @@ export function BackupImportPanel() {
   const [pendingBundle, setPendingBundle] = useState<StashExportBundle | null>(
     null,
   );
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<
+    'merge' | 'replace' | 'chrome' | 'html' | null
+  >(null);
+  const busy = busyAction !== null;
 
   const handleExportJson = async () => {
     const snapshot = await stashRepo.getSnapshot();
@@ -61,7 +65,7 @@ export function BackupImportPanel() {
 
   const handleRestore = async (mode: 'merge' | 'replace') => {
     if (!pendingBundle || busy) return;
-    setBusy(true);
+    setBusyAction(mode);
     try {
       const stats = await stashRepo.restoreBundle(pendingBundle, mode);
       setPendingBundle(null);
@@ -75,13 +79,13 @@ export function BackupImportPanel() {
         );
       }
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   const handleImportChromeBookmarks = async () => {
     if (busy) return;
-    setBusy(true);
+    setBusyAction('chrome');
     try {
       const result = await readChromeBookmarksWithPermission();
       if (!result.ok) {
@@ -97,7 +101,7 @@ export function BackupImportPanel() {
         `Imported ${summary.linksAdded} bookmarks across ${summary.collectionsCreated} new collection${summary.collectionsCreated === 1 ? '' : 's'}${summary.linksSkipped > 0 ? ` (${summary.linksSkipped} duplicates skipped)` : ''}.`,
       );
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
@@ -108,7 +112,7 @@ export function BackupImportPanel() {
     event.target.value = '';
     if (!file || busy) return;
 
-    setBusy(true);
+    setBusyAction('html');
     try {
       const html = await file.text();
       const folders = parseNetscapeBookmarksHtml(html);
@@ -121,7 +125,7 @@ export function BackupImportPanel() {
         `Imported ${summary.linksAdded} bookmarks across ${summary.collectionsCreated} new collection${summary.collectionsCreated === 1 ? '' : 's'}${summary.linksSkipped > 0 ? ` (${summary.linksSkipped} duplicates skipped)` : ''}.`,
       );
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
@@ -183,7 +187,12 @@ export function BackupImportPanel() {
                 disabled={busy}
                 onClick={() => void handleRestore('merge')}
               >
-                Merge (Skip Duplicates)
+                {busyAction === 'merge' ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : null}
+                {busyAction === 'merge'
+                  ? 'Merging...'
+                  : 'Merge (Skip Duplicates)'}
               </Button>
               <Button
                 variant="danger"
@@ -191,7 +200,10 @@ export function BackupImportPanel() {
                 disabled={busy}
                 onClick={() => void handleRestore('replace')}
               >
-                Replace All
+                {busyAction === 'replace' ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : null}
+                {busyAction === 'replace' ? 'Replacing...' : 'Replace All'}
               </Button>
               <Button
                 variant="ghost"
@@ -224,8 +236,14 @@ export function BackupImportPanel() {
             disabled={busy}
             onClick={() => void handleImportChromeBookmarks()}
           >
-            <Bookmark className="h-3.5 w-3.5 text-accent" />
-            Import Chrome Bookmarks
+            {busyAction === 'chrome' ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+            ) : (
+              <Bookmark className="h-3.5 w-3.5 text-accent" />
+            )}
+            {busyAction === 'chrome'
+              ? 'Importing Bookmarks...'
+              : 'Import Chrome Bookmarks'}
           </Button>
           <Button
             variant="secondary"
@@ -233,8 +251,14 @@ export function BackupImportPanel() {
             disabled={busy}
             onClick={() => htmlInputRef.current?.click()}
           >
-            <FileCode2 className="h-3.5 w-3.5 text-fg-muted" />
-            Import HTML File (.html)
+            {busyAction === 'html' ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+            ) : (
+              <FileCode2 className="h-3.5 w-3.5 text-fg-muted" />
+            )}
+            {busyAction === 'html'
+              ? 'Importing HTML...'
+              : 'Import HTML File (.html)'}
           </Button>
           <input
             ref={htmlInputRef}

@@ -1,5 +1,14 @@
 import { useDraggable } from '@dnd-kit/react';
-import { Archive, FolderPlus, Layers, Pin, Plus, X } from 'lucide-react';
+import {
+  Archive,
+  FolderPlus,
+  Layers,
+  Loader2,
+  Pin,
+  Plus,
+  Volume2,
+  X,
+} from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -11,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ClearTabsButton } from '@/components/workbench/clear-tabs-button';
 import { playSessionFreeze } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
 import {
@@ -31,6 +41,7 @@ interface OpenTabsSidebarProps {
   tabs: readonly OpenTabInfo[];
   pinnedTabs: readonly OpenTabInfo[];
   regularTabs: readonly OpenTabInfo[];
+  clearableCount: number;
   collections: readonly Collection[];
   settings: StashSettings;
   onQuickStashTab: (tab: OpenTabInfo, collectionId: string) => Promise<void>;
@@ -133,6 +144,12 @@ function OpenTabRow({
                 aria-label="Pinned tab"
               />
             )}
+            {tab.audible && (
+              <Volume2
+                className="h-2.5 w-2.5 shrink-0 text-accent"
+                aria-label="Playing audio"
+              />
+            )}
             <span
               title={tab.title}
               className="truncate text-xs font-medium text-fg"
@@ -224,6 +241,7 @@ export function OpenTabsSidebar({
   tabs,
   pinnedTabs,
   regularTabs,
+  clearableCount,
   collections,
   settings,
   onQuickStashTab,
@@ -294,17 +312,30 @@ export function OpenTabsSidebar({
     >
       {/* Sidebar Header & Session Controls */}
       <div className="space-y-2.5 border-b border-border p-3.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <Layers className="h-3.5 w-3.5 text-accent" />
-            <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-fg">
+        <div className="flex items-center justify-between gap-1.5">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <Layers className="h-3.5 w-3.5 shrink-0 text-accent" />
+            <h2 className="truncate font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-fg">
               Open Tabs
             </h2>
+            <span
+              className="shrink-0 rounded-pill border border-border bg-canvas px-1.5 py-0.5 font-mono text-[10px] text-fg-muted"
+              title={
+                pinnedTabs.length > 0
+                  ? `${regularTabs.length} regular + ${pinnedTabs.length} pinned`
+                  : `${regularTabs.length} open`
+              }
+            >
+              {regularTabs.length}
+              {pinnedTabs.length > 0 ? `+${pinnedTabs.length}p` : ''}
+            </span>
           </div>
-          <span className="rounded-pill border border-border bg-canvas px-2 py-0.5 font-mono text-[10px] text-fg-muted">
-            {regularTabs.length}
-            {pinnedTabs.length > 0 ? ` + ${pinnedTabs.length} pin` : ''}
-          </span>
+          <ClearTabsButton
+            clearableCount={clearableCount}
+            soundEffects={settings.soundEffects}
+            motionMode={settings.motionMode}
+            disabled={saving}
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-1.5">
@@ -316,8 +347,12 @@ export function OpenTabsSidebar({
             className="w-full px-2 text-xs"
             title="Save open tabs into a dated session collection and leave them open"
           >
-            <Archive className="h-3.5 w-3.5" />
-            Save Session
+            {saving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Archive className="h-3.5 w-3.5" />
+            )}
+            {saving ? 'Saving...' : 'Save Session'}
           </Button>
           <Button
             variant="secondary"
@@ -327,7 +362,8 @@ export function OpenTabsSidebar({
             className="w-full px-2 text-xs"
             title="Save open tabs into a dated session collection and close them"
           >
-            Save & Close
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            Save &amp; Close
           </Button>
         </div>
 

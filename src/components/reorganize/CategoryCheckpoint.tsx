@@ -1,4 +1,5 @@
 import { ArrowRight, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { AiActivityPanel } from '@/components/ui/ai-activity-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { ProposedCategory } from '@/lib/reorganize/digest';
@@ -15,6 +16,7 @@ interface CategoryCheckpointProps {
   onDeleteCategory: (id: string) => void;
   onAddCategory: () => void;
   onRegenerate: () => void;
+  onCancelRegenerate: () => void;
   onBack: () => void;
   onStartSort: () => void;
 }
@@ -30,6 +32,7 @@ export function CategoryCheckpoint({
   onDeleteCategory,
   onAddCategory,
   onRegenerate,
+  onCancelRegenerate,
   onBack,
   onStartSort,
 }: CategoryCheckpointProps) {
@@ -77,45 +80,55 @@ export function CategoryCheckpoint({
         </p>
       ) : null}
 
-      <div className="space-y-2">
-        {categories.map((cat, idx) => (
-          <div
-            key={cat.id}
-            className="grid gap-2 rounded-card border border-border bg-canvas p-3 sm:grid-cols-[180px_1fr_auto] sm:items-center"
-          >
-            <Input
-              value={cat.name}
-              maxLength={40}
-              placeholder={`Category ${idx + 1}`}
-              aria-label={`Category ${idx + 1} name`}
-              onChange={(e) =>
-                onUpdateCategory(cat.id, { name: e.target.value })
-              }
-              className="h-8 text-xs font-medium"
-            />
-            <Input
-              value={cat.description}
-              maxLength={120}
-              placeholder="Short description of what belongs here..."
-              aria-label={`Category ${idx + 1} description`}
-              onChange={(e) =>
-                onUpdateCategory(cat.id, { description: e.target.value })
-              }
-              className="h-8 text-xs text-fg-muted"
-            />
-            <button
-              type="button"
-              onClick={() => onDeleteCategory(cat.id)}
-              disabled={categories.length <= 1}
-              aria-label={`Remove ${cat.name || 'category'}`}
-              title="Remove category"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-panel hover:text-danger disabled:opacity-35 cursor-pointer"
+      {regenerating ? (
+        <AiActivityPanel
+          title="Regenerating category proposals..."
+          subtitle={`Re-evaluating ${scopedLinksCount} ${scopedLinksCount === 1 ? 'link' : 'links'} with Gemini Nano`}
+          showElapsed
+          skeletonRows={4}
+          onCancel={onCancelRegenerate}
+        />
+      ) : (
+        <div className="space-y-2">
+          {categories.map((cat, idx) => (
+            <div
+              key={cat.id}
+              className="grid gap-2 rounded-card border border-border bg-canvas p-3 sm:grid-cols-[180px_1fr_auto] sm:items-center"
             >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ))}
-      </div>
+              <Input
+                value={cat.name}
+                maxLength={40}
+                placeholder={`Category ${idx + 1}`}
+                aria-label={`Category ${idx + 1} name`}
+                onChange={(e) =>
+                  onUpdateCategory(cat.id, { name: e.target.value })
+                }
+                className="h-8 text-xs font-medium"
+              />
+              <Input
+                value={cat.description}
+                maxLength={120}
+                placeholder="Short description of what belongs here..."
+                aria-label={`Category ${idx + 1} description`}
+                onChange={(e) =>
+                  onUpdateCategory(cat.id, { description: e.target.value })
+                }
+                className="h-8 text-xs text-fg-muted"
+              />
+              <button
+                type="button"
+                onClick={() => onDeleteCategory(cat.id)}
+                disabled={categories.length <= 1}
+                aria-label={`Remove ${cat.name || 'category'}`}
+                title="Remove category"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-panel hover:text-danger disabled:opacity-35 cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
         <Button variant="ghost" size="sm" onClick={onBack}>

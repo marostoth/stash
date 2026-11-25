@@ -3,7 +3,7 @@ import {
   OSCILLOSCOPE_THEME,
 } from '@/lib/themes/built-in-themes';
 import { CARD_RADIUS_PRESETS } from '@/lib/themes/presets';
-import type { ThemeDefinition } from '@/lib/types/stash';
+import type { BackdropOverride, ThemeDefinition } from '@/lib/types/stash';
 
 export function getAllThemes(
   customThemes: readonly ThemeDefinition[] = [],
@@ -31,8 +31,12 @@ export function resolveTheme(
 export function applyThemeToDocument(
   theme: ThemeDefinition,
   root: HTMLElement = document.documentElement,
+  backdropOverride: BackdropOverride = 'theme',
 ): void {
-  const backdrop = theme.backdropStyle ?? 'flat';
+  const backdrop =
+    backdropOverride !== 'theme'
+      ? backdropOverride
+      : (theme.backdropStyle ?? 'flat');
   const radiusSpec = theme.cardRadius
     ? CARD_RADIUS_PRESETS[theme.cardRadius]
     : null;

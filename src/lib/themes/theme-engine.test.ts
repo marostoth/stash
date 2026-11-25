@@ -3,7 +3,11 @@ import {
   BUILT_IN_THEMES,
   OSCILLOSCOPE_THEME,
 } from '@/lib/themes/built-in-themes';
-import { getAllThemes, resolveTheme } from '@/lib/themes/theme-engine';
+import {
+  applyThemeToDocument,
+  getAllThemes,
+  resolveTheme,
+} from '@/lib/themes/theme-engine';
 import type { ThemeDefinition } from '@/lib/types/stash';
 
 describe('theme-engine', () => {
@@ -17,10 +21,33 @@ describe('theme-engine', () => {
       'warm-paper',
     ]);
     expect(resolveTheme('non-existent-theme').id).toBe(OSCILLOSCOPE_THEME.id);
+    expect(OSCILLOSCOPE_THEME.backdropStyle).toBe('ambient-glow');
     expect(resolveTheme('clean-light').mode).toBe('light');
     expect(resolveTheme('warm-paper').mode).toBe('light');
     expect(resolveTheme('amber-phosphor').backdropStyle).toBe('dot-matrix');
     expect(resolveTheme('midnight-indigo').backdropStyle).toBe('ambient-glow');
+  });
+
+  it('applies theme default backdrop or honors an explicit backdrop override', () => {
+    const props = new Map<string, string>();
+    const fakeRoot = {
+      dataset: {} as Record<string, string>,
+      style: {
+        colorScheme: '',
+        setProperty: (key: string, value: string) => {
+          props.set(key, value);
+        },
+      },
+    } as unknown as HTMLElement;
+
+    applyThemeToDocument(OSCILLOSCOPE_THEME, fakeRoot, 'theme');
+    expect(fakeRoot.dataset.backdrop).toBe('ambient-glow');
+
+    applyThemeToDocument(OSCILLOSCOPE_THEME, fakeRoot, 'mesh-glow');
+    expect(fakeRoot.dataset.backdrop).toBe('mesh-glow');
+
+    applyThemeToDocument(OSCILLOSCOPE_THEME, fakeRoot, 'flat');
+    expect(fakeRoot.dataset.backdrop).toBe('flat');
   });
 
   it('merges custom themes without letting custom IDs override built-in themes', () => {
