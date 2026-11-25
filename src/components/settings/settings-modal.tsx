@@ -1,0 +1,306 @@
+import {
+  Cpu,
+  Download,
+  FolderSync,
+  Palette,
+  SlidersHorizontal,
+  Sparkles,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { BackupImportPanel } from '@/components/settings/backup-import-panel';
+import { RulesManager } from '@/components/settings/rules-manager';
+import { ThemesPanel } from '@/components/settings/themes-panel';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  checkNanoAvailability,
+  downloadNanoModel,
+} from '@/lib/categorizer/nano-engine';
+import type { NanoAvailabilityStatus } from '@/lib/categorizer/types';
+import { stashRepo } from '@/lib/storage/repo';
+import type {
+  CategorizationRule,
+  Collection,
+  StashSettings,
+  ThemeDefinition,
+} from '@/lib/types/stash';
+import { cn } from '@/lib/utils/cn';
+import { useUiStore } from '@/store/ui-store';
+
+interface SettingsModalProps {
+  collections: readonly Collection[];
+  rules: readonly CategorizationRule[];
+  settings: StashSettings;
+  allThemes: readonly ThemeDefinition[];
+  activeTheme: ThemeDefinition;
+}
+
+type SettingsTab = 'rules' | 'backup' | 'themes' | 'general';
+
+export function SettingsModal({
+  collections,
+  rules,
+  settings,
+  allThemes,
+  activeTheme,
+}: SettingsModalProps) {
+  const open = useUiStore((s) => s.settingsOpen);
+  const closeSettings = useUiStore((s) => s.closeSettings);
+
+  const [activeTab, setActiveTab] = useState<SettingsTab>('rules');
+  const [nanoStatus, setNanoStatus] =
+    useState<NanoAvailabilityStatus>('unavailable');
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let mounted = true;
+    checkNanoAvailability()
+      .then((status) => {
+        if (mounted) setNanoStatus(status);
+      })
+      .catch(() => {
+        if (mounted) setNanoStatus('unavailable');
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [open]);
+
+  const handleDownloadModel = async () => {
+    setDownloadProgress(0);
+    const ok = await downloadNanoModel((pct) => setDownloadProgress(pct));
+    const refreshed = await checkNanoAvailability();
+    setNanoStatus(refreshed);
+    setDownloadProgress(null);
+    if (ok) {
+      await stashRepo.updateSettings({ enableOnDeviceAi: true });
+      toast.success('On-device Gemini Nano model is ready');
+    } else {
+      toast.error(
+        'Could not enable On-Device AI. Falling back cleanly to Tier 1 rules.',
+      );
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) closeSettings();
+      }}
+    >
+      <DialogContent className="flex max-h-[85vh] w-[min(94vw,720px)] flex-col overflow-hidden">
+        <DialogHeader className="mb-3 shrink-0">
+          <DialogTitle>Stash Settings</DialogTitle>
+          <DialogDescription>
+            Manage auto-categorization rules, backups, bookmark imports, custom
+            themes, and preferences.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Tab Bar */}
+        <div className="mb-4 flex shrink-0 flex-wrap items-center gap-1 border-b border-border pb-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('rules')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-control px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer',
+              activeTab === 'rules'
+                ? 'bg-accent text-accent-fg'
+                : 'text-fg-muted hover:bg-card hover:text-fg',
+            )}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Auto-Rules ({rules.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('backup')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-control px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer',
+              activeTab === 'backup'
+                ? 'bg-accent text-accent-fg'
+                : 'text-fg-muted hover:bg-card hover:text-fg',
+            )}
+          >
+            <FolderSync className="h-3.5 w-3.5" />
+            Backup &amp; Import
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('themes')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-control px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer',
+              activeTab === 'themes'
+                ? 'bg-accent text-accent-fg'
+                : 'text-fg-muted hover:bg-card hover:text-fg',
+            )}
+          >
+            <Palette className="h-3.5 w-3.5" />
+            Themes ({allThemes.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('general')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-control px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer',
+              activeTab === 'general'
+                ? 'bg-accent text-accent-fg'
+                : 'text-fg-muted hover:bg-card hover:text-fg',
+            )}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            General &amp; AI
+          </button>
+        </div>
+
+        {/* Tab Body */}
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          {activeTab === 'rules' ? (
+            <RulesManager rules={rules} collections={collections} />
+          ) : activeTab === 'backup' ? (
+            <BackupImportPanel />
+          ) : activeTab === 'themes' ? (
+            <ThemesPanel allThemes={allThemes} activeTheme={activeTheme} />
+          ) : (
+            <div className="space-y-4">
+              {/* General Behavior */}
+              <div className="space-y-2.5 rounded-card border border-border bg-canvas p-4">
+                <h3 className="font-mono text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
+                  Workspace Behavior
+                </h3>
+
+                <label className="flex cursor-pointer items-center justify-between gap-3 py-1 text-xs text-fg">
+                  <span>Open saved links in a new tab</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.openLinkInNewTab}
+                    onChange={() =>
+                      void stashRepo.updateSettings({
+                        openLinkInNewTab: !settings.openLinkInNewTab,
+                      })
+                    }
+                    className="h-4 w-4 accent-[var(--stash-accent)] cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex cursor-pointer items-center justify-between gap-3 py-1 text-xs text-fg">
+                  <span>Compact card density</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.density === 'compact'}
+                    onChange={() =>
+                      void stashRepo.updateSettings({
+                        density:
+                          settings.density === 'compact'
+                            ? 'comfortable'
+                            : 'compact',
+                      })
+                    }
+                    className="h-4 w-4 accent-[var(--stash-accent)] cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex cursor-pointer items-center justify-between gap-3 py-1 text-xs text-fg">
+                  <span>Include pinned tabs when saving sessions</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.includePinnedInSessions}
+                    onChange={() =>
+                      void stashRepo.updateSettings({
+                        includePinnedInSessions:
+                          !settings.includePinnedInSessions,
+                      })
+                    }
+                    className="h-4 w-4 accent-[var(--stash-accent)] cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex cursor-pointer items-center justify-between gap-3 py-1 text-xs text-fg">
+                  <span>Close tab after Side Panel quick-stash</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.closeTabOnQuickStash}
+                    onChange={() =>
+                      void stashRepo.updateSettings({
+                        closeTabOnQuickStash: !settings.closeTabOnQuickStash,
+                      })
+                    }
+                    className="h-4 w-4 accent-[var(--stash-accent)] cursor-pointer"
+                  />
+                </label>
+              </div>
+
+              {/* Tier 2 On-Device AI */}
+              <div className="space-y-3 rounded-card border border-border bg-canvas p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Cpu className="h-4 w-4 text-accent" />
+                    <h3 className="text-xs font-semibold text-fg">
+                      On-Device AI (Chrome Gemini Nano)
+                    </h3>
+                  </div>
+                  <span
+                    className={cn(
+                      'rounded-pill border px-2 py-0.5 font-mono text-[10px] uppercase',
+                      nanoStatus === 'available'
+                        ? 'border-accent/40 bg-accent/15 text-accent'
+                        : 'border-border bg-panel text-fg-muted',
+                    )}
+                  >
+                    {nanoStatus}
+                  </span>
+                </div>
+
+                <p className="text-xs leading-relaxed text-fg-muted">
+                  Runs locally inside Chrome when no Tier 1 rule matches to
+                  suggest an existing collection or a new category, up to 3
+                  tags, and a short summary note. Never sends your bookmarks to
+                  external servers.
+                </p>
+
+                <label className="flex cursor-pointer items-center justify-between gap-3 text-xs text-fg">
+                  <span>Use On-Device AI fallback when available</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.enableOnDeviceAi}
+                    onChange={() =>
+                      void stashRepo.updateSettings({
+                        enableOnDeviceAi: !settings.enableOnDeviceAi,
+                      })
+                    }
+                    className="h-4 w-4 accent-[var(--stash-accent)] cursor-pointer"
+                  />
+                </label>
+
+                {nanoStatus === 'downloadable' && (
+                  <div className="pt-1">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={downloadProgress !== null}
+                      onClick={() => void handleDownloadModel()}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      {downloadProgress !== null
+                        ? `Downloading model (${downloadProgress}%)...`
+                        : 'Enable On-Device AI (Download Model)'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

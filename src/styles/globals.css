@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+:root {
+  --stash-canvas: #0e1013;
+  --stash-panel: #15181d;
+  --stash-card: #1d2128;
+  --stash-card-hover: #242a33;
+  --stash-border: rgba(255, 255, 255, 0.08);
+  --stash-accent: #00d68f;
+  --stash-accent-fg: #06150f;
+  --stash-text: #eceff4;
+  --stash-text-muted: #8b949e;
+  --stash-danger: #f87171;
+  --stash-radius-card: 6px;
+  --stash-radius-control: 6px;
+  --stash-radius-pill: 9999px;
+  --stash-font-sans:
+    "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+  --stash-font-mono:
+    "JetBrains Mono", "Cascadia Code", ui-monospace, SFMono-Regular, Menlo,
+    Consolas, monospace;
+}
+
+@theme inline {
+  --color-canvas: var(--stash-canvas);
+  --color-panel: var(--stash-panel);
+  --color-card: var(--stash-card);
+  --color-card-hover: var(--stash-card-hover);
+  --color-border: var(--stash-border);
+  --color-accent: var(--stash-accent);
+  --color-accent-fg: var(--stash-accent-fg);
+  --color-fg: var(--stash-text);
+  --color-fg-muted: var(--stash-text-muted);
+  --color-danger: var(--stash-danger);
+
+  --radius-card: var(--stash-radius-card);
+  --radius-control: var(--stash-radius-control);
+  --radius-pill: var(--stash-radius-pill);
+
+  --font-sans: var(--stash-font-sans);
+  --font-mono: var(--stash-font-mono);
+}
+
+@layer base {
+  * {
+    border-color: var(--stash-border);
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    background-color: var(--stash-canvas);
+    color: var(--stash-text);
+    font-family: var(--stash-font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--stash-accent) 30%, transparent);
+    color: var(--stash-text);
+  }
+}
+
+@keyframes stash-duplicate-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--stash-accent) 75%, transparent);
+    border-color: var(--stash-accent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px
+      color-mix(in srgb, var(--stash-accent) 22%, transparent);
+    border-color: var(--stash-accent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--stash-accent) 0%, transparent);
+    border-color: var(--stash-border);
+  }
+}
+
+.stash-duplicate-pulse {
+  animation: stash-duplicate-pulse 1.1s ease-out 2;
+  border-color: var(--stash-accent);
+}

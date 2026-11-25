@@ -1,0 +1,144 @@
+export type TabGroupColor =
+  | 'grey'
+  | 'blue'
+  | 'red'
+  | 'yellow'
+  | 'green'
+  | 'pink'
+  | 'purple'
+  | 'cyan'
+  | 'orange';
+
+export const TAB_GROUP_COLORS: readonly TabGroupColor[] = [
+  'grey',
+  'blue',
+  'red',
+  'yellow',
+  'green',
+  'pink',
+  'purple',
+  'cyan',
+  'orange',
+] as const;
+
+export const TAB_GROUP_COLOR_SWATCH: Record<TabGroupColor, string> = {
+  grey: '#94A3B8',
+  blue: '#60A5FA',
+  red: '#F87171',
+  yellow: '#FACC15',
+  green: '#34D399',
+  pink: '#F472B6',
+  purple: '#C084FC',
+  cyan: '#22D3EE',
+  orange: '#FB923C',
+};
+
+export interface Collection {
+  id: string;
+  name: string;
+  description?: string;
+  color: TabGroupColor;
+  icon?: string;
+  order: number;
+  collapsed: boolean;
+  isSession?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LinkItem {
+  id: string;
+  collectionId: string;
+  url: string;
+  title: string;
+  note: string;
+  tags: string[];
+  faviconUrl?: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+  lastOpenedAt?: string;
+}
+
+export interface CategorizationRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  priority: number;
+  match: {
+    domainContains?: string[];
+    titleKeywords?: string[];
+    urlContains?: string[];
+  };
+  action: {
+    targetCollectionId: string;
+    addTags?: string[];
+  };
+}
+
+export interface StashSettings {
+  activeThemeId: string;
+  openLinkInNewTab: boolean;
+  includePinnedInSessions: boolean;
+  closeTabOnQuickStash: boolean;
+  openTabsSidebarVisible: boolean;
+  enableOnDeviceAi: boolean;
+  density: 'compact' | 'comfortable';
+}
+
+export type ThemeMode = 'dark' | 'light';
+
+export interface ThemeColors {
+  canvas: string;
+  panel: string;
+  card: string;
+  cardHover: string;
+  border: string;
+  accent: string;
+  accentFg: string;
+  text: string;
+  textMuted: string;
+  danger: string;
+}
+
+export interface ThemeRadius {
+  card: string;
+  control: string;
+  pill: string;
+}
+
+export interface ThemeFonts {
+  sans: string;
+  mono: string;
+}
+
+export interface ThemeDefinition {
+  id: string;
+  name: string;
+  isBuiltIn: boolean;
+  mode: ThemeMode;
+  colors: ThemeColors;
+  radius: ThemeRadius;
+  fonts: ThemeFonts;
+}
+
+export interface StashExportBundle {
+  app: 'stash';
+  schemaVersion: 1;
+  exportedAt: string;
+  collections: Collection[];
+  links: LinkItem[];
+  rules: CategorizationRule[];
+  settings: StashSettings;
+  customThemes: ThemeDefinition[];
+}
+
+export const DEFAULT_SETTINGS: StashSettings = {
+  activeThemeId: 'oscilloscope',
+  openLinkInNewTab: true,
+  includePinnedInSessions: false,
+  closeTabOnQuickStash: false,
+  openTabsSidebarVisible: true,
+  enableOnDeviceAi: true,
+  density: 'comfortable',
+};
