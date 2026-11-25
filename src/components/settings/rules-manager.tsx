@@ -2,14 +2,17 @@ import {
   ArrowDown,
   ArrowRight,
   ArrowUp,
+  ListFilter,
   Pencil,
   Plus,
   Trash2,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { SettingsSectionCard } from '@/components/settings/settings-section-card';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { stashRepo } from '@/lib/storage/repo';
 import {
   type CategorizationRule,
@@ -125,28 +128,32 @@ export function RulesManager({ rules, collections }: RulesManagerProps) {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-fg-muted">
-          Rules run instantly in priority order (top to bottom) to suggest a
-          collection and tags whenever you stash or triage links.
-        </p>
-        {!formOpen && (
+    <SettingsSectionCard
+      icon={<ListFilter className="h-4 w-4" />}
+      title="Auto-Categorization Rules"
+      subtitle="Tier 1 rules run instantly in priority order (top to bottom) before On-Device AI fallback."
+      badge={
+        rules.length > 0
+          ? { label: `${rules.length} active`, tone: 'neutral' }
+          : undefined
+      }
+      headerAction={
+        !formOpen ? (
           <Button
             variant="primary"
             size="sm"
             onClick={openCreateForm}
             disabled={collections.length === 0}
-            className="shrink-0"
+            className="h-7 shrink-0 px-2.5 text-[11px]"
           >
             <Plus className="h-3.5 w-3.5" />
             Add Rule
           </Button>
-        )}
-      </div>
-
+        ) : undefined
+      }
+    >
       {collections.length === 0 && (
-        <div className="rounded-card border border-dashed border-border bg-canvas px-4 py-5 text-center text-xs text-fg-muted">
+        <div className="rounded-card border border-dashed border-border bg-panel/40 px-4 py-5 text-center text-xs text-fg-muted">
           Create at least one collection first so rules have a destination.
         </div>
       )}
@@ -154,7 +161,7 @@ export function RulesManager({ rules, collections }: RulesManagerProps) {
       {formOpen && (
         <form
           onSubmit={(e) => void handleSaveRule(e)}
-          className="space-y-3 rounded-card border border-accent/40 bg-canvas p-4"
+          className="space-y-3 rounded-card border border-accent/40 bg-panel/60 p-4"
         >
           <div className="text-xs font-semibold text-fg">
             {editingRuleId ? 'Edit Rule' : 'New Auto-Categorization Rule'}
@@ -338,15 +345,14 @@ export function RulesManager({ rules, collections }: RulesManagerProps) {
                     <span className="rounded border border-border bg-panel px-1.5 py-0.5 font-mono text-[10px] text-fg-muted">
                       #{index + 1}
                     </span>
-                    <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-fg">
-                      <input
-                        type="checkbox"
-                        checked={rule.enabled}
-                        onChange={() => handleToggleRule(rule)}
-                        className="h-3.5 w-3.5 rounded accent-[var(--stash-accent)] cursor-pointer"
-                      />
-                      <span>{rule.name}</span>
-                    </label>
+                    <Switch
+                      checked={rule.enabled}
+                      onCheckedChange={() => handleToggleRule(rule)}
+                      aria-label={`Enable rule ${rule.name}`}
+                    />
+                    <span className="text-xs font-medium text-fg">
+                      {rule.name}
+                    </span>
                     <ArrowRight className="h-3 w-3 text-fg-muted" />
                     <span className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-panel px-2 py-0.5 text-[11px] text-fg">
                       <span
@@ -430,6 +436,6 @@ export function RulesManager({ rules, collections }: RulesManagerProps) {
           })}
         </div>
       )}
-    </div>
+    </SettingsSectionCard>
   );
 }

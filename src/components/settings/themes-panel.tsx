@@ -2,6 +2,7 @@ import {
   Check,
   Copy,
   Download,
+  FileJson,
   Palette,
   Pencil,
   Sparkles,
@@ -10,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { BackdropStudioCard } from '@/components/settings/backdrop-studio-card';
+import { SettingsSectionCard } from '@/components/settings/settings-section-card';
 import { ThemeStudio } from '@/components/themes/ThemeStudio';
 import { Button } from '@/components/ui/button';
 import { triggerFileDownload } from '@/lib/import-export/chrome-bookmarks';
@@ -138,14 +139,11 @@ export function ThemesPanel({
   };
 
   return (
-    <div className="space-y-4">
-      <BackdropStudioCard activeTheme={activeTheme} settings={settings} />
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-fg-muted">
-          Pick a built-in skin, duplicate any theme to remix live in Theme
-          Studio, or paste a shared theme code.
-        </p>
+    <SettingsSectionCard
+      icon={<Palette className="h-4 w-4" />}
+      title="Themes & Theme Studio"
+      subtitle="Pick a built-in skin, duplicate any theme to remix live in Theme Studio, or import a shared code."
+      headerAction={
         <div className="flex items-center gap-1.5">
           <Button
             variant="secondary"
@@ -154,18 +152,20 @@ export function ThemesPanel({
               setImportOpen((prev) => !prev);
               setImportError(null);
             }}
-            className="gap-1.5"
+            className="h-7 gap-1.5 px-2.5 text-[11px]"
           >
-            <Upload className="h-3.5 w-3.5 text-accent" />
-            Import Theme
+            <Upload className="h-3 w-3 text-accent" />
+            Import Theme Code
           </Button>
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             title="Upload .stash-theme.json file"
+            className="h-7 gap-1.5 px-2.5 text-[11px]"
           >
-            .json file
+            <FileJson className="h-3 w-3 text-fg-muted" />
+            Import .json
           </Button>
           <input
             ref={fileInputRef}
@@ -175,11 +175,11 @@ export function ThemesPanel({
             className="hidden"
           />
         </div>
-      </div>
-
+      }
+    >
       {/* Paste Share Code / JSON Import Box */}
       {importOpen ? (
-        <div className="space-y-2 rounded-card border border-accent/40 bg-canvas p-3.5">
+        <div className="space-y-2 rounded-card border border-accent/40 bg-panel/60 p-3.5">
           <label
             htmlFor="theme-share-paste"
             className="block font-mono text-[10px] uppercase tracking-wider text-fg-muted"
@@ -373,6 +373,6 @@ export function ThemesPanel({
           );
         })}
       </div>
-    </div>
+    </SettingsSectionCard>
   );
 }

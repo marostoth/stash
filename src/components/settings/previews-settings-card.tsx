@@ -1,6 +1,10 @@
 import { Eye, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import {
+  SettingsSectionCard,
+  SettingsToggleRow,
+} from '@/components/settings/settings-section-card';
 import { Button } from '@/components/ui/button';
 import { clearPreviewCache, getPreviewCacheCount } from '@/lib/previews/cache';
 import {
@@ -9,7 +13,6 @@ import {
 } from '@/lib/previews/permissions';
 import { stashRepo } from '@/lib/storage/repo';
 import type { StashSettings } from '@/lib/types/stash';
-import { cn } from '@/lib/utils/cn';
 
 interface PreviewsSettingsCardProps {
   settings: StashSettings;
@@ -111,62 +114,33 @@ export function PreviewsSettingsCard({
   };
 
   return (
-    <div className="space-y-2.5 rounded-card border border-border bg-canvas p-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Eye className="h-4 w-4 text-accent" />
-          <h3 className="font-mono text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
-            Previews
-          </h3>
-        </div>
-        <span
-          className={cn(
-            'rounded-pill border px-2 py-0.5 font-mono text-[10px] uppercase',
-            effectiveVisualEnabled
-              ? 'border-accent/40 bg-accent/15 text-accent'
-              : 'border-border bg-panel text-fg-muted',
-          )}
-        >
-          {effectiveVisualEnabled ? 'Visual Active' : 'Text Only'}
-        </span>
-      </div>
-
-      <label className="flex cursor-pointer items-center justify-between gap-3 py-1 text-xs text-fg">
-        <span>Hover previews (500ms pause or Space to peek)</span>
-        <input
-          type="checkbox"
+    <SettingsSectionCard
+      icon={<Eye className="h-4 w-4" />}
+      title="Previews"
+      badge={{
+        label: effectiveVisualEnabled ? 'Visual On' : 'Text Only',
+        tone: effectiveVisualEnabled ? 'accent' : 'neutral',
+      }}
+    >
+      <div className="space-y-1">
+        <SettingsToggleRow
+          id="settings-hover-previews"
+          label="Hover previews"
+          hint="500ms pause or press Space while hovering a card"
           checked={settings.hoverPreviews}
-          onChange={() =>
-            void stashRepo.updateSettings({
-              hoverPreviews: !settings.hoverPreviews,
-            })
+          onCheckedChange={(checked) =>
+            void stashRepo.updateSettings({ hoverPreviews: checked })
           }
-          className="h-4 w-4 accent-[var(--stash-accent)] cursor-pointer"
         />
-      </label>
 
-      <div className="flex items-center justify-between gap-3 py-1 text-xs text-fg">
-        <span>Visual Previews (Screenshots &amp; Site Cards)</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={effectiveVisualEnabled}
+        <SettingsToggleRow
+          id="settings-visual-previews"
+          label="Visual Previews (Screenshots & Site Cards)"
+          hint="Local-only IndexedDB cache; skips incognito, login, and checkout pages"
+          checked={effectiveVisualEnabled}
           disabled={busy}
-          onClick={handleToggleVisualPreviews}
-          className={cn(
-            'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-50',
-            effectiveVisualEnabled
-              ? 'border-accent bg-accent'
-              : 'border-border bg-panel',
-          )}
-        >
-          <span
-            className={cn(
-              'pointer-events-none block h-3.5 w-3.5 rounded-full bg-canvas shadow-sm transition-transform',
-              effectiveVisualEnabled ? 'translate-x-4' : 'translate-x-0.5',
-            )}
-          />
-        </button>
+          onCheckedChange={handleToggleVisualPreviews}
+        />
       </div>
 
       {lastError ? (
@@ -175,14 +149,7 @@ export function PreviewsSettingsCard({
         </p>
       ) : null}
 
-      <p className="text-[11px] leading-relaxed text-fg-muted">
-        Opt-in local-only previews: caches compressed tab snapshots as you
-        browse and falls back to Open Graph metadata on hover. Skips incognito,
-        login, checkout, and password-manager pages. Stored separately in local
-        IndexedDB (never exported in JSON backups).
-      </p>
-
-      <div className="pt-1">
+      <div className="pt-0.5">
         <Button
           variant="secondary"
           size="sm"
@@ -194,6 +161,6 @@ export function PreviewsSettingsCard({
           Clear Preview Cache ({cacheCount})
         </Button>
       </div>
-    </div>
+    </SettingsSectionCard>
   );
 }

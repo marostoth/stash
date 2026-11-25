@@ -1,7 +1,9 @@
 import { Image as ImageIcon, Layers, Loader2, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { SettingsSectionCard } from '@/components/settings/settings-section-card';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { stashRepo } from '@/lib/storage/repo';
 import { BACKDROP_STYLE_OPTIONS } from '@/lib/themes/presets';
 import {
@@ -114,20 +116,22 @@ export function BackdropStudioCard({
   };
 
   return (
-    <div className="space-y-4 rounded-card border border-border bg-canvas p-3.5">
+    <SettingsSectionCard
+      icon={<Layers className="h-4 w-4" />}
+      title="Canvas Backdrop & Wallpaper"
+      badge={{
+        label:
+          settings.backdropOverride === 'theme'
+            ? `${themeDefaultLabel}`
+            : 'Override Active',
+        tone: settings.backdropOverride === 'theme' ? 'neutral' : 'accent',
+      }}
+    >
       {/* 1. Quick Canvas Backdrop Override */}
       <div className="space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <Layers className="h-3.5 w-3.5 text-accent" />
-            <h3 className="text-xs font-semibold text-fg">Canvas Backdrop</h3>
-          </div>
-          <span className="font-mono text-[10px] text-fg-muted">
-            {settings.backdropOverride === 'theme'
-              ? `Using ${activeTheme.name} default (${themeDefaultLabel})`
-              : 'Custom override active'}
-          </span>
-        </div>
+        <p className="text-[11px] text-fg-muted">
+          Override the background texture on any built-in or custom theme.
+        </p>
 
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           <button
@@ -227,20 +231,24 @@ export function BackdropStudioCard({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-fg">
-                  <input
-                    type="checkbox"
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-1.5">
+                  <label
+                    htmlFor="settings-wallpaper-show"
+                    className="cursor-pointer text-[11px] text-fg select-none"
+                  >
+                    Show
+                  </label>
+                  <Switch
+                    id="settings-wallpaper-show"
                     checked={settings.wallpaperEnabled}
-                    onChange={() =>
+                    onCheckedChange={(checked) =>
                       void stashRepo.updateSettings({
-                        wallpaperEnabled: !settings.wallpaperEnabled,
+                        wallpaperEnabled: checked,
                       })
                     }
-                    className="h-3.5 w-3.5 cursor-pointer accent-[var(--stash-accent)]"
                   />
-                  <span>Show</span>
-                </label>
+                </div>
 
                 <Button
                   variant="ghost"
@@ -310,6 +318,6 @@ export function BackdropStudioCard({
           </div>
         ) : null}
       </div>
-    </div>
+    </SettingsSectionCard>
   );
 }

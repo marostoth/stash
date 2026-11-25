@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { SettingsSectionCard } from '@/components/settings/settings-section-card';
 import { Button } from '@/components/ui/button';
 import { parseNetscapeBookmarksHtml } from '@/lib/import-export/bookmarks-html';
 import {
@@ -132,18 +133,12 @@ export function BackupImportPanel() {
   return (
     <div className="space-y-4">
       {/* JSON Backup & Restore */}
-      <div className="space-y-3 rounded-card border border-border bg-canvas p-4">
-        <div className="flex items-center gap-2">
-          <FolderSync className="h-4 w-4 text-accent" />
-          <h3 className="text-xs font-semibold text-fg">
-            JSON Backup &amp; Restore (schemaVersion 1)
-          </h3>
-        </div>
-        <p className="text-xs leading-relaxed text-fg-muted">
-          Export your entire Stash library—collections, links, notes, tags,
-          rules, settings, and custom themes—as a single portable JSON file.
-        </p>
-
+      <SettingsSectionCard
+        icon={<FolderSync className="h-4 w-4" />}
+        title="JSON Backup & Restore"
+        subtitle="Export your entire Stash library—collections, links, notes, tags, rules, settings, and custom themes—as a single portable JSON file."
+        badge={{ label: 'Schema v1', tone: 'neutral' }}
+      >
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="primary"
@@ -216,19 +211,14 @@ export function BackupImportPanel() {
             </div>
           </div>
         )}
-      </div>
+      </SettingsSectionCard>
 
       {/* Bookmark Importers */}
-      <div className="space-y-3 rounded-card border border-border bg-canvas p-4">
-        <div className="flex items-center gap-2">
-          <Bookmark className="h-4 w-4 text-accent" />
-          <h3 className="text-xs font-semibold text-fg">Import Bookmarks</h3>
-        </div>
-        <p className="text-xs leading-relaxed text-fg-muted">
-          Bring existing bookmarks into Stash collections. Duplicate URLs within
-          a collection are automatically skipped.
-        </p>
-
+      <SettingsSectionCard
+        icon={<Bookmark className="h-4 w-4" />}
+        title="Import Bookmarks"
+        subtitle="Bring existing bookmarks into Stash collections. Duplicate URLs within a collection are automatically skipped."
+      >
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="secondary"
@@ -272,7 +262,7 @@ export function BackupImportPanel() {
           Direct Chrome import requests optional bookmarks permission on click.
           HTML import supports Chrome, Edge, Firefox, and Toby exports.
         </p>
-      </div>
+      </SettingsSectionCard>
     </div>
   );
 }
