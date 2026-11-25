@@ -2,6 +2,7 @@ import type { OpenTabInfo } from '@/lib/tabs/session-filter';
 import type {
   CategorizationRule,
   Collection,
+  CollectionViewMode,
   LinkItem,
   StashSettings,
   TabGroupColor,
@@ -12,7 +13,9 @@ export interface CreateCollectionInput {
   name: string;
   description?: string;
   color?: TabGroupColor;
+  tintColor?: string;
   icon?: string;
+  viewMode?: CollectionViewMode;
   isSession?: boolean;
 }
 
@@ -20,7 +23,9 @@ export interface UpdateCollectionInput {
   name?: string;
   description?: string;
   color?: TabGroupColor;
-  icon?: string;
+  tintColor?: string | null;
+  icon?: string | null;
+  viewMode?: CollectionViewMode;
   collapsed?: boolean;
   order?: number;
 }

@@ -6,6 +6,8 @@ import {
   ChevronRight,
   ExternalLink,
   GripVertical,
+  Image as ImageIcon,
+  LayoutGrid,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -15,7 +17,9 @@ import {
   X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import type { CSSProperties } from 'react';
 import { toast } from 'sonner';
+import { CollectionAppearancePopover } from '@/components/CollectionAppearancePopover';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -34,6 +38,7 @@ import {
   wakeUpCollectionInTabGroup,
 } from '@/lib/tabs/tab-actions';
 import { isEligibleForAutoTag } from '@/lib/tagging/auto-tagger';
+import { getCuratedCollectionIcon } from '@/lib/themes/collection-icons';
 import {
   type Collection,
   type LinkItem,
@@ -106,7 +111,19 @@ export function CollectionSection({
   });
 
   const isCollapsed = collection.collapsed && !forceExpanded;
-  const colorHex = TAB_GROUP_COLOR_SWATCH[collection.color];
+  const colorHex =
+    collection.tintColor ?? TAB_GROUP_COLOR_SWATCH[collection.color];
+  const viewMode = collection.viewMode ?? 'compact';
+  const CuratedIcon = getCuratedCollectionIcon(collection.icon);
+  const tintStyle = collection.tintColor
+    ? ({ '--collection-tint': collection.tintColor } as CSSProperties)
+    : undefined;
+
+  const handleToggleViewMode = () => {
+    void stashRepo.updateCollection(collection.id, {
+      viewMode: viewMode === 'cover' ? 'compact' : 'cover',
+    });
+  };
 
   const handleToggleCollapse = () => {
     if (collection.collapsed) {
@@ -156,8 +173,12 @@ export function CollectionSection({
     >
       <div
         ref={dropRef}
+        style={tintStyle}
         className={cn(
-          'space-y-3 rounded-card p-1.5 -m-1.5 transition-colors',
+          'space-y-3 rounded-card transition-colors',
+          collection.tintColor
+            ? 'stash-collection-tinted p-3.5'
+            : 'p-1.5 -m-1.5',
           isDropTarget && 'bg-panel/60 ring-2 ring-accent/55',
         )}
       >
@@ -189,11 +210,26 @@ export function CollectionSection({
                   <ChevronDown className="h-4 w-4" />
                 )}
               </span>
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: colorHex }}
-                aria-hidden="true"
-              />
+              {CuratedIcon ? (
+                <CuratedIcon
+                  className="h-4 w-4 shrink-0"
+                  style={{ color: colorHex }}
+                  aria-hidden="true"
+                />
+              ) : collection.icon ? (
+                <span
+                  className="shrink-0 text-sm leading-none"
+                  aria-hidden="true"
+                >
+                  {collection.icon}
+                </span>
+              ) : (
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: colorHex }}
+                  aria-hidden="true"
+                />
+              )}
               <h2 className="truncate text-sm font-semibold tracking-tight text-fg">
                 {collection.name}
               </h2>
@@ -282,6 +318,34 @@ export function CollectionSection({
               <span className="hidden sm:inline">Add Link</span>
             </Button>
 
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleToggleViewMode}
+              aria-label={
+                viewMode === 'cover'
+                  ? `Switch ${collection.name} to compact view`
+                  : `Switch ${collection.name} to visual cover view`
+              }
+              title={
+                viewMode === 'cover'
+                  ? 'Cover view active (click for Compact)'
+                  : 'Compact view active (click for Visual Cover view)'
+              }
+              className={cn(
+                'h-7 w-7 text-fg-muted hover:text-accent',
+                viewMode === 'cover' && 'bg-accent/15 text-accent',
+              )}
+            >
+              {viewMode === 'cover' ? (
+                <ImageIcon className="h-3.5 w-3.5" />
+              ) : (
+                <LayoutGrid className="h-3.5 w-3.5" />
+              )}
+            </Button>
+
+            <CollectionAppearancePopover collection={collection} />
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -363,6 +427,8 @@ export function CollectionSection({
                         motionMode={motionMode}
                         cascadeActive={isCascading}
                         hoverPreviews={hoverPreviews}
+                        viewMode={viewMode}
+                        collectionTint={collection.tintColor}
                       />
                     ))}
                   </div>

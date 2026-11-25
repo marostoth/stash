@@ -33,12 +33,16 @@ export const TAB_GROUP_COLOR_SWATCH: Record<TabGroupColor, string> = {
   orange: '#FB923C',
 };
 
+export type CollectionViewMode = 'compact' | 'cover';
+
 export interface Collection {
   id: string;
   name: string;
   description?: string;
   color: TabGroupColor;
+  tintColor?: string;
   icon?: string;
+  viewMode?: CollectionViewMode;
   order: number;
   collapsed: boolean;
   isSession?: boolean;
@@ -78,6 +82,8 @@ export interface CategorizationRule {
 }
 
 export type MotionMode = 'arcade' | 'tactile' | 'reduced' | 'off';
+export type CardRadiusPreset = 'sharp' | 'standard' | 'rounded';
+export type BackdropStyle = 'flat' | 'dot-matrix' | 'grid' | 'ambient-glow';
 
 export interface StashSettings {
   activeThemeId: string;
@@ -92,9 +98,18 @@ export interface StashSettings {
   hoverPreviews: boolean;
   visualPreviewsEnabled: boolean;
   density: 'compact' | 'comfortable';
+  customThemes?: ThemeDefinition[];
 }
 
 export type ThemeMode = 'dark' | 'light';
+
+export interface CoreThemeColors {
+  canvas: string;
+  surface: string;
+  accent: string;
+  text: string;
+  border: string;
+}
 
 export interface ThemeColors {
   canvas: string;
@@ -128,6 +143,8 @@ export interface ThemeDefinition {
   colors: ThemeColors;
   radius: ThemeRadius;
   fonts: ThemeFonts;
+  cardRadius?: CardRadiusPreset;
+  backdropStyle?: BackdropStyle;
 }
 
 export interface StashExportBundle {
@@ -154,4 +171,5 @@ export const DEFAULT_SETTINGS: StashSettings = {
   hoverPreviews: true,
   visualPreviewsEnabled: false,
   density: 'comfortable',
+  customThemes: [],
 };

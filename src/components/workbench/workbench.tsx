@@ -300,7 +300,7 @@ export function Workbench() {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex h-screen flex-col overflow-hidden bg-canvas text-fg">
+        <div className="stash-backdrop flex h-screen flex-col overflow-hidden text-fg">
           <TopBar
             searchInputRef={searchInputRef}
             allThemes={allThemes}

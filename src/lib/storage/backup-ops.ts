@@ -240,6 +240,29 @@ export async function saveSessionCollectionInStorage(
   };
 }
 
+export async function deleteCollectionInStorage(id: string): Promise<boolean> {
+  const [existingCollections, existingLinks] = await Promise.all([
+    collectionsStorage.getValue(),
+    linksStorage.getValue(),
+  ]);
+  const remaining = existingCollections.filter((item) => item.id !== id);
+  if (remaining.length === existingCollections.length) return false;
+
+  const reindexed = sortByOrder(remaining).map((item, index) => ({
+    ...item,
+    order: index,
+  }));
+  const remainingLinks = existingLinks.filter(
+    (link) => link.collectionId !== id,
+  );
+
+  await Promise.all([
+    collectionsStorage.setValue(reindexed),
+    linksStorage.setValue(remainingLinks),
+  ]);
+  return true;
+}
+
 export async function deleteLinkInStorage(id: string): Promise<boolean> {
   const existing = await linksStorage.getValue();
   const target = existing.find((item) => item.id === id);

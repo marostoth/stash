@@ -3,6 +3,7 @@ import type { RestoreStats } from '@/lib/import-export/bundle';
 import type { LibraryBoardState } from '@/lib/reorganize/plan';
 import {
   type BookmarkImportSummary,
+  deleteCollectionInStorage,
   deleteCustomThemeInStorage,
   deleteLinkInStorage,
   deleteLinksInStorage,
@@ -117,7 +118,9 @@ export const stashRepo = {
       name: input.name.trim() || 'Untitled Collection',
       description: input.description?.trim() || undefined,
       color: input.color ?? 'green',
-      icon: input.icon,
+      tintColor: input.tintColor?.trim() || undefined,
+      icon: input.icon?.trim() || undefined,
+      viewMode: input.viewMode,
       order: maxOrder + 1,
       collapsed: false,
       isSession: input.isSession,
@@ -145,7 +148,13 @@ export const stashRepo = {
           ? { description: patch.description.trim() || undefined }
           : {}),
         ...(patch.color !== undefined ? { color: patch.color } : {}),
-        ...(patch.icon !== undefined ? { icon: patch.icon } : {}),
+        ...(patch.tintColor !== undefined
+          ? { tintColor: patch.tintColor?.trim() || undefined }
+          : {}),
+        ...(patch.icon !== undefined
+          ? { icon: patch.icon?.trim() || undefined }
+          : {}),
+        ...(patch.viewMode !== undefined ? { viewMode: patch.viewMode } : {}),
         ...(patch.collapsed !== undefined
           ? { collapsed: patch.collapsed }
           : {}),
@@ -182,28 +191,8 @@ export const stashRepo = {
     return this.updateCollection(id, { collapsed: !target.collapsed });
   },
 
-  async deleteCollection(id: string): Promise<boolean> {
-    const [existingCollections, existingLinks] = await Promise.all([
-      collectionsStorage.getValue(),
-      linksStorage.getValue(),
-    ]);
-    const remaining = existingCollections.filter((item) => item.id !== id);
-    if (remaining.length === existingCollections.length) return false;
-
-    const reindexed = sortByOrder(remaining).map((item, index) => ({
-      ...item,
-      order: index,
-    }));
-    const remainingLinks = existingLinks.filter(
-      (link) => link.collectionId !== id,
-    );
-
-    await Promise.all([
-      collectionsStorage.setValue(reindexed),
-      linksStorage.setValue(remainingLinks),
-    ]);
-    return true;
-  },
+  deleteCollection: (id: string): Promise<boolean> =>
+    deleteCollectionInStorage(id),
 
   async seedStarterCollections(): Promise<Collection[]> {
     const existing = await collectionsStorage.getValue();
@@ -410,12 +399,22 @@ export const stashRepo = {
 
   async getSettings(): Promise<StashSettings> {
     const stored = await settingsStorage.getValue();
-    return { ...DEFAULT_SETTINGS, ...stored };
+    return {
+      ...DEFAULT_SETTINGS,
+      ...stored,
+      customThemes: Array.isArray(stored.customThemes)
+        ? stored.customThemes
+        : [],
+    };
   },
 
   watchSettings(cb: (settings: StashSettings) => void): () => void {
     return settingsStorage.watch((next) =>
-      cb({ ...DEFAULT_SETTINGS, ...next }),
+      cb({
+        ...DEFAULT_SETTINGS,
+        ...next,
+        customThemes: Array.isArray(next.customThemes) ? next.customThemes : [],
+      }),
     );
   },
 

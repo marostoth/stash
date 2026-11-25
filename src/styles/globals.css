@@ -2,15 +2,27 @@
 
 :root {
   --stash-canvas: #0e1013;
+  --stash-surface: #1d2128;
   --stash-panel: #15181d;
   --stash-card: #1d2128;
   --stash-card-hover: #242a33;
-  --stash-border: rgba(255, 255, 255, 0.08);
+  --stash-border: #262b34;
   --stash-accent: #00d68f;
   --stash-accent-fg: #06150f;
   --stash-text: #eceff4;
   --stash-text-muted: #8b949e;
   --stash-danger: #f87171;
+  --stash-badge-bg: color-mix(
+    in srgb,
+    var(--stash-accent) 14%,
+    var(--stash-surface)
+  );
+  --stash-accent-border: color-mix(
+    in srgb,
+    var(--stash-accent) 42%,
+    var(--stash-border)
+  );
+  --stash-glow: color-mix(in srgb, var(--stash-accent) 24%, transparent);
   --stash-radius-card: 6px;
   --stash-radius-control: 6px;
   --stash-radius-pill: 9999px;
@@ -104,4 +116,56 @@
   );
   animation: stash-phosphor-sweep 1.25s ease-in-out infinite;
   will-change: transform;
+}
+
+/* Pure-CSS Canvas Backdrops (zero image assets, zero scroll lag) */
+.stash-backdrop {
+  background-color: var(--stash-canvas);
+}
+
+html[data-backdrop="dot-matrix"] .stash-backdrop {
+  background-color: var(--stash-canvas);
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--stash-text) 14%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 20px 20px;
+}
+
+html[data-backdrop="grid"] .stash-backdrop {
+  background-color: var(--stash-canvas);
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--stash-text) 7%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--stash-text) 7%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 28px 28px;
+}
+
+html[data-backdrop="ambient-glow"] .stash-backdrop {
+  background-color: var(--stash-canvas);
+  background-image: radial-gradient(
+    ellipse 85% 44% at 50% -6%,
+    color-mix(in srgb, var(--stash-accent) 18%, transparent) 0%,
+    transparent 74%
+  );
+}
+
+/* Theme-safe translucent collection tint blending */
+.stash-collection-tinted {
+  background-color: color-mix(
+    in srgb,
+    var(--collection-tint) 10%,
+    var(--stash-surface)
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--collection-tint) 28%, var(--stash-border));
+  border-top: 3px solid
+    color-mix(in srgb, var(--collection-tint) 76%, transparent);
 }

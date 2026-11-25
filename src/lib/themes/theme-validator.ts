@@ -99,6 +99,20 @@ export function validateThemeDefinition(raw: unknown): ThemeValidationResult {
     fonts[key] = val.trim();
   }
 
+  const cardRadius =
+    obj.cardRadius === 'sharp' ||
+    obj.cardRadius === 'standard' ||
+    obj.cardRadius === 'rounded'
+      ? obj.cardRadius
+      : undefined;
+  const backdropStyle =
+    obj.backdropStyle === 'flat' ||
+    obj.backdropStyle === 'dot-matrix' ||
+    obj.backdropStyle === 'grid' ||
+    obj.backdropStyle === 'ambient-glow'
+      ? obj.backdropStyle
+      : undefined;
+
   return {
     ok: true,
     theme: {
@@ -109,6 +123,8 @@ export function validateThemeDefinition(raw: unknown): ThemeValidationResult {
       colors,
       radius,
       fonts,
+      ...(cardRadius ? { cardRadius } : {}),
+      ...(backdropStyle ? { backdropStyle } : {}),
     },
   };
 }

@@ -7,6 +7,7 @@ import {
 } from 'motion/react';
 import { memo, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { CoverCardBanner } from '@/components/CoverCardBanner';
 import { CardActionDrawer } from '@/components/workbench/card-action-drawer';
 import { DropSparks } from '@/components/workbench/drop-sparks';
 import { playDelete, playDrop, playHoverRiffle } from '@/lib/audio/foley';
@@ -26,7 +27,11 @@ import {
   TAG_POP_SPRING,
 } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
-import type { LinkItem, MotionMode } from '@/lib/types/stash';
+import type {
+  CollectionViewMode,
+  LinkItem,
+  MotionMode,
+} from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 import { extractDomain, getMonogram } from '@/lib/utils/url';
 import { useUiStore } from '@/store/ui-store';
@@ -40,6 +45,8 @@ interface LinkCardProps {
   motionMode: MotionMode;
   cascadeActive: boolean;
   hoverPreviews: boolean;
+  viewMode?: CollectionViewMode;
+  collectionTint?: string;
 }
 
 export const LinkCard = memo(function LinkCard({
@@ -51,6 +58,8 @@ export const LinkCard = memo(function LinkCard({
   motionMode,
   cascadeActive,
   hoverPreviews,
+  viewMode = 'compact',
+  collectionTint,
 }: LinkCardProps) {
   const openEditLink = useUiStore((s) => s.openEditLink);
   const highlightedLinkId = useUiStore((s) => s.highlightedLinkId);
@@ -341,74 +350,96 @@ export const LinkCard = memo(function LinkCard({
             onPointerEnter={handleBodyPointerEnter}
             onPointerLeave={dismissPreview}
             className={cn(
-              'relative z-[1] flex h-full flex-col gap-2 rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
-              compact ? 'p-2.5' : 'p-3.5',
+              'relative z-[1] flex h-full flex-col overflow-hidden rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+              viewMode === 'cover'
+                ? 'p-0'
+                : compact
+                  ? 'gap-2 p-2.5'
+                  : 'gap-2 p-3.5',
             )}
           >
-            {/* Header: Favicon + Title */}
-            <div className="flex items-start gap-2.5 pr-6">
-              <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-control border border-border bg-panel font-mono text-xs font-semibold text-accent">
-                {showFavicon ? (
-                  <img
-                    src={link.faviconUrl}
-                    alt=""
-                    width={16}
-                    height={16}
-                    loading="lazy"
-                    draggable={false}
-                    onError={() => setFaviconFailed(true)}
-                    className="h-4 w-4 object-contain"
-                  />
-                ) : (
-                  <span aria-hidden="true">{monogram}</span>
-                )}
+            {viewMode === 'cover' ? (
+              <CoverCardBanner
+                url={link.url}
+                title={link.title}
+                faviconUrl={link.faviconUrl}
+                collectionTint={collectionTint}
+              />
+            ) : null}
+
+            <div
+              className={cn(
+                'flex flex-1 flex-col gap-2',
+                viewMode === 'cover' && (compact ? 'p-2.5' : 'p-3'),
+              )}
+            >
+              {/* Header: Favicon + Title */}
+              <div className="flex items-start gap-2.5 pr-6">
+                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-control border border-border bg-panel font-mono text-xs font-semibold text-accent">
+                  {showFavicon ? (
+                    <img
+                      src={link.faviconUrl}
+                      alt=""
+                      width={16}
+                      height={16}
+                      loading="lazy"
+                      draggable={false}
+                      onError={() => setFaviconFailed(true)}
+                      className="h-4 w-4 object-contain"
+                    />
+                  ) : (
+                    <span aria-hidden="true">{monogram}</span>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="line-clamp-2 text-sm font-medium leading-snug text-fg">
+                    {link.title}
+                  </div>
+                  <div className="mt-0.5 truncate font-mono text-[11px] text-fg-muted">
+                    {domain}
+                  </div>
+                </div>
               </div>
 
-              <div className="min-w-0 flex-1">
-                <div className="line-clamp-2 text-sm font-medium leading-snug text-fg">
-                  {link.title}
+              {/* Optional "Why I saved this" Note */}
+              {link.note && (
+                <p className="line-clamp-1 text-xs text-fg-muted">
+                  {link.note}
+                </p>
+              )}
+
+              {/* Optional Tag Pills (newly appearing AI tags pop in with spring) */}
+              {visibleTags.length > 0 && (
+                <div className="mt-auto flex flex-wrap items-center gap-1 pt-0.5">
+                  {visibleTags.map((tag) => {
+                    const isNewlyAdded = !seenTagsRef.current.has(tag);
+                    return (
+                      <motion.span
+                        key={tag}
+                        initial={
+                          isNewlyAdded && tactile
+                            ? { scale: 0.7, opacity: 0 }
+                            : false
+                        }
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={
+                          arcade ? ARCADE_TAG_POP_SPRING : TAG_POP_SPRING
+                        }
+                        className="rounded-pill border border-border bg-panel px-2 py-0.5 font-mono text-[10px] text-fg-muted"
+                      >
+                        #{tag}
+                      </motion.span>
+                    );
+                  })}
+                  {hiddenTagCount > 0 && (
+                    <span className="font-mono text-[10px] text-fg-muted">
+                      +{hiddenTagCount}
+                    </span>
+                  )}
                 </div>
-                <div className="mt-0.5 truncate font-mono text-[11px] text-fg-muted">
-                  {domain}
-                </div>
-              </div>
+              )}
             </div>
-
-            {/* Optional "Why I saved this" Note */}
-            {link.note && (
-              <p className="line-clamp-1 text-xs text-fg-muted">{link.note}</p>
-            )}
-
-            {/* Optional Tag Pills (newly appearing AI tags pop in with spring) */}
-            {visibleTags.length > 0 && (
-              <div className="mt-auto flex flex-wrap items-center gap-1 pt-0.5">
-                {visibleTags.map((tag) => {
-                  const isNewlyAdded = !seenTagsRef.current.has(tag);
-                  return (
-                    <motion.span
-                      key={tag}
-                      initial={
-                        isNewlyAdded && tactile
-                          ? { scale: 0.7, opacity: 0 }
-                          : false
-                      }
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={
-                        arcade ? ARCADE_TAG_POP_SPRING : TAG_POP_SPRING
-                      }
-                      className="rounded-pill border border-border bg-panel px-2 py-0.5 font-mono text-[10px] text-fg-muted"
-                    >
-                      #{tag}
-                    </motion.span>
-                  );
-                })}
-                {hiddenTagCount > 0 && (
-                  <span className="font-mono text-[10px] text-fg-muted">
-                    +{hiddenTagCount}
-                  </span>
-                )}
-              </div>
-            )}
           </a>
 
           {/* Mechanical Edit + Slide-Down Delete Drawer */}

@@ -444,4 +444,34 @@ describe('stashRepo', () => {
       tagsLocked: true,
     });
   });
+
+  it('persists and clears collection tintColor, icon, viewMode and backfills settings.customThemes', async () => {
+    const col = await stashRepo.createCollection({ name: 'Design' });
+    expect(col.tintColor).toBeUndefined();
+    expect(col.icon).toBeUndefined();
+    expect(col.viewMode).toBeUndefined();
+
+    const styled = await stashRepo.updateCollection(col.id, {
+      tintColor: '#6366F1',
+      icon: 'sparkles',
+      viewMode: 'cover',
+    });
+    expect(styled).toMatchObject({
+      tintColor: '#6366F1',
+      icon: 'sparkles',
+      viewMode: 'cover',
+    });
+
+    const cleared = await stashRepo.updateCollection(col.id, {
+      tintColor: null,
+      icon: null,
+      viewMode: 'compact',
+    });
+    expect(cleared?.tintColor).toBeUndefined();
+    expect(cleared?.icon).toBeUndefined();
+    expect(cleared?.viewMode).toBe('compact');
+
+    const settings = await stashRepo.getSettings();
+    expect(settings.customThemes).toEqual([]);
+  });
 });

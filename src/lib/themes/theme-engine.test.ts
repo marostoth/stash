@@ -7,14 +7,20 @@ import { getAllThemes, resolveTheme } from '@/lib/themes/theme-engine';
 import type { ThemeDefinition } from '@/lib/types/stash';
 
 describe('theme-engine', () => {
-  it('ships all three built-in themes with oscilloscope as default fallback', () => {
+  it('ships all six built-in themes with oscilloscope as default fallback', () => {
     expect(BUILT_IN_THEMES.map((t) => t.id)).toEqual([
       'oscilloscope',
       'clean-dark',
       'clean-light',
+      'amber-phosphor',
+      'midnight-indigo',
+      'warm-paper',
     ]);
     expect(resolveTheme('non-existent-theme').id).toBe(OSCILLOSCOPE_THEME.id);
     expect(resolveTheme('clean-light').mode).toBe('light');
+    expect(resolveTheme('warm-paper').mode).toBe('light');
+    expect(resolveTheme('amber-phosphor').backdropStyle).toBe('dot-matrix');
+    expect(resolveTheme('midnight-indigo').backdropStyle).toBe('ambient-glow');
   });
 
   it('merges custom themes without letting custom IDs override built-in themes', () => {
@@ -36,6 +42,9 @@ describe('theme-engine', () => {
       'oscilloscope',
       'clean-dark',
       'clean-light',
+      'amber-phosphor',
+      'midnight-indigo',
+      'warm-paper',
       'amber-crt',
     ]);
     expect(resolveTheme('oscilloscope', [collision]).name).toBe('Oscilloscope');

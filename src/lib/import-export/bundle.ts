@@ -1,5 +1,6 @@
 import type { StashSnapshot } from '@/lib/storage/repo-types';
 import { BUILT_IN_THEMES } from '@/lib/themes/built-in-themes';
+import { normalizeHexColor } from '@/lib/themes/contrast';
 import {
   normalizeImportedCustomTheme,
   validateThemeDefinition,
@@ -72,6 +73,12 @@ function parseCollection(
       ? (obj.color as TabGroupColor)
       : 'green';
 
+  const tintColor = normalizeHexColor(obj.tintColor) ?? undefined;
+  const viewMode =
+    obj.viewMode === 'compact' || obj.viewMode === 'cover'
+      ? obj.viewMode
+      : undefined;
+
   return {
     id: obj.id.trim(),
     name: obj.name.trim(),
@@ -80,7 +87,12 @@ function parseCollection(
         ? obj.description.trim()
         : undefined,
     color,
-    icon: typeof obj.icon === 'string' ? obj.icon : undefined,
+    tintColor,
+    icon:
+      typeof obj.icon === 'string' && obj.icon.trim()
+        ? obj.icon.trim()
+        : undefined,
+    viewMode,
     order: typeof obj.order === 'number' ? obj.order : fallbackOrder,
     collapsed: Boolean(obj.collapsed),
     isSession: obj.isSession === true ? true : undefined,
@@ -232,6 +244,7 @@ function parseSettings(raw: unknown): StashSettings {
       obj.density === 'compact' || obj.density === 'comfortable'
         ? obj.density
         : DEFAULT_SETTINGS.density,
+    customThemes: [],
   };
 }
 
