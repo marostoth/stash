@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import type { Collection, LinkItem } from '@/lib/types/stash';
 
+export type SettingsTab =
+  | 'general'
+  | 'appearance'
+  | 'ai-rules'
+  | 'library-tools'
+  | 'shortcuts'
+  | 'backup';
+
 export type LinkModalState =
   | { mode: 'create'; defaultCollectionId: string }
   | { mode: 'edit'; link: LinkItem }
@@ -38,6 +46,7 @@ interface UiStoreState {
   collectionModal: CollectionModalState;
   linkModal: LinkModalState;
   settingsOpen: boolean;
+  settingsTab: SettingsTab;
   healthCheckOpen: boolean;
   reorganizeOpen: boolean;
   triageCollectionId: string | null;
@@ -58,7 +67,8 @@ interface UiStoreState {
   openCreateLink: (collectionId: string) => void;
   openEditLink: (link: LinkItem) => void;
   closeLinkModal: () => void;
-  openSettings: () => void;
+  openSettings: (tab?: SettingsTab) => void;
+  setSettingsTab: (tab: SettingsTab) => void;
   closeSettings: () => void;
   openHealthCheck: () => void;
   closeHealthCheck: () => void;
@@ -99,6 +109,7 @@ export const useUiStore = create<UiStoreState>((set) => ({
   collectionModal: null,
   linkModal: null,
   settingsOpen: false,
+  settingsTab: 'general',
   healthCheckOpen: false,
   reorganizeOpen: false,
   triageCollectionId: null,
@@ -157,14 +168,16 @@ export const useUiStore = create<UiStoreState>((set) => ({
   },
   closeLinkModal: () => set({ linkModal: null }),
 
-  openSettings: () => {
+  openSettings: (tab) => {
     clearPreviewTimer();
     set({
       settingsOpen: true,
+      settingsTab: typeof tab === 'string' ? tab : 'general',
       hoveredPreviewCandidate: null,
       activePreview: null,
     });
   },
+  setSettingsTab: (tab) => set({ settingsTab: tab }),
   closeSettings: () => set({ settingsOpen: false }),
 
   openHealthCheck: () => {

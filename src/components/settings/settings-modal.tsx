@@ -1,5 +1,6 @@
 import {
   FolderSync,
+  Keyboard,
   Palette,
   SlidersHorizontal,
   Sparkles,
@@ -11,6 +12,7 @@ import { AppearancePanel } from '@/components/settings/appearance-panel';
 import { BackupImportPanel } from '@/components/settings/backup-import-panel';
 import { GeneralPanel } from '@/components/settings/general-panel';
 import { LibraryToolsPanel } from '@/components/settings/library-tools-panel';
+import { ShortcutsPanel } from '@/components/settings/shortcuts-panel';
 import {
   Dialog,
   DialogContent,
@@ -27,7 +29,7 @@ import type {
   ThemeDefinition,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
-import { useUiStore } from '@/store/ui-store';
+import { type SettingsTab, useUiStore } from '@/store/ui-store';
 
 interface SettingsModalProps {
   collections: readonly Collection[];
@@ -37,13 +39,6 @@ interface SettingsModalProps {
   allThemes: readonly ThemeDefinition[];
   activeTheme: ThemeDefinition;
 }
-
-type SettingsTab =
-  | 'general'
-  | 'appearance'
-  | 'ai-rules'
-  | 'library-tools'
-  | 'backup';
 
 interface NavItemSpec {
   id: SettingsTab;
@@ -81,6 +76,13 @@ const NAV_ITEMS: readonly NavItemSpec[] = [
     Icon: Wrench,
   },
   {
+    id: 'shortcuts',
+    label: 'Shortcuts',
+    description:
+      'Live Chrome global bindings, board navigation, and quick-capture tricks.',
+    Icon: Keyboard,
+  },
+  {
     id: 'backup',
     label: 'Backup & Import',
     description: 'Portable JSON backups and Chrome or Netscape HTML imports.',
@@ -97,7 +99,7 @@ function readExtensionVersion(): string {
   } catch {
     // Fallback outside extension runtime
   }
-  return 'v1.11.0';
+  return 'v1.12.0';
 }
 
 export function SettingsModal({
@@ -109,11 +111,12 @@ export function SettingsModal({
   activeTheme,
 }: SettingsModalProps) {
   const open = useUiStore((s) => s.settingsOpen);
+  const activeTab = useUiStore((s) => s.settingsTab);
+  const setActiveTab = useUiStore((s) => s.setSettingsTab);
   const closeSettings = useUiStore((s) => s.closeSettings);
   const openHealthCheck = useUiStore((s) => s.openHealthCheck);
   const openReorganize = useUiStore((s) => s.openReorganize);
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [nanoStatus, setNanoStatus] =
     useState<NanoAvailabilityStatus>('unavailable');
 
@@ -275,6 +278,8 @@ export function SettingsModal({
               onOpenHealthCheck={openHealthCheck}
               onOpenReorganize={openReorganize}
             />
+          ) : activeTab === 'shortcuts' ? (
+            <ShortcutsPanel settingsOpen={open} />
           ) : (
             <BackupImportPanel
               settings={settings}

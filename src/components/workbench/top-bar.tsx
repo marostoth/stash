@@ -252,7 +252,7 @@ export function TopBar({
           <Button
             variant="ghost"
             size="icon"
-            onClick={openSettings}
+            onClick={() => openSettings()}
             aria-label="Settings"
             title="Settings & Auto-Rules"
           >

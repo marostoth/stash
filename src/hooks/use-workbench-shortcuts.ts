@@ -67,6 +67,35 @@ export function useWorkbenchShortcuts({
       }
 
       if (
+        event.key === '?' &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !isEditableElement(event.target)
+      ) {
+        const ui = useUiStore.getState();
+        const otherModalOpen =
+          ui.collectionModal !== null ||
+          ui.linkModal !== null ||
+          ui.healthCheckOpen ||
+          ui.reorganizeOpen ||
+          ui.triageOpen;
+        if (otherModalOpen) return;
+
+        if (ui.settingsOpen && ui.settingsTab === 'shortcuts') {
+          event.preventDefault();
+          ui.closeSettings();
+          return;
+        }
+        if (!ui.settingsOpen) {
+          event.preventDefault();
+          ui.openSettings('shortcuts');
+          return;
+        }
+        return;
+      }
+
+      if (
         event.key === '/' &&
         !event.ctrlKey &&
         !event.metaKey &&
