@@ -11,6 +11,7 @@ import type {
   CardDensity,
   StashSettings,
 } from '@/lib/types/stash';
+import { COMMON_CURRENCIES } from '@/lib/utils/price-math';
 
 interface GeneralPanelProps {
   settings: StashSettings;
@@ -76,6 +77,31 @@ export function GeneralPanel({ settings, settingsOpen }: GeneralPanelProps) {
             >
               <option value="standard">Standard</option>
               <option value="wide">Ultrawide</option>
+            </Select>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 py-1">
+            <label
+              htmlFor="settings-default-currency"
+              className="text-xs text-fg select-none"
+            >
+              Default currency
+            </label>
+            <Select
+              id="settings-default-currency"
+              value={settings.defaultCurrency ?? 'GBP'}
+              onChange={(e) =>
+                void stashRepo.updateSettings({
+                  defaultCurrency: e.target.value,
+                })
+              }
+              className="h-8 w-36 text-xs"
+            >
+              {COMMON_CURRENCIES.map((currency) => (
+                <option key={currency.code} value={currency.code}>
+                  {currency.label}
+                </option>
+              ))}
             </Select>
           </div>
 

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { BackgroundJobsTray } from '@/components/workbench/background-jobs-tray';
 import { CollectionModal } from '@/components/workbench/collection-modal';
 import { CollectionSection } from '@/components/workbench/collection-section';
+import { DetailsView } from '@/components/workbench/details-view';
 import { DragGhost } from '@/components/workbench/drag-ghost';
 import { EmptyState } from '@/components/workbench/empty-state';
 import { LinkPreviewPopover } from '@/components/workbench/link-preview-popover';
@@ -31,6 +32,10 @@ import { useWorkbenchShortcuts } from '@/hooks/use-workbench-shortcuts';
 import { isDragItemData } from '@/lib/dnd/types';
 import { resolveReducedMotionPolicy } from '@/lib/motion/physics';
 import { DEFAULT_SPACE_ID } from '@/lib/types/stash';
+import {
+  formatCurrencySummaries,
+  summarizePrices,
+} from '@/lib/utils/price-math';
 import { groupAndFilterCollections } from '@/lib/utils/search';
 import { useBackgroundJobsStore } from '@/store/background-jobs-store';
 import { useUiStore } from '@/store/ui-store';
@@ -110,9 +115,28 @@ export function Workbench() {
     [collections, resolvedSpaceId],
   );
 
-  const starredCount = useMemo(
-    () => links.filter((link) => link.starred === true).length,
-    [links],
+  const activeSpaceCollectionIds = useMemo(
+    () => new Set(activeSpaceCollections.map((c) => c.id)),
+    [activeSpaceCollections],
+  );
+  const defaultCurrency = settings.defaultCurrency ?? 'GBP';
+
+  const scopedStarredLinks = useMemo(
+    () =>
+      links.filter(
+        (link) =>
+          link.starred === true &&
+          (searchAllSpaces || activeSpaceCollectionIds.has(link.collectionId)),
+      ),
+    [links, searchAllSpaces, activeSpaceCollectionIds],
+  );
+  const starredCount = scopedStarredLinks.length;
+  const starredSubtotal = useMemo(
+    () =>
+      formatCurrencySummaries(
+        summarizePrices(scopedStarredLinks, defaultCurrency),
+      ),
+    [scopedStarredLinks, defaultCurrency],
   );
 
   const groups = useMemo(
@@ -150,6 +174,7 @@ export function Workbench() {
   });
 
   const effectiveDensity = activeSpace?.densityOverride ?? settings.density;
+  const activeViewMode = activeSpace?.viewMode ?? 'grid';
   const wideBoard = settings.boardWidth === 'wide';
 
   return (
@@ -172,6 +197,7 @@ export function Workbench() {
               settings={settings}
               totalLinks={links.length}
               starredCount={starredCount}
+              starredSubtotal={starredSubtotal || undefined}
               spacesCount={spaces.length}
               openTabsCount={tabs.length}
             />
@@ -255,6 +281,20 @@ export function Workbench() {
                             : 'Clear Search'}
                       </Button>
                     </div>
+                  ) : activeViewMode === 'details' ? (
+                    <DetailsView
+                      activeSpace={activeSpace}
+                      groups={groups}
+                      spaces={spaces}
+                      isFiltering={isFiltering}
+                      searchAllSpaces={searchAllSpaces}
+                      openInNewTab={settings.openLinkInNewTab}
+                      defaultCurrency={defaultCurrency}
+                      motionMode={settings.motionMode}
+                      soundEffects={settings.soundEffects}
+                      hoverPreviews={settings.hoverPreviews}
+                      onSwitchSpace={setActiveSpaceId}
+                    />
                   ) : (
                     <div className="space-y-8">
                       {groups.map(
@@ -277,6 +317,7 @@ export function Workbench() {
                               spaceBadge={outsideActiveSpace}
                               onSwitchSpace={setActiveSpaceId}
                               openInNewTab={settings.openLinkInNewTab}
+                              defaultCurrency={defaultCurrency}
                               density={effectiveDensity}
                               wideBoard={wideBoard}
                               forceExpanded={isFiltering}
@@ -309,7 +350,11 @@ export function Workbench() {
           </div>
 
           <CollectionModal spaces={spaces} activeSpaceId={resolvedSpaceId} />
-          <QuickEditModal collections={collections} spaces={spaces} />
+          <QuickEditModal
+            collections={collections}
+            spaces={spaces}
+            defaultCurrency={defaultCurrency}
+          />
           <SettingsModal
             spaces={spaces}
             collections={collections}

@@ -1,9 +1,11 @@
 import { BookmarkPlus, Check, Plus, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { QuickStashProductPanel } from '@/components/sidepanel/quick-stash-product-panel';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { SpaceGroupedCollectionOptions } from '@/components/ui/space-grouped-collection-options';
+import { useQuickStashProduct } from '@/hooks/use-quick-stash-product';
 import { playDrop, playError } from '@/lib/audio/foley';
 import { categorizeLink } from '@/lib/categorizer/categorizer';
 import {
@@ -46,6 +48,7 @@ export function QuickStashCard({
   rules,
   settings,
 }: QuickStashCardProps) {
+  const defaultCurrency = settings.defaultCurrency ?? 'GBP';
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('');
   const [note, setNote] = useState('');
   const [tagsRaw, setTagsRaw] = useState('');
@@ -57,6 +60,13 @@ export function QuickStashCard({
   const [saving, setSaving] = useState(false);
   const [faviconFailed, setFaviconFailed] = useState(false);
   const [creatingName, setCreatingName] = useState<string | null>(null);
+
+  const product = useQuickStashProduct({
+    activeTab,
+    links,
+    enableOnDeviceAi: settings.enableOnDeviceAi,
+    defaultCurrency,
+  });
 
   const orderedCollections = useMemo(() => {
     const regular = collections.filter((c) => !c.isSession);
@@ -139,9 +149,18 @@ export function QuickStashCard({
   const alreadyInSelected = useMemo(() => {
     if (!activeTab || !selectedCollectionId) return false;
     return Boolean(
-      stashRepo.findDuplicateInList(links, selectedCollectionId, activeTab.url),
+      stashRepo.findDuplicateInList(
+        links,
+        selectedCollectionId,
+        product.canonicalUrl,
+      ) ??
+        stashRepo.findDuplicateInList(
+          links,
+          selectedCollectionId,
+          activeTab.url,
+        ),
     );
-  }, [activeTab, links, selectedCollectionId]);
+  }, [activeTab, links, product.canonicalUrl, selectedCollectionId]);
 
   const handleCreateQuickCollection = async (nameToCreate: string) => {
     const trimmed = nameToCreate.trim();
@@ -166,13 +185,36 @@ export function QuickStashCard({
     setSaving(true);
     try {
       const submittedTags = parseTagsInput(tagsRaw);
+
+      if (
+        alreadyInSelected &&
+        product.existingStashedLink &&
+        product.productMeta
+      ) {
+        await stashRepo.updateLink(product.existingStashedLink.id, {
+          ...(product.titleOverride.trim()
+            ? { title: product.titleOverride.trim() }
+            : {}),
+          product: {
+            ...product.productMeta,
+            ...(product.existingStashedLink.product?.orderQty
+              ? { orderQty: product.existingStashedLink.product.orderQty }
+              : {}),
+          },
+        });
+        playDrop(settings.soundEffects);
+        toast.success('Updated product info');
+        return;
+      }
+
       const shouldLockTags = tagsEditedByUser || submittedTags.length > 0;
       const result = await stashRepo.addLink({
         collectionId: targetId,
-        url: activeTab.url,
-        title: activeTab.title,
+        url: product.canonicalUrl || activeTab.url,
+        title: product.titleOverride.trim() || activeTab.title,
         note,
         tags: submittedTags,
+        ...(product.productMeta ? { product: product.productMeta } : {}),
         ...(shouldLockTags ? { tagsLocked: true } : {}),
         faviconUrl: activeTab.favIconUrl,
       });
@@ -402,6 +444,18 @@ export function QuickStashCard({
         )}
       </div>
 
+      {/* 2-Stage Product Capture + Manual Fallback */}
+      <QuickStashProductPanel
+        isAlreadyStashed={Boolean(product.existingStashedLink)}
+        extracting={product.extractingProduct}
+        notice={product.extractNotice}
+        expanded={product.productOpen}
+        draft={product.productDraft}
+        onExtract={product.handleExtractProduct}
+        onToggleExpanded={() => product.setProductOpen((prev) => !prev)}
+        onChangeDraft={product.setProductDraft}
+      />
+
       {/* Confirm Footer */}
       <div className="flex items-center justify-between gap-2 pt-0.5">
         <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-fg-muted select-none hover:text-fg">
@@ -422,11 +476,15 @@ export function QuickStashCard({
           type="submit"
           variant="primary"
           size="sm"
-          disabled={saving || alreadyInSelected}
+          disabled={saving || (alreadyInSelected && !product.productMeta)}
           className="gap-1.5"
         >
           <BookmarkPlus className="h-3.5 w-3.5" />
-          {alreadyInSelected ? 'Saved' : 'Stash Tab'}
+          {alreadyInSelected
+            ? product.productMeta
+              ? 'Save Product'
+              : 'Saved'
+            : 'Stash Tab'}
         </Button>
       </div>
     </form>

@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   Plus,
   Sparkles,
+  Star,
   Tag,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -40,6 +41,10 @@ import {
   TAB_GROUP_COLOR_SWATCH,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+import {
+  formatCurrencySummaries,
+  summarizePrices,
+} from '@/lib/utils/price-math';
 import { useUiStore } from '@/store/ui-store';
 
 interface CollectionSectionProps {
@@ -50,6 +55,7 @@ interface CollectionSectionProps {
   spaceBadge?: Space;
   onSwitchSpace?: (spaceId: string) => void;
   openInNewTab: boolean;
+  defaultCurrency?: string;
   density: CardDensity;
   wideBoard?: boolean;
   forceExpanded: boolean;
@@ -67,6 +73,7 @@ export function CollectionSection({
   spaceBadge,
   onSwitchSpace,
   openInNewTab,
+  defaultCurrency = 'GBP',
   density,
   wideBoard = false,
   forceExpanded,
@@ -154,6 +161,13 @@ export function CollectionSection({
   const currentSpaceId =
     collection.spaceId ?? spaces[0]?.id ?? DEFAULT_SPACE_ID;
   const otherSpaces = spaces.filter((s) => s.id !== currentSpaceId);
+  const collectionTotalText = formatCurrencySummaries(
+    summarizePrices(links, defaultCurrency),
+  );
+  const starredLinks = links.filter((l) => l.starred === true);
+  const starredTotalText = formatCurrencySummaries(
+    summarizePrices(starredLinks, defaultCurrency),
+  );
 
   const handleWakeUp = async () => {
     if (links.length === 0) {
@@ -257,6 +271,18 @@ export function CollectionSection({
               {collection.isSession && (
                 <span className="hidden shrink-0 rounded-pill border border-accent/55 bg-accent/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-accent sm:inline-block">
                   SESSION
+                </span>
+              )}
+              {collectionTotalText && (
+                <span className="shrink-0 rounded-pill border border-border bg-panel px-2 py-0.5 font-mono text-[10px] text-fg">
+                  {collectionTotalText}
+                </span>
+              )}
+              {collectionTotalText && starredLinks.length > 0 && (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-pill border border-accent/45 bg-accent/12 px-2 py-0.5 font-mono text-[10px] text-accent">
+                  <Star className="h-2.5 w-2.5 fill-accent" />
+                  {starredLinks.length}
+                  {starredTotalText ? ` · ${starredTotalText}` : ''}
                 </span>
               )}
               {collection.description && (

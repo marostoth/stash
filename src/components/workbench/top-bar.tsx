@@ -31,6 +31,7 @@ interface TopBarProps {
   settings: StashSettings;
   totalLinks: number;
   starredCount: number;
+  starredSubtotal?: string;
   spacesCount: number;
   openTabsCount: number;
 }
@@ -42,6 +43,7 @@ export function TopBar({
   settings,
   totalLinks,
   starredCount,
+  starredSubtotal,
   spacesCount,
   openTabsCount,
 }: TopBarProps) {
@@ -188,6 +190,11 @@ export function TopBar({
               <Star className="h-3.5 w-3.5 fill-accent text-accent" />
               <span className="hidden sm:inline">Starred</span>
               <span className="font-mono text-[11px]">{starredCount}</span>
+              {starredSubtotal && (
+                <span className="hidden font-mono text-[11px] text-accent md:inline">
+                  · {starredSubtotal}
+                </span>
+              )}
             </button>
           )}
         </div>

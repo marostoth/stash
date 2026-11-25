@@ -57,7 +57,7 @@ export function buildAiAuditPrompt(
 
   const spacesContractLines = multiSpace
     ? [
-        `- **Spaces & \`collection.spaceId\`:** Preserve the top-level \`"spaces"\` array (\`id\`, \`name\`, \`icon\`, \`order\`, optional \`densityOverride\`) and keep every \`collection.spaceId\` mapped to a valid Space ID (${spacesSummary}) unless I approve moving a collection between Spaces.`,
+        `- **Spaces & \`collection.spaceId\`:** Preserve the top-level \`"spaces"\` array (\`id\`, \`name\`, \`icon\`, \`order\`, optional \`densityOverride\`, \`viewMode\`, \`groupBy\`) and keep every \`collection.spaceId\` mapped to a valid Space ID (${spacesSummary}) unless I approve moving a collection between Spaces.`,
       ]
     : [];
 
@@ -70,7 +70,7 @@ export function buildAiAuditPrompt(
       ? '- Top-level keys MUST be: `"app": "stash"`, `"schemaVersion": 1`, `"exportedAt"` (ISO-8601 string), `"spaces"`, `"collections"`, `"links"`, `"rules"`, `"settings"`, `"customThemes"`.'
       : '- Top-level keys MUST be: `"app": "stash"`, `"schemaVersion": 1`, `"exportedAt"` (ISO-8601 string), `"collections"`, `"links"`, `"rules"`, `"settings"`, `"customThemes"`.',
     ...spacesContractLines,
-    '- **Preserve existing data:** Keep original `id` values on all retained collections and links, and strictly preserve `starred`, `faviconUrl`, `createdAt`, `rules`, `settings`, and `customThemes` untouched.',
+    '- **Preserve existing data:** Keep original `id` values on all retained collections and links, and strictly preserve `starred`, `product` (`store`, `price`, `currency`, `priceIsEstimate`, `spec`, `orderQty`, `source`, `capturedAt`), `faviconUrl`, `createdAt`, `rules`, `settings` (including `defaultCurrency`), and `customThemes` untouched.',
     '- **Valid `collection.color` values (use ONLY these):**',
     `  \`${validColors}\``,
     '- **Valid `collection.icon` keys (use ONLY these):**',

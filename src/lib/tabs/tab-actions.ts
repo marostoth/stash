@@ -8,7 +8,7 @@ import {
   type OpenTabInfo,
   type RawTabLike,
 } from '@/lib/tabs/session-filter';
-import type { Collection, LinkItem } from '@/lib/types/stash';
+import type { Collection, LinkItem, TabGroupColor } from '@/lib/types/stash';
 
 export async function getRawCurrentWindowTabs(): Promise<RawTabLike[]> {
   if (typeof browser === 'undefined' || !browser.tabs?.query) {
@@ -132,9 +132,10 @@ export async function closeTabs(tabIds: readonly number[]): Promise<void> {
   await browser.tabs.remove([...tabIds]);
 }
 
-export async function wakeUpCollectionInTabGroup(
-  collection: Collection,
+export async function openLinksInNamedTabGroup(
+  title: string,
   links: readonly LinkItem[],
+  color: TabGroupColor = 'green',
 ): Promise<number> {
   if (links.length === 0) return 0;
   if (typeof browser === 'undefined' || !browser.tabs?.create) return 0;
@@ -159,10 +160,7 @@ export async function wakeUpCollectionInTabGroup(
         tabIds: [firstId, ...createdIds.slice(1)],
       });
       if (browser.tabGroups?.update) {
-        await browser.tabGroups.update(groupId, {
-          title: collection.name,
-          color: collection.color,
-        });
+        await browser.tabGroups.update(groupId, { title, color });
       }
     } catch (error: unknown) {
       console.warn('Stash: failed to group woken tabs', error);
@@ -170,6 +168,13 @@ export async function wakeUpCollectionInTabGroup(
   }
 
   return createdIds.length;
+}
+
+export async function wakeUpCollectionInTabGroup(
+  collection: Collection,
+  links: readonly LinkItem[],
+): Promise<number> {
+  return openLinksInNamedTabGroup(collection.name, links, collection.color);
 }
 
 export async function wakeUpCollectionInNewWindow(

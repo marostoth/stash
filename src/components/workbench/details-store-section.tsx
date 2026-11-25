@@ -1,0 +1,237 @@
+import {
+  ArrowUpRight,
+  ChevronDown,
+  ChevronRight,
+  Star,
+  Store,
+  X,
+} from 'lucide-react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { DetailsRow } from '@/components/workbench/details-row';
+import { stashRepo } from '@/lib/storage/repo';
+import type { LinkItem, MotionMode } from '@/lib/types/stash';
+import { normalizeStoreName } from '@/lib/utils/product-url';
+
+export type DetailsSortColumn = 'starred' | 'title' | 'store' | 'price';
+
+export interface DetailsSortState {
+  column: DetailsSortColumn;
+  dir: 'asc' | 'desc';
+}
+
+export function sortDetailsLinks(
+  items: readonly LinkItem[],
+  sort: DetailsSortState | null,
+): LinkItem[] {
+  if (!sort) return [...items];
+  const factor = sort.dir === 'asc' ? 1 : -1;
+  return [...items].sort((a, b) => {
+    switch (sort.column) {
+      case 'starred': {
+        const av = a.starred ? 1 : 0;
+        const bv = b.starred ? 1 : 0;
+        if (av !== bv) return (bv - av) * factor;
+        return a.title.localeCompare(b.title);
+      }
+      case 'title':
+        return a.title.localeCompare(b.title) * factor;
+      case 'store': {
+        const as = normalizeStoreName(a.url, a.product?.store);
+        const bs = normalizeStoreName(b.url, b.product?.store);
+        return as.localeCompare(bs) * factor;
+      }
+      case 'price': {
+        const ap = a.product?.price;
+        const bp = b.product?.price;
+        if (ap === undefined && bp === undefined) return 0;
+        if (ap === undefined) return 1;
+        if (bp === undefined) return -1;
+        return (ap - bp) * factor;
+      }
+      default:
+        return 0;
+    }
+  });
+}
+
+function StoreClearStarredButton({
+  storeName,
+  starredLinks,
+}: {
+  storeName: string;
+  starredLinks: readonly LinkItem[];
+}) {
+  const [armed, setArmed] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const disarm = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setArmed(false);
+  };
+
+  const handleClick = async () => {
+    if (!armed) {
+      setArmed(true);
+      timerRef.current = setTimeout(() => {
+        setArmed(false);
+        timerRef.current = null;
+      }, 3000);
+      return;
+    }
+
+    disarm();
+    const ids = starredLinks.map((l) => l.id);
+    const changedIds = await stashRepo.setLinksStarred(ids, false);
+    if (changedIds.length === 0) return;
+    toast(`Cleared ${changedIds.length} starred in ${storeName}`, {
+      duration: 5000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          void stashRepo.setLinksStarred(changedIds, true);
+        },
+      },
+    });
+  };
+
+  return (
+    <Button
+      variant={armed ? 'danger' : 'ghost'}
+      size="sm"
+      onClick={() => void handleClick()}
+      onBlur={disarm}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') disarm();
+      }}
+      className="h-7 gap-1 px-2 text-[11px]"
+    >
+      <X className="h-3 w-3" />
+      <span>{armed ? `Unstar ${starredLinks.length}?` : 'Clear Starred'}</span>
+    </Button>
+  );
+}
+
+export interface StoreGroupSummary {
+  storeName: string;
+  items: LinkItem[];
+  starredItems: LinkItem[];
+  totalText: string;
+  starredTotalText: string;
+}
+
+interface DetailsStoreSectionProps {
+  group: StoreGroupSummary;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  onOpenStoreStarred: () => void;
+  renderTableHeader: () => ReactNode;
+  showPriceColumn: boolean;
+  defaultCurrency: string;
+  openInNewTab: boolean;
+  motionMode: MotionMode;
+  soundEffects: boolean;
+  hoverPreviews: boolean;
+  gridTemplateClass: string;
+}
+
+export function DetailsStoreSection({
+  group,
+  collapsed,
+  onToggleCollapse,
+  onOpenStoreStarred,
+  renderTableHeader,
+  showPriceColumn,
+  defaultCurrency,
+  openInNewTab,
+  motionMode,
+  soundEffects,
+  hoverPreviews,
+  gridTemplateClass,
+}: DetailsStoreSectionProps) {
+  return (
+    <section className="overflow-hidden rounded-card border border-border bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-panel/70 px-3 py-2">
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="flex min-w-0 items-center gap-2 text-left cursor-pointer"
+        >
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4 text-fg-muted" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-fg-muted" />
+          )}
+          <Store className="h-3.5 w-3.5 text-accent" />
+          <span className="text-xs font-semibold text-fg">
+            {group.storeName}
+          </span>
+          <span className="font-mono text-[10px] text-fg-muted">
+            · {group.items.length} item{group.items.length === 1 ? '' : 's'}
+          </span>
+          {group.totalText && (
+            <span className="rounded-pill border border-border bg-canvas px-2 py-0.25 font-mono text-[10px] text-fg">
+              Total {group.totalText}
+            </span>
+          )}
+          {group.starredItems.length > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-pill border border-accent/45 bg-accent/12 px-2 py-0.25 font-mono text-[10px] text-accent">
+              <Star className="h-2.5 w-2.5 fill-accent" />
+              {group.starredItems.length}
+              {group.starredTotalText ? ` (${group.starredTotalText})` : ''}
+            </span>
+          )}
+        </button>
+
+        {group.starredItems.length > 0 && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onOpenStoreStarred}
+              className="h-7 gap-1 border-accent/45 px-2 text-[11px] text-accent hover:bg-accent/10"
+            >
+              <span>Open Starred ({group.starredItems.length})</span>
+              <ArrowUpRight className="h-3 w-3" />
+            </Button>
+            <StoreClearStarredButton
+              storeName={group.storeName}
+              starredLinks={group.starredItems}
+            />
+          </div>
+        )}
+      </div>
+
+      {!collapsed && (
+        <div>
+          {renderTableHeader()}
+          <div>
+            {group.items.map((link) => (
+              <DetailsRow
+                key={link.id}
+                link={link}
+                showPriceColumn={showPriceColumn}
+                defaultCurrency={defaultCurrency}
+                openInNewTab={openInNewTab}
+                motionMode={motionMode}
+                soundEffects={soundEffects}
+                hoverPreviews={hoverPreviews}
+                gridTemplateClass={gridTemplateClass}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}

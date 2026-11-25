@@ -13,6 +13,12 @@ import {
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { SpaceGroupedCollectionOptions } from '@/components/ui/space-grouped-collection-options';
 import { Switch } from '@/components/ui/switch';
+import {
+  buildProductMetaFromDraft,
+  createProductFormDraft,
+  ProductFieldsSection,
+  type ProductFormDraft,
+} from '@/components/workbench/product-fields-section';
 import { playDrop, playError } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
 import { triggerAutoTagSingleLink } from '@/lib/tagging/trigger-auto-tag';
@@ -24,9 +30,14 @@ import { useUiStore } from '@/store/ui-store';
 interface QuickEditModalProps {
   collections: readonly Collection[];
   spaces: readonly Space[];
+  defaultCurrency?: string;
 }
 
-export function QuickEditModal({ collections, spaces }: QuickEditModalProps) {
+export function QuickEditModal({
+  collections,
+  spaces,
+  defaultCurrency = 'GBP',
+}: QuickEditModalProps) {
   const modal = useUiStore((s) => s.linkModal);
   const closeLinkModal = useUiStore((s) => s.closeLinkModal);
   const pulseLink = useUiStore((s) => s.pulseLink);
@@ -39,6 +50,10 @@ export function QuickEditModal({ collections, spaces }: QuickEditModalProps) {
   const [tagsTouched, setTagsTouched] = useState(false);
   const [collectionId, setCollectionId] = useState('');
   const [starred, setStarred] = useState(false);
+  const [productOpen, setProductOpen] = useState(false);
+  const [productDraft, setProductDraft] = useState<ProductFormDraft>(() =>
+    createProductFormDraft(undefined, defaultCurrency),
+  );
   const [urlError, setUrlError] = useState<string | null>(null);
 
   const isEdit = modal?.mode === 'edit';
@@ -54,6 +69,10 @@ export function QuickEditModal({ collections, spaces }: QuickEditModalProps) {
       setTagsRaw(modal.link.tags.join(', '));
       setCollectionId(modal.link.collectionId);
       setStarred(Boolean(modal.link.starred));
+      setProductDraft(
+        createProductFormDraft(modal.link.product, defaultCurrency),
+      );
+      setProductOpen(Boolean(modal.link.product));
     } else {
       setUrl('');
       setTitle('');
@@ -61,8 +80,10 @@ export function QuickEditModal({ collections, spaces }: QuickEditModalProps) {
       setTagsRaw('');
       setCollectionId(modal.defaultCollectionId || collections[0]?.id || '');
       setStarred(false);
+      setProductDraft(createProductFormDraft(undefined, defaultCurrency));
+      setProductOpen(false);
     }
-  }, [modal, collections]);
+  }, [modal, collections, defaultCurrency]);
 
   const parsedTags = parseTagsInput(tagsRaw);
 
@@ -98,6 +119,7 @@ export function QuickEditModal({ collections, spaces }: QuickEditModalProps) {
         parsedTags.length !== modal.link.tags.length ||
         parsedTags.some((tag, idx) => tag !== modal.link.tags[idx]);
 
+      const nextProduct = buildProductMetaFromDraft(productDraft);
       const result = await stashRepo.updateLink(modal.link.id, {
         collectionId,
         url: normalizedUrl,
@@ -105,6 +127,7 @@ export function QuickEditModal({ collections, spaces }: QuickEditModalProps) {
         note,
         tags: parsedTags,
         starred,
+        product: nextProduct ?? null,
         ...(tagsChanged ? { tagsLocked: true } : {}),
       });
 
@@ -122,6 +145,7 @@ export function QuickEditModal({ collections, spaces }: QuickEditModalProps) {
       return;
     }
 
+    const nextProduct = buildProductMetaFromDraft(productDraft);
     const hasManualTags = parsedTags.length > 0;
     const result = await stashRepo.addLink({
       collectionId,
@@ -130,6 +154,7 @@ export function QuickEditModal({ collections, spaces }: QuickEditModalProps) {
       note,
       tags: parsedTags,
       ...(starred ? { starred: true } : {}),
+      ...(nextProduct ? { product: nextProduct } : {}),
       ...(hasManualTags ? { tagsLocked: true } : {}),
     });
 
@@ -302,6 +327,13 @@ export function QuickEditModal({ collections, spaces }: QuickEditModalProps) {
               onCheckedChange={setStarred}
             />
           </div>
+
+          <ProductFieldsSection
+            expanded={productOpen}
+            onToggleExpanded={() => setProductOpen((prev) => !prev)}
+            draft={productDraft}
+            onChange={setProductDraft}
+          />
 
           <DialogFooter className="justify-between">
             {isEdit ? (

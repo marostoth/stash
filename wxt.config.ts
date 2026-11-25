@@ -18,6 +18,7 @@ export default defineConfig({
       'tabGroups',
       'sidePanel',
       'contextMenus',
+      'scripting',
     ],
     optional_permissions: ['bookmarks'],
     optional_host_permissions: ['https://*/*', 'http://*/*'],

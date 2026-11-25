@@ -7,6 +7,8 @@ import {
   type Collection,
   DEFAULT_SETTINGS,
   type LinkItem,
+  type ProductMeta,
+  type ProductMetaSource,
   type Space,
   type StashSettings,
   TAB_GROUP_COLORS,
@@ -23,6 +25,66 @@ function parseDensity(raw: unknown): CardDensity | undefined {
   return undefined;
 }
 
+function parseProductMeta(raw: unknown): ProductMeta | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const obj = raw as Record<string, unknown>;
+
+  const store =
+    typeof obj.store === 'string' && obj.store.trim()
+      ? obj.store.trim()
+      : undefined;
+  const spec =
+    typeof obj.spec === 'string' && obj.spec.trim()
+      ? obj.spec.trim()
+      : undefined;
+  const price =
+    typeof obj.price === 'number' &&
+    Number.isFinite(obj.price) &&
+    obj.price >= 0
+      ? Math.round(obj.price * 100) / 100
+      : undefined;
+  const currency =
+    typeof obj.currency === 'string' &&
+    /^[a-zA-Z]{3}$/.test(obj.currency.trim())
+      ? obj.currency.trim().toUpperCase()
+      : undefined;
+  const orderQty =
+    typeof obj.orderQty === 'number' &&
+    Number.isFinite(obj.orderQty) &&
+    obj.orderQty >= 1
+      ? Math.floor(obj.orderQty)
+      : undefined;
+  const priceIsEstimate = obj.priceIsEstimate === true ? true : undefined;
+  const source: ProductMetaSource =
+    obj.source === 'extracted' || obj.source === 'ai' || obj.source === 'manual'
+      ? obj.source
+      : 'manual';
+  const capturedAt =
+    typeof obj.capturedAt === 'string' && obj.capturedAt.trim()
+      ? obj.capturedAt.trim()
+      : undefined;
+
+  if (
+    store === undefined &&
+    spec === undefined &&
+    price === undefined &&
+    orderQty === undefined
+  ) {
+    return undefined;
+  }
+
+  return {
+    ...(store !== undefined ? { store } : {}),
+    ...(price !== undefined ? { price } : {}),
+    ...(currency !== undefined ? { currency } : {}),
+    ...(priceIsEstimate ? { priceIsEstimate: true } : {}),
+    ...(spec !== undefined ? { spec } : {}),
+    ...(orderQty !== undefined ? { orderQty } : {}),
+    source,
+    ...(capturedAt !== undefined ? { capturedAt } : {}),
+  };
+}
+
 export function parseSpace(raw: unknown, fallbackOrder: number): Space | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const obj = raw as Record<string, unknown>;
@@ -30,6 +92,15 @@ export function parseSpace(raw: unknown, fallbackOrder: number): Space | null {
   if (typeof obj.name !== 'string' || !obj.name.trim()) return null;
 
   const now = new Date().toISOString();
+  const viewMode =
+    obj.viewMode === 'grid' || obj.viewMode === 'details'
+      ? obj.viewMode
+      : undefined;
+  const groupBy =
+    obj.groupBy === 'collection' || obj.groupBy === 'store'
+      ? obj.groupBy
+      : undefined;
+
   return {
     id: obj.id.trim(),
     name: obj.name.trim(),
@@ -39,6 +110,8 @@ export function parseSpace(raw: unknown, fallbackOrder: number): Space | null {
         : undefined,
     order: typeof obj.order === 'number' ? obj.order : fallbackOrder,
     densityOverride: parseDensity(obj.densityOverride),
+    ...(viewMode ? { viewMode } : {}),
+    ...(groupBy ? { groupBy } : {}),
     createdAt: typeof obj.createdAt === 'string' ? obj.createdAt : now,
     updatedAt: typeof obj.updatedAt === 'string' ? obj.updatedAt : now,
   };
@@ -120,6 +193,7 @@ export function parseLink(
     tags: normalizeTags(rawTags),
     tagsLocked: obj.tagsLocked === true ? true : undefined,
     starred: obj.starred === true ? true : undefined,
+    product: parseProductMeta(obj.product),
     faviconUrl:
       typeof obj.faviconUrl === 'string' && obj.faviconUrl.trim()
         ? obj.faviconUrl.trim()
@@ -263,6 +337,11 @@ export function parseSettings(raw: unknown): StashSettings {
       obj.boardWidth === 'standard' || obj.boardWidth === 'wide'
         ? obj.boardWidth
         : DEFAULT_SETTINGS.boardWidth,
+    defaultCurrency:
+      typeof obj.defaultCurrency === 'string' &&
+      /^[a-zA-Z]{3}$/.test(obj.defaultCurrency.trim())
+        ? obj.defaultCurrency.trim().toUpperCase()
+        : DEFAULT_SETTINGS.defaultCurrency,
     lastBackupAt:
       typeof obj.lastBackupAt === 'string' && obj.lastBackupAt.trim()
         ? obj.lastBackupAt.trim()

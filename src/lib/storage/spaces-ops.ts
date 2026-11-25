@@ -100,6 +100,8 @@ export async function createSpaceInStorage(
     icon: input.icon?.trim() || undefined,
     order: maxOrder + 1,
     densityOverride: input.densityOverride,
+    viewMode: input.viewMode,
+    groupBy: input.groupBy,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -127,6 +129,8 @@ export async function updateSpaceInStorage(
       ...(patch.densityOverride !== undefined
         ? { densityOverride: patch.densityOverride ?? undefined }
         : {}),
+      ...(patch.viewMode !== undefined ? { viewMode: patch.viewMode } : {}),
+      ...(patch.groupBy !== undefined ? { groupBy: patch.groupBy } : {}),
       updatedAt: nowIso(),
     };
     return updated;

@@ -575,4 +575,50 @@ describe('stashRepo', () => {
     expect(remainingLinks).toHaveLength(1);
     expect(remainingLinks[0]?.url).toBe('https://amazon.com/dp/B000001');
   });
+
+  it('persists Space viewMode/groupBy and preserves product.orderQty across unstarring', async () => {
+    const updatedSpace = await stashRepo.updateSpace(DEFAULT_SPACE_ID, {
+      viewMode: 'details',
+      groupBy: 'store',
+    });
+    expect(updatedSpace?.viewMode).toBe('details');
+    expect(updatedSpace?.groupBy).toBe('store');
+
+    const col = await stashRepo.createCollection({ name: 'Filaments' });
+    const added = await stashRepo.addLink({
+      collectionId: col.id,
+      url: 'https://uk.store.bambulab.com/products/pla-matte',
+      title: 'Bambu PLA Matte',
+      starred: true,
+      product: {
+        store: 'Bambu Lab',
+        price: 16.99,
+        currency: 'GBP',
+        orderQty: 4,
+        source: 'extracted',
+      },
+    });
+    expect(added.ok).toBe(true);
+    if (!added.ok) return;
+
+    // Unstarring single link must preserve persistent orderQty
+    const unstarred = await stashRepo.updateLink(added.link.id, {
+      starred: false,
+    });
+    expect(unstarred.ok).toBe(true);
+    if (!unstarred.ok) return;
+    expect(unstarred.link.starred).toBeUndefined();
+    expect(unstarred.link.product?.orderQty).toBe(4);
+
+    // Re-star and batch clear via setLinksStarred must also preserve orderQty
+    await stashRepo.setLinksStarred([added.link.id], true);
+    const clearedIds = await stashRepo.setLinksStarred([added.link.id], false);
+    expect(clearedIds).toEqual([added.link.id]);
+
+    const afterBatch = (await stashRepo.getLinks()).find(
+      (l) => l.id === added.link.id,
+    );
+    expect(afterBatch?.starred).toBeUndefined();
+    expect(afterBatch?.product?.orderQty).toBe(4);
+  });
 });

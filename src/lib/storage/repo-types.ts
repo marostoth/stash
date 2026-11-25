@@ -5,7 +5,10 @@ import type {
   Collection,
   CollectionViewMode,
   LinkItem,
+  ProductMeta,
   Space,
+  SpaceGroupBy,
+  SpaceViewMode,
   StashSettings,
   TabGroupColor,
   ThemeDefinition,
@@ -15,6 +18,8 @@ export interface CreateSpaceInput {
   name: string;
   icon?: string;
   densityOverride?: CardDensity;
+  viewMode?: SpaceViewMode;
+  groupBy?: SpaceGroupBy;
 }
 
 export interface UpdateSpaceInput {
@@ -22,6 +27,8 @@ export interface UpdateSpaceInput {
   icon?: string | null;
   order?: number;
   densityOverride?: CardDensity | null;
+  viewMode?: SpaceViewMode;
+  groupBy?: SpaceGroupBy;
 }
 
 export interface DeleteSpaceResult {
@@ -61,6 +68,7 @@ export interface AddLinkInput {
   tags?: string[];
   tagsLocked?: boolean;
   starred?: boolean;
+  product?: ProductMeta;
   faviconUrl?: string;
 }
 
@@ -72,6 +80,7 @@ export interface UpdateLinkInput {
   tags?: string[];
   tagsLocked?: boolean;
   starred?: boolean;
+  product?: ProductMeta | null;
   faviconUrl?: string;
   order?: number;
 }

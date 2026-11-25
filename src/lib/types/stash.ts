@@ -34,6 +34,9 @@ export const TAB_GROUP_COLOR_SWATCH: Record<TabGroupColor, string> = {
 };
 
 export type CollectionViewMode = 'compact' | 'cover';
+export type SpaceViewMode = 'grid' | 'details';
+export type SpaceGroupBy = 'collection' | 'store';
+export type ProductMetaSource = 'extracted' | 'ai' | 'manual';
 
 export const DEFAULT_SPACE_ID = 'space-main';
 
@@ -43,8 +46,21 @@ export interface Space {
   icon?: string;
   order: number;
   densityOverride?: CardDensity;
+  viewMode?: SpaceViewMode;
+  groupBy?: SpaceGroupBy;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductMeta {
+  store?: string;
+  price?: number;
+  currency?: string;
+  priceIsEstimate?: boolean;
+  spec?: string;
+  orderQty?: number;
+  source: ProductMetaSource;
+  capturedAt?: string;
 }
 
 export function createDefaultSpace(
@@ -85,6 +101,7 @@ export interface LinkItem {
   tags: string[];
   tagsLocked?: boolean;
   starred?: boolean;
+  product?: ProductMeta;
   faviconUrl?: string;
   order: number;
   createdAt: string;
@@ -140,6 +157,7 @@ export interface StashSettings {
   visualPreviewsEnabled: boolean;
   density: CardDensity;
   boardWidth: BoardWidthMode;
+  defaultCurrency?: string;
   lastBackupAt?: string;
   customThemes?: ThemeDefinition[];
 }
@@ -220,5 +238,6 @@ export const DEFAULT_SETTINGS: StashSettings = {
   visualPreviewsEnabled: false,
   density: 'comfortable',
   boardWidth: 'standard',
+  defaultCurrency: 'GBP',
   customThemes: [],
 };

@@ -6,7 +6,7 @@ import type {
   UpdateLinkInput,
   UpdateLinkResult,
 } from '@/lib/storage/repo-types';
-import type { LinkItem } from '@/lib/types/stash';
+import type { LinkItem, ProductMeta } from '@/lib/types/stash';
 import {
   insertLinkAtIndexInList,
   type MoveLinkListResult,
@@ -37,6 +37,52 @@ export function findDuplicateLinkInList(
   );
 }
 
+function normalizeProductMeta(
+  raw: ProductMeta | null | undefined,
+): ProductMeta | undefined {
+  if (!raw) return undefined;
+  const store = raw.store?.trim() || undefined;
+  const spec = raw.spec?.trim() || undefined;
+  const price =
+    typeof raw.price === 'number' &&
+    Number.isFinite(raw.price) &&
+    raw.price >= 0
+      ? Math.round(raw.price * 100) / 100
+      : undefined;
+  const currency =
+    typeof raw.currency === 'string' &&
+    /^[a-zA-Z]{3}$/.test(raw.currency.trim())
+      ? raw.currency.trim().toUpperCase()
+      : undefined;
+  const orderQty =
+    typeof raw.orderQty === 'number' &&
+    Number.isFinite(raw.orderQty) &&
+    raw.orderQty >= 1
+      ? Math.floor(raw.orderQty)
+      : undefined;
+  const priceIsEstimate = raw.priceIsEstimate === true ? true : undefined;
+
+  if (
+    store === undefined &&
+    spec === undefined &&
+    price === undefined &&
+    orderQty === undefined
+  ) {
+    return undefined;
+  }
+
+  return {
+    ...(store !== undefined ? { store } : {}),
+    ...(price !== undefined ? { price } : {}),
+    ...(currency !== undefined ? { currency } : {}),
+    ...(priceIsEstimate ? { priceIsEstimate: true } : {}),
+    ...(spec !== undefined ? { spec } : {}),
+    ...(orderQty !== undefined ? { orderQty } : {}),
+    source: raw.source,
+    ...(raw.capturedAt ? { capturedAt: raw.capturedAt } : {}),
+  };
+}
+
 export async function addLinkInStorage(
   input: AddLinkInput,
   targetIndex?: number,
@@ -53,6 +99,7 @@ export async function addLinkInStorage(
 
   const timestamp = nowIso();
   const trimmedUrl = input.url.trim();
+  const product = normalizeProductMeta(input.product);
   const created: LinkItem = {
     id: crypto.randomUUID(),
     collectionId: input.collectionId,
@@ -62,6 +109,7 @@ export async function addLinkInStorage(
     tags: normalizeTags(input.tags ?? []),
     ...(input.tagsLocked === true ? { tagsLocked: true } : {}),
     ...(input.starred === true ? { starred: true } : {}),
+    ...(product ? { product } : {}),
     faviconUrl: input.faviconUrl?.trim() || undefined,
     order: 0,
     createdAt: timestamp,
@@ -121,6 +169,11 @@ export async function updateLinkInStorage(
         : undefined
       : current.starred;
 
+  const nextProduct =
+    patch.product !== undefined
+      ? normalizeProductMeta(patch.product)
+      : current.product;
+
   const updated: LinkItem = {
     ...current,
     collectionId: targetCollectionId,
@@ -133,6 +186,7 @@ export async function updateLinkInStorage(
     tags: patch.tags !== undefined ? normalizeTags(patch.tags) : current.tags,
     tagsLocked: nextTagsLocked,
     starred: nextStarred,
+    product: nextProduct,
     faviconUrl:
       patch.faviconUrl !== undefined
         ? patch.faviconUrl.trim() || undefined
@@ -199,4 +253,36 @@ export async function markLinkOpenedInStorage(id: string): Promise<void> {
     return { ...item, lastOpenedAt: timestamp };
   });
   if (changed) await linksStorage.setValue(next);
+}
+
+/**
+ * Batch-updates `starred` on multiple links in a single storage write while
+ * preserving persistent `product.orderQty` counts.
+ */
+export async function setLinksStarredInStorage(
+  ids: readonly string[],
+  starred: boolean,
+): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const idSet = new Set(ids);
+  const existing = await linksStorage.getValue();
+  const changedIds: string[] = [];
+  const timestamp = nowIso();
+
+  const next = existing.map((item) => {
+    if (!idSet.has(item.id)) return item;
+    const currentlyStarred = item.starred === true;
+    if (currentlyStarred === starred) return item;
+    changedIds.push(item.id);
+    return {
+      ...item,
+      starred: starred ? true : undefined,
+      updatedAt: timestamp,
+    };
+  });
+
+  if (changedIds.length > 0) {
+    await linksStorage.setValue(next);
+  }
+  return changedIds;
 }

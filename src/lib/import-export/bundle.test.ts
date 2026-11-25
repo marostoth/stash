@@ -277,4 +277,55 @@ describe('StashExportBundle validation & restore', () => {
       'space-reorders',
     );
   });
+
+  it('round-trips product metadata, Space viewMode/groupBy, and settings.defaultCurrency', async () => {
+    const incoming = makeValidBundle();
+    const firstLink = incoming.links[0];
+    expect(firstLink).toBeDefined();
+    if (!firstLink) return;
+
+    incoming.spaces = [
+      {
+        ...createDefaultSpace(NOW),
+        viewMode: 'details',
+        groupBy: 'store',
+      },
+    ];
+    incoming.links[0] = {
+      ...firstLink,
+      product: {
+        store: 'Bambu Lab',
+        price: 16.99,
+        currency: 'GBP',
+        priceIsEstimate: true,
+        spec: '1kg · Matte Black PLA',
+        orderQty: 3,
+        source: 'manual',
+        capturedAt: NOW,
+      },
+    };
+    incoming.settings = { ...incoming.settings, defaultCurrency: 'EUR' };
+
+    const validated = validateExportBundle(incoming);
+    expect(validated.ok).toBe(true);
+    if (!validated.ok) return;
+
+    await stashRepo.restoreBundle(validated.bundle, 'replace');
+    const restored = await stashRepo.getSnapshot();
+    const reExported = buildExportBundle(restored, NOW);
+
+    expect(reExported.spaces?.[0]?.viewMode).toBe('details');
+    expect(reExported.spaces?.[0]?.groupBy).toBe('store');
+    expect(reExported.settings.defaultCurrency).toBe('EUR');
+    expect(reExported.links.find((l) => l.id === 'link-1')?.product).toEqual({
+      store: 'Bambu Lab',
+      price: 16.99,
+      currency: 'GBP',
+      priceIsEstimate: true,
+      spec: '1kg · Matte Black PLA',
+      orderQty: 3,
+      source: 'manual',
+      capturedAt: NOW,
+    });
+  });
 });
