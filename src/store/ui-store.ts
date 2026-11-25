@@ -18,6 +18,7 @@ interface UiStoreState {
   settingsOpen: boolean;
   triageCollectionId: string | null;
   highlightedLinkId: string | null;
+  settledLinkId: string | null;
   setSearchQuery: (query: string) => void;
   openCreateCollection: () => void;
   openEditCollection: (collection: Collection) => void;
@@ -30,9 +31,11 @@ interface UiStoreState {
   openTriage: (collectionId: string) => void;
   closeTriage: () => void;
   pulseLink: (linkId: string) => void;
+  settleLink: (linkId: string) => void;
 }
 
 let pulseTimer: ReturnType<typeof setTimeout> | null = null;
+let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useUiStore = create<UiStoreState>((set) => ({
   searchQuery: '',
@@ -41,6 +44,7 @@ export const useUiStore = create<UiStoreState>((set) => ({
   settingsOpen: false,
   triageCollectionId: null,
   highlightedLinkId: null,
+  settledLinkId: null,
 
   setSearchQuery: (query) => set({ searchQuery: query }),
 
@@ -73,5 +77,18 @@ export const useUiStore = create<UiStoreState>((set) => ({
       );
       pulseTimer = null;
     }, 2300);
+  },
+
+  settleLink: (linkId) => {
+    if (settleTimer) {
+      clearTimeout(settleTimer);
+    }
+    set({ settledLinkId: linkId });
+    settleTimer = setTimeout(() => {
+      set((state) =>
+        state.settledLinkId === linkId ? { settledLinkId: null } : state,
+      );
+      settleTimer = null;
+    }, 520);
   },
 }));

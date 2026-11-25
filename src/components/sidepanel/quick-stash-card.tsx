@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { playDrop, playError } from '@/lib/audio/foley';
 import { categorizeLink } from '@/lib/categorizer/categorizer';
 import type { CategorizationSuggestion } from '@/lib/categorizer/types';
 import { stashRepo } from '@/lib/storage/repo';
@@ -158,10 +159,12 @@ export function QuickStashCard({
       });
 
       if (!result.ok) {
+        playError(settings.soundEffects);
         toast.info('Already in this collection');
         return;
       }
 
+      playDrop(settings.soundEffects);
       toast.success('Tab stashed');
       setNote('');
       setTagsRaw('');

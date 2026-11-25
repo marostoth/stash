@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { playSessionFreeze } from '@/lib/audio/foley';
 import {
   type AutoTagProgress,
   runBatchAutoTagSweep,
@@ -58,6 +59,7 @@ export function useAutoTagSweep(collectionId?: string): AutoTagSweepController {
       }
 
       if (result.tagged > 0) {
+        playSessionFreeze();
         toast.success(
           `Auto-tagged ${result.tagged} of ${result.total} link${result.total === 1 ? '' : 's'}`,
         );

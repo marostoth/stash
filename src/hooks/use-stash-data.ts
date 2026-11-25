@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { setSoundEffectsEnabled } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
 import {
   applyThemeToDocument,
@@ -74,6 +75,10 @@ export function useStashData(): StashDataState {
   useEffect(() => {
     applyThemeToDocument(activeTheme);
   }, [activeTheme]);
+
+  useEffect(() => {
+    setSoundEffectsEnabled(settings.soundEffects);
+  }, [settings.soundEffects]);
 
   return {
     loading,

@@ -1,6 +1,8 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
+import { motion } from 'motion/react';
 import type * as React from 'react';
+import { MODAL_SPRING } from '@/lib/motion/physics';
 import { cn } from '@/lib/utils/cn';
 
 export const Dialog = DialogPrimitive.Root;
@@ -14,21 +16,35 @@ export function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px]" />
+      <DialogPrimitive.Overlay asChild>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.14 }}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px]"
+        />
+      </DialogPrimitive.Overlay>
       <DialogPrimitive.Content
-        className={cn(
-          'fixed left-1/2 top-1/2 z-50 w-[min(92vw,460px)] -translate-x-1/2 -translate-y-1/2 rounded-card border border-border bg-panel p-5 text-fg shadow-2xl focus:outline-none',
-          className,
-        )}
+        className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 focus:outline-none"
         {...props}
       >
-        {children}
-        <DialogPrimitive.Close
-          aria-label="Close"
-          className="absolute right-3.5 top-3.5 inline-flex h-7 w-7 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-card hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 cursor-pointer"
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 6 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={MODAL_SPRING}
+          className={cn(
+            'relative w-[min(92vw,460px)] rounded-card border border-border bg-panel p-5 text-fg shadow-2xl',
+            className,
+          )}
         >
-          <X className="h-4 w-4" />
-        </DialogPrimitive.Close>
+          {children}
+          <DialogPrimitive.Close
+            aria-label="Close"
+            className="absolute right-3.5 top-3.5 inline-flex h-7 w-7 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-card hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </DialogPrimitive.Close>
+        </motion.div>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   );

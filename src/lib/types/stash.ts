@@ -77,6 +77,8 @@ export interface CategorizationRule {
   };
 }
 
+export type MotionMode = 'tactile' | 'reduced' | 'off';
+
 export interface StashSettings {
   activeThemeId: string;
   openLinkInNewTab: boolean;
@@ -85,6 +87,8 @@ export interface StashSettings {
   openTabsSidebarVisible: boolean;
   enableOnDeviceAi: boolean;
   autoTagOnSave: boolean;
+  motionMode: MotionMode;
+  soundEffects: boolean;
   density: 'compact' | 'comfortable';
 }
 
@@ -143,5 +147,7 @@ export const DEFAULT_SETTINGS: StashSettings = {
   openTabsSidebarVisible: true,
   enableOnDeviceAi: true,
   autoTagOnSave: true,
+  motionMode: 'tactile',
+  soundEffects: true,
   density: 'comfortable',
 };

@@ -14,6 +14,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LinkCard } from '@/components/workbench/link-card';
 import { useAutoTagSweep } from '@/hooks/use-auto-tag-sweep';
+import { COLLAPSE_SPRING } from '@/lib/motion/physics';
 import { stashRepo } from '@/lib/storage/repo';
 import {
   wakeUpCollectionInNewWindow,
@@ -34,6 +36,7 @@ import { isEligibleForAutoTag } from '@/lib/tagging/auto-tagger';
 import {
   type Collection,
   type LinkItem,
+  type MotionMode,
   TAB_GROUP_COLOR_SWATCH,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
@@ -47,6 +50,7 @@ interface CollectionSectionProps {
   compact: boolean;
   forceExpanded: boolean;
   dragDisabled: boolean;
+  motionMode: MotionMode;
 }
 
 export function CollectionSection({
@@ -57,6 +61,7 @@ export function CollectionSection({
   compact,
   forceExpanded,
   dragDisabled,
+  motionMode,
 }: CollectionSectionProps) {
   const openCreateLink = useUiStore((s) => s.openCreateLink);
   const openEditCollection = useUiStore((s) => s.openEditCollection);
@@ -316,43 +321,58 @@ export function CollectionSection({
           </div>
         </div>
 
-        {/* Links Grid */}
-        {!isCollapsed &&
-          (links.length > 0 ? (
-            <div
-              className={cn(
-                'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4',
-                compact ? 'gap-2.5' : 'gap-3.5',
-              )}
+        {/* Links Grid (smooth spring expand/collapse) */}
+        <AnimatePresence initial={false}>
+          {!isCollapsed && (
+            <motion.div
+              key="collection-body"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={COLLAPSE_SPRING}
+              className="overflow-hidden"
             >
-              {links.map((link, cardIndex) => (
-                <LinkCard
-                  key={link.id}
-                  link={link}
-                  index={cardIndex}
-                  openInNewTab={openInNewTab}
-                  compact={compact}
-                  dragDisabled={dragDisabled}
-                />
-              ))}
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => openCreateLink(collection.id)}
-              className={cn(
-                'flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-border bg-panel/40 px-4 py-5 text-xs text-fg-muted transition-colors hover:border-accent/50 hover:bg-panel hover:text-fg cursor-pointer',
-                isDropTarget && 'border-accent bg-accent/10 text-accent',
-              )}
-            >
-              <Plus className="h-3.5 w-3.5 text-accent" />
-              <span>
-                {isDropTarget
-                  ? `Drop to stash into ${collection.name}`
-                  : `Drop an open tab here or add your first link to ${collection.name}`}
-              </span>
-            </button>
-          ))}
+              <div className="px-0.5 py-1">
+                {links.length > 0 ? (
+                  <div
+                    className={cn(
+                      'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4',
+                      compact ? 'gap-2.5' : 'gap-3.5',
+                    )}
+                  >
+                    {links.map((link, cardIndex) => (
+                      <LinkCard
+                        key={link.id}
+                        link={link}
+                        index={cardIndex}
+                        openInNewTab={openInNewTab}
+                        compact={compact}
+                        dragDisabled={dragDisabled}
+                        motionMode={motionMode}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openCreateLink(collection.id)}
+                    className={cn(
+                      'flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-border bg-panel/40 px-4 py-5 text-xs text-fg-muted transition-colors hover:border-accent/50 hover:bg-panel hover:text-fg cursor-pointer',
+                      isDropTarget && 'border-accent bg-accent/10 text-accent',
+                    )}
+                  >
+                    <Plus className="h-3.5 w-3.5 text-accent" />
+                    <span>
+                      {isDropTarget
+                        ? `Drop to stash into ${collection.name}`
+                        : `Drop an open tab here or add your first link to ${collection.name}`}
+                    </span>
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </section>
   );

@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input, Select, Textarea } from '@/components/ui/input';
+import { playDrop, playError } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
 import { autoTagSingleLink } from '@/lib/tagging/auto-tagger';
 import type { Collection } from '@/lib/types/stash';
@@ -25,6 +26,7 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
   const modal = useUiStore((s) => s.linkModal);
   const closeLinkModal = useUiStore((s) => s.closeLinkModal);
   const pulseLink = useUiStore((s) => s.pulseLink);
+  const settleLink = useUiStore((s) => s.settleLink);
 
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
@@ -64,6 +66,7 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
     await stashRepo.updateCollection(targetCollectionId, { collapsed: false });
     closeLinkModal();
     pulseLink(existingLinkId);
+    playError();
     toast.info('Already in this collection');
     requestAnimationFrame(() => {
       const el = document.querySelector<HTMLElement>(
@@ -126,6 +129,8 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
       return;
     }
 
+    playDrop();
+    settleLink(result.link.id);
     toast.success('Link stashed');
     closeLinkModal();
     if (!hasManualTags) {

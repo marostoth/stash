@@ -209,6 +209,16 @@ function parseSettings(raw: unknown): StashSettings {
       typeof obj.autoTagOnSave === 'boolean'
         ? obj.autoTagOnSave
         : DEFAULT_SETTINGS.autoTagOnSave,
+    motionMode:
+      obj.motionMode === 'tactile' ||
+      obj.motionMode === 'reduced' ||
+      obj.motionMode === 'off'
+        ? obj.motionMode
+        : DEFAULT_SETTINGS.motionMode,
+    soundEffects:
+      typeof obj.soundEffects === 'boolean'
+        ? obj.soundEffects
+        : DEFAULT_SETTINGS.soundEffects,
     density:
       obj.density === 'compact' || obj.density === 'comfortable'
         ? obj.density

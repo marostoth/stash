@@ -6,6 +6,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Tag,
+  Volume2,
   X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -21,7 +22,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Select } from '@/components/ui/input';
 import { useAutoTagSweep } from '@/hooks/use-auto-tag-sweep';
+import { playDrop } from '@/lib/audio/foley';
 import {
   checkNanoAvailability,
   downloadNanoModel,
@@ -33,6 +36,7 @@ import type {
   CategorizationRule,
   Collection,
   LinkItem,
+  MotionMode,
   StashSettings,
   ThemeDefinition,
 } from '@/lib/types/stash';
@@ -246,6 +250,68 @@ export function SettingsModal({
                     className="h-4 w-4 accent-[var(--stash-accent)] cursor-pointer"
                   />
                 </label>
+              </div>
+
+              {/* Tactile Motion & Audio Foley */}
+              <div className="space-y-2.5 rounded-card border border-border bg-canvas p-4">
+                <h3 className="font-mono text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
+                  Motion &amp; Sound FX
+                </h3>
+
+                <div className="flex items-center justify-between gap-3 py-1 text-xs text-fg">
+                  <label htmlFor="settings-motion-mode">Motion feel</label>
+                  <Select
+                    id="settings-motion-mode"
+                    value={settings.motionMode}
+                    onChange={(e) =>
+                      void stashRepo.updateSettings({
+                        motionMode: e.target.value as MotionMode,
+                      })
+                    }
+                    className="h-8 w-36 text-xs"
+                  >
+                    <option value="tactile">Tactile</option>
+                    <option value="reduced">Reduced</option>
+                    <option value="off">Off</option>
+                  </Select>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 py-1 text-xs text-fg">
+                  <label
+                    htmlFor="settings-sound-fx"
+                    className="flex cursor-pointer items-center gap-2"
+                  >
+                    <span>Mechanical sound effects</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={!settings.soundEffects}
+                      onClick={() => playDrop(true)}
+                      className="h-7 gap-1 px-2 text-[11px]"
+                      title="Play test card-snap click"
+                    >
+                      <Volume2 className="h-3.5 w-3.5 text-accent" />
+                      Test Sound
+                    </Button>
+                    <input
+                      id="settings-sound-fx"
+                      type="checkbox"
+                      checked={settings.soundEffects}
+                      onChange={() => {
+                        const nextEnabled = !settings.soundEffects;
+                        void stashRepo.updateSettings({
+                          soundEffects: nextEnabled,
+                        });
+                        if (nextEnabled) {
+                          playDrop(true);
+                        }
+                      }}
+                      className="h-4 w-4 accent-[var(--stash-accent)] cursor-pointer"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Tier 2 On-Device AI */}

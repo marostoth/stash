@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { playSessionFreeze } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
 import {
   type OpenTabInfo,
@@ -223,10 +224,12 @@ export function OpenTabsSidebar({
 
       if (closeAfterSave) {
         await closeTabs(saved.savedTabs.map((t) => t.id));
+        playSessionFreeze(settings.soundEffects);
         toast.success(
           `Saved & closed ${saved.links.length} tab${saved.links.length === 1 ? '' : 's'} into "${saved.collection.name}"`,
         );
       } else {
+        playSessionFreeze(settings.soundEffects);
         toast.success(
           `Saved ${saved.links.length} tab${saved.links.length === 1 ? '' : 's'} into "${saved.collection.name}"`,
         );

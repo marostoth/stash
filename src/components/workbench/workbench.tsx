@@ -7,6 +7,7 @@ import {
 } from '@dnd-kit/react';
 import { isSortable } from '@dnd-kit/react/sortable';
 import { SearchX } from 'lucide-react';
+import { MotionConfig } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Toaster, toast } from 'sonner';
 import { SettingsModal } from '@/components/settings/settings-modal';
@@ -21,7 +22,9 @@ import { TopBar } from '@/components/workbench/top-bar';
 import { TriageModal } from '@/components/workbench/triage-modal';
 import { useOpenTabs } from '@/hooks/use-open-tabs';
 import { useStashData } from '@/hooks/use-stash-data';
+import { playDrop, playError, playPickup } from '@/lib/audio/foley';
 import { isDragItemData, isDropTargetData } from '@/lib/dnd/types';
+import { resolveReducedMotionPolicy } from '@/lib/motion/physics';
 import { stashRepo } from '@/lib/storage/repo';
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
 import { autoTagSingleLink } from '@/lib/tagging/auto-tagger';
@@ -67,6 +70,7 @@ export function Workbench() {
   const searchQuery = useUiStore((s) => s.searchQuery);
   const setSearchQuery = useUiStore((s) => s.setSearchQuery);
   const pulseLink = useUiStore((s) => s.pulseLink);
+  const settleLink = useUiStore((s) => s.settleLink);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -112,6 +116,7 @@ export function Workbench() {
         collapsed: false,
       });
       pulseLink(existingLinkId);
+      playError(settings.soundEffects);
       toast.info('Already in this collection');
       requestAnimationFrame(() => {
         const el = document.querySelector<HTMLElement>(
@@ -120,7 +125,7 @@ export function Workbench() {
         el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
     },
-    [pulseLink],
+    [pulseLink, settings.soundEffects],
   );
 
   const handleQuickStashTab = useCallback(
@@ -141,11 +146,17 @@ export function Workbench() {
       }
 
       await stashRepo.updateCollection(collectionId, { collapsed: false });
+      playDrop(settings.soundEffects);
+      settleLink(result.link.id);
       toast.success(`Stashed "${result.link.title}"`);
       void autoTagSingleLink(result.link.id);
     },
-    [revealDuplicate],
+    [revealDuplicate, settings.soundEffects, settleLink],
   );
+
+  const handleDragStart = useCallback(() => {
+    playPickup(settings.soundEffects);
+  }, [settings.soundEffects]);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -167,6 +178,7 @@ export function Workbench() {
             ? source.index
             : targetData.index;
         if (nextIndex !== sourceData.index) {
+          playDrop(settings.soundEffects);
           void stashRepo.reorderCollections(
             sourceData.collection.id,
             nextIndex,
@@ -204,6 +216,11 @@ export function Workbench() {
           );
           if (!result.ok && result.reason === 'duplicate') {
             await revealDuplicate(result.existingLink.id, targetCollectionId);
+            return;
+          }
+          if (result.ok) {
+            playDrop(settings.soundEffects);
+            settleLink(sourceData.link.id);
           }
         };
 
@@ -234,7 +251,7 @@ export function Workbench() {
         }
       }
     },
-    [handleQuickStashTab, revealDuplicate],
+    [handleQuickStashTab, revealDuplicate, settings.soundEffects, settleLink],
   );
 
   const groups = useMemo(
@@ -246,115 +263,127 @@ export function Workbench() {
   const compact = settings.density === 'compact';
 
   return (
-    <DragDropProvider sensors={WORKBENCH_SENSORS} onDragEnd={handleDragEnd}>
-      <div className="flex h-screen flex-col overflow-hidden bg-canvas text-fg">
-        <TopBar
-          searchInputRef={searchInputRef}
-          allThemes={allThemes}
-          activeTheme={activeTheme}
-          settings={settings}
-          totalLinks={links.length}
-          openTabsCount={tabs.length}
-        />
+    <MotionConfig
+      reducedMotion={resolveReducedMotionPolicy(settings.motionMode)}
+    >
+      <DragDropProvider
+        sensors={WORKBENCH_SENSORS}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex h-screen flex-col overflow-hidden bg-canvas text-fg">
+          <TopBar
+            searchInputRef={searchInputRef}
+            allThemes={allThemes}
+            activeTheme={activeTheme}
+            settings={settings}
+            totalLinks={links.length}
+            openTabsCount={tabs.length}
+          />
 
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-            <div className="mx-auto max-w-[1320px]">
-              {loading ? (
-                <div className="py-20 text-center font-mono text-xs text-fg-muted">
-                  Loading workspace...
-                </div>
-              ) : collections.length === 0 ? (
-                <EmptyState />
-              ) : groups.length === 0 ? (
-                <div className="mx-auto flex max-w-md flex-col items-center justify-center rounded-card border border-border bg-panel px-6 py-12 text-center">
-                  <SearchX className="mb-3 h-7 w-7 text-fg-muted" />
-                  <p className="text-sm font-medium text-fg">
-                    No matches for "{searchQuery.trim()}"
-                  </p>
-                  <p className="mt-1 text-xs text-fg-muted">
-                    Try searching by domain, title, tag, or note.
-                  </p>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setSearchQuery('')}
-                    className="mt-4"
-                  >
-                    Clear Search
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-8">
-                  {groups.map(
-                    ({ collection, links: collectionLinks }, colIndex) => (
-                      <CollectionSection
-                        key={collection.id}
-                        collection={collection}
-                        index={colIndex}
-                        links={collectionLinks}
-                        openInNewTab={settings.openLinkInNewTab}
-                        compact={compact}
-                        forceExpanded={isSearching}
-                        dragDisabled={isSearching}
-                      />
-                    ),
-                  )}
-                </div>
-              )}
-            </div>
-          </main>
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+              <div className="mx-auto max-w-[1320px]">
+                {loading ? (
+                  <div className="py-20 text-center font-mono text-xs text-fg-muted">
+                    Loading workspace...
+                  </div>
+                ) : collections.length === 0 ? (
+                  <EmptyState />
+                ) : groups.length === 0 ? (
+                  <div className="mx-auto flex max-w-md flex-col items-center justify-center rounded-card border border-border bg-panel px-6 py-12 text-center">
+                    <SearchX className="mb-3 h-7 w-7 text-fg-muted" />
+                    <p className="text-sm font-medium text-fg">
+                      No matches for "{searchQuery.trim()}"
+                    </p>
+                    <p className="mt-1 text-xs text-fg-muted">
+                      Try searching by domain, title, tag, or note.
+                    </p>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setSearchQuery('')}
+                      className="mt-4"
+                    >
+                      Clear Search
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {groups.map(
+                      ({ collection, links: collectionLinks }, colIndex) => (
+                        <CollectionSection
+                          key={collection.id}
+                          collection={collection}
+                          index={colIndex}
+                          links={collectionLinks}
+                          openInNewTab={settings.openLinkInNewTab}
+                          compact={compact}
+                          forceExpanded={isSearching}
+                          dragDisabled={isSearching}
+                          motionMode={settings.motionMode}
+                        />
+                      ),
+                    )}
+                  </div>
+                )}
+              </div>
+            </main>
 
-          {settings.openTabsSidebarVisible && (
-            <OpenTabsSidebar
-              tabs={tabs}
-              pinnedTabs={pinnedTabs}
-              regularTabs={regularTabs}
-              collections={collections}
-              settings={settings}
-              onQuickStashTab={handleQuickStashTab}
-            />
-          )}
+            {settings.openTabsSidebarVisible && (
+              <OpenTabsSidebar
+                tabs={tabs}
+                pinnedTabs={pinnedTabs}
+                regularTabs={regularTabs}
+                collections={collections}
+                settings={settings}
+                onQuickStashTab={handleQuickStashTab}
+              />
+            )}
+          </div>
+
+          <CollectionModal />
+          <QuickEditModal collections={collections} />
+          <SettingsModal
+            collections={collections}
+            links={links}
+            rules={rules}
+            settings={settings}
+            allThemes={allThemes}
+            activeTheme={activeTheme}
+          />
+          <TriageModal
+            collections={collections}
+            links={links}
+            rules={rules}
+            settings={settings}
+          />
+
+          <DragOverlay dropAnimation={null}>
+            {(source) =>
+              isDragItemData(source.data) ? (
+                <DragGhost
+                  data={source.data}
+                  motionMode={settings.motionMode}
+                />
+              ) : null
+            }
+          </DragOverlay>
+
+          <Toaster
+            position="bottom-right"
+            theme={activeTheme.mode}
+            toastOptions={{
+              style: {
+                background: 'var(--stash-panel)',
+                color: 'var(--stash-text)',
+                border: '1px solid var(--stash-border)',
+                borderRadius: 'var(--stash-radius-card)',
+              },
+            }}
+          />
         </div>
-
-        <CollectionModal />
-        <QuickEditModal collections={collections} />
-        <SettingsModal
-          collections={collections}
-          links={links}
-          rules={rules}
-          settings={settings}
-          allThemes={allThemes}
-          activeTheme={activeTheme}
-        />
-        <TriageModal
-          collections={collections}
-          links={links}
-          rules={rules}
-          settings={settings}
-        />
-
-        <DragOverlay dropAnimation={null}>
-          {(source) =>
-            isDragItemData(source.data) ? (
-              <DragGhost data={source.data} />
-            ) : null
-          }
-        </DragOverlay>
-
-        <Toaster
-          position="bottom-right"
-          theme={activeTheme.mode}
-          toastOptions={{
-            style: {
-              background: 'var(--stash-panel)',
-              color: 'var(--stash-text)',
-              border: '1px solid var(--stash-border)',
-              borderRadius: 'var(--stash-radius-card)',
-            },
-          }}
-        />
-      </div>
-    </DragDropProvider>
+      </DragDropProvider>
+    </MotionConfig>
   );
 }
