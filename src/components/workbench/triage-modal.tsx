@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/input';
 import { TriageRowCard } from '@/components/workbench/triage-row-card';
 import {
   TRIAGE_CREATE_CUSTOM_SENTINEL,
+  TRIAGE_DELETE_SENTINEL,
   TRIAGE_NEW_PREFIX,
   useTriageWorkflow,
 } from '@/hooks/use-triage-workflow';
@@ -72,6 +73,9 @@ export function TriageModal({
                 className="h-8 max-w-[230px] text-xs"
               >
                 <option value="">Keep in session</option>
+                <option value={TRIAGE_DELETE_SENTINEL}>
+                  Delete from session
+                </option>
                 {wf.destinationCollections.map((col) => (
                   <option key={col.id} value={col.id}>
                     {col.name}
@@ -131,6 +135,7 @@ export function TriageModal({
                 destination={destination}
                 newPrefix={TRIAGE_NEW_PREFIX}
                 createCustomSentinel={TRIAGE_CREATE_CUSTOM_SENTINEL}
+                deleteSentinel={TRIAGE_DELETE_SENTINEL}
                 isCreatingCustom={wf.editingCustomRowId === link.id}
                 customDraft={wf.customDraft}
                 availableNewCategories={wf.availableNewCategories}
@@ -141,6 +146,7 @@ export function TriageModal({
                 onChangeDestination={(value) =>
                   wf.handleChangeDestination(link.id, value)
                 }
+                onToggleDiscard={() => wf.toggleDiscardRow(link.id)}
               />
             ))
           )}
@@ -173,7 +179,13 @@ export function TriageModal({
               ) : (
                 <CheckCircle2 className="h-3.5 w-3.5" />
               )}
-              {wf.applying ? 'Applying...' : `Accept All (${wf.assignedCount})`}
+              {wf.applying
+                ? 'Applying...'
+                : wf.moveCount > 0 && wf.deleteCount > 0
+                  ? `Accept All (${wf.moveCount} move · ${wf.deleteCount} del)`
+                  : wf.deleteCount > 0
+                    ? `Delete (${wf.deleteCount})`
+                    : `Accept All (${wf.assignedCount})`}
             </Button>
           </div>
         </DialogFooter>

@@ -1,27 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { playDelete } from '@/lib/audio/foley';
 import { categorizeLink } from '@/lib/categorizer/categorizer';
+import {
+  createNanoCategorizerSession,
+  type NanoCategorizerSession,
+} from '@/lib/categorizer/nano-engine';
+import { evaluateTier1Rules } from '@/lib/categorizer/rules-engine';
 import type { CategorizationSuggestion } from '@/lib/categorizer/types';
-import { autoAssignCollectionIconIfEmpty } from '@/lib/icons/auto-assign-icon';
-import { stashRepo } from '@/lib/storage/repo';
+import { applyTriageRows } from '@/lib/tabs/triage-apply';
 import type {
   CategorizationRule,
   Collection,
   LinkItem,
   StashSettings,
 } from '@/lib/types/stash';
-import { normalizeTags } from '@/lib/utils/url';
 import { useBackgroundJobsStore } from '@/store/background-jobs-store';
 import { useUiStore } from '@/store/ui-store';
 
 export interface TriageRow {
   link: LinkItem;
   suggestion: CategorizationSuggestion;
-  destination: string; // '' = keep in session, '__new__:Name', or collectionId
+  destination: string; // '' = keep in session, '__delete__', '__new__:Name', or collectionId
 }
 
 export const TRIAGE_NEW_PREFIX = '__new__:';
 export const TRIAGE_CREATE_CUSTOM_SENTINEL = '__create_custom__';
+export const TRIAGE_DELETE_SENTINEL = '__delete__';
 
 export function useTriageWorkflow(
   collections: readonly Collection[],
@@ -52,6 +57,8 @@ export function useTriageWorkflow(
   const [bulkDestination, setBulkDestination] = useState('');
 
   const cancelAnalysisRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const previousDestRef = useRef<Map<string, string>>(new Map());
   const analyzedCollectionIdRef = useRef<string | null>(null);
   const openRef = useRef(triageOpen);
   openRef.current = triageOpen;
@@ -76,9 +83,19 @@ export function useTriageWorkflow(
 
   const cancelAndClear = useCallback(() => {
     cancelAnalysisRef.current = true;
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
     useBackgroundJobsStore.getState().removeJob('triage');
     clearTriage();
   }, [clearTriage]);
+
+  useEffect(() => {
+    return () => {
+      cancelAnalysisRef.current = true;
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (!triageOpen) return;
@@ -107,6 +124,10 @@ export function useTriageWorkflow(
 
     analyzedCollectionIdRef.current = triageCollectionId;
     cancelAnalysisRef.current = false;
+    previousDestRef.current.clear();
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setAnalyzing(true);
     setAnalyzeProgress({
       current: 0,
@@ -127,47 +148,83 @@ export function useTriageWorkflow(
 
     const runCategorization = async () => {
       const nextRows: TriageRow[] = [];
-      for (let i = 0; i < sessionLinks.length; i++) {
-        const link = sessionLinks[i];
-        if (!link || cancelAnalysisRef.current) break;
-        setAnalyzeProgress({
-          current: i,
-          total: sessionLinks.length,
-          title: link.title,
-        });
-        useBackgroundJobsStore.getState().upsertJob({
-          id: 'triage',
-          title: 'Auto-Categorize',
-          detail: `${i} / ${sessionLinks.length} · ${link.title}`,
-          status: 'running',
-          progress: { current: i, total: sessionLinks.length },
-          usesNano: settings.enableOnDeviceAi,
-          onReopen: reopenTriage,
-          onCancel: cancelAndClear,
-        });
-        const suggestion = await categorizeLink(
-          { url: link.url, title: link.title },
-          {
+      const validDestIds = new Set(destinationCollections.map((c) => c.id));
+      let nanoSession: NanoCategorizerSession | null = null;
+      let triedCreateNano = false;
+
+      try {
+        for (let i = 0; i < sessionLinks.length; i++) {
+          const link = sessionLinks[i];
+          if (!link || cancelAnalysisRef.current || controller.signal.aborted) {
+            break;
+          }
+          setAnalyzeProgress({
+            current: i,
+            total: sessionLinks.length,
+            title: link.title,
+          });
+          useBackgroundJobsStore.getState().upsertJob({
+            id: 'triage',
+            title: 'Auto-Categorize',
+            detail: `${i} / ${sessionLinks.length} · ${link.title}`,
+            status: 'running',
+            progress: { current: i, total: sessionLinks.length },
+            usesNano: settings.enableOnDeviceAi,
+            onReopen: reopenTriage,
+            onCancel: cancelAndClear,
+          });
+
+          // Tier 1 rules run instantly (0ms); lazily create ONE base Nano session
+          // only on the first link that misses all Tier 1 rules.
+          const ruleHit = evaluateTier1Rules(
+            { url: link.url, title: link.title },
             rules,
-            collections: destinationCollections,
-            enableOnDeviceAi: settings.enableOnDeviceAi,
-          },
-        );
-        if (cancelAnalysisRef.current) break;
-        const defaultDest =
-          suggestion.collectionId ??
-          (suggestion.suggestedNewCollection
-            ? `${TRIAGE_NEW_PREFIX}${suggestion.suggestedNewCollection}`
-            : '');
-        nextRows.push({ link, suggestion, destination: defaultDest });
-        setAnalyzeProgress({
-          current: i + 1,
-          total: sessionLinks.length,
-          title: link.title,
-        });
+            validDestIds,
+          );
+          let suggestion: CategorizationSuggestion;
+          if (ruleHit) {
+            suggestion = ruleHit;
+          } else {
+            if (settings.enableOnDeviceAi && !triedCreateNano) {
+              triedCreateNano = true;
+              nanoSession = await createNanoCategorizerSession(
+                controller.signal,
+              );
+            }
+            if (cancelAnalysisRef.current || controller.signal.aborted) break;
+            suggestion = await categorizeLink(
+              { url: link.url, title: link.title },
+              {
+                rules,
+                collections: destinationCollections,
+                enableOnDeviceAi: Boolean(nanoSession),
+                nanoSession,
+                signal: controller.signal,
+              },
+            );
+          }
+
+          if (cancelAnalysisRef.current || controller.signal.aborted) break;
+          const defaultDest =
+            suggestion.collectionId ??
+            (suggestion.suggestedNewCollection
+              ? `${TRIAGE_NEW_PREFIX}${suggestion.suggestedNewCollection}`
+              : '');
+          nextRows.push({ link, suggestion, destination: defaultDest });
+          setAnalyzeProgress({
+            current: i + 1,
+            total: sessionLinks.length,
+            title: link.title,
+          });
+        }
+      } finally {
+        nanoSession?.destroy();
+        if (abortControllerRef.current === controller) {
+          abortControllerRef.current = null;
+        }
       }
 
-      if (cancelAnalysisRef.current) {
+      if (cancelAnalysisRef.current || controller.signal.aborted) {
         setAnalyzing(false);
         setAnalyzeProgress(null);
         useBackgroundJobsStore.getState().removeJob('triage');
@@ -226,7 +283,14 @@ export function useTriageWorkflow(
     return Array.from(byLower.values());
   }, [rows, customCategories, destinationCollections]);
 
-  const assignedCount = rows.filter((row) => row.destination !== '').length;
+  const deleteCount = rows.filter(
+    (row) => row.destination === TRIAGE_DELETE_SENTINEL,
+  ).length;
+  const moveCount = rows.filter(
+    (row) =>
+      row.destination !== '' && row.destination !== TRIAGE_DELETE_SENTINEL,
+  ).length;
+  const assignedCount = moveCount + deleteCount;
 
   const handleChangeDestination = (linkId: string, value: string) => {
     if (value === TRIAGE_CREATE_CUSTOM_SENTINEL) {
@@ -234,10 +298,27 @@ export function useTriageWorkflow(
       setCustomDraft('');
       return;
     }
+    if (value !== TRIAGE_DELETE_SENTINEL) {
+      previousDestRef.current.set(linkId, value);
+    }
     setRows((prev) =>
       prev.map((row) =>
         row.link.id === linkId ? { ...row, destination: value } : row,
       ),
+    );
+  };
+
+  const toggleDiscardRow = (linkId: string) => {
+    setRows((prev) =>
+      prev.map((row) => {
+        if (row.link.id !== linkId) return row;
+        if (row.destination === TRIAGE_DELETE_SENTINEL) {
+          const restored = previousDestRef.current.get(linkId) ?? '';
+          return { ...row, destination: restored };
+        }
+        previousDestRef.current.set(linkId, row.destination);
+        return { ...row, destination: TRIAGE_DELETE_SENTINEL };
+      }),
     );
   };
 
@@ -274,98 +355,46 @@ export function useTriageWorkflow(
     setApplying(true);
 
     try {
-      const createdByName = new Map<
-        string,
-        { id: string; name: string; sampleTitles: string[] }
-      >();
-      let movedCount = 0;
-      let skippedDuplicates = 0;
+      const { movedCount, deletedCount, skippedDuplicates } =
+        await applyTriageRows({
+          triageCollectionId,
+          rows: rows.map((row) => ({
+            link: row.link,
+            destination: row.destination,
+            suggestionTags: row.suggestion.tags,
+            suggestionSummaryNote: row.suggestion.summaryNote,
+          })),
+          newPrefix: TRIAGE_NEW_PREFIX,
+          deleteSentinel: TRIAGE_DELETE_SENTINEL,
+          deleteEmptySession,
+        });
 
-      for (const row of rows) {
-        if (!row.destination) continue;
-
-        let targetCollectionId = row.destination;
-        if (targetCollectionId.startsWith(TRIAGE_NEW_PREFIX)) {
-          const newName = targetCollectionId
-            .slice(TRIAGE_NEW_PREFIX.length)
-            .trim();
-          const key = newName.toLowerCase();
-          const existingNew = createdByName.get(key);
-          if (existingNew) {
-            targetCollectionId = existingNew.id;
-            existingNew.sampleTitles.push(row.link.title);
-          } else {
-            const created = await stashRepo.createCollection({ name: newName });
-            createdByName.set(key, {
-              id: created.id,
-              name: created.name,
-              sampleTitles: [row.link.title],
-            });
-            targetCollectionId = created.id;
-          }
-        }
-
-        const mergedTags = normalizeTags([
-          ...row.link.tags,
-          ...row.suggestion.tags,
-        ]);
-        const nextNote =
-          row.link.note.trim() || row.suggestion.summaryNote || '';
-
-        const moved = await stashRepo.moveOrReorderLink(
-          row.link.id,
-          targetCollectionId,
-        );
-        if (!moved.ok) {
-          if (moved.reason === 'duplicate') {
-            skippedDuplicates += 1;
-          }
-          continue;
-        }
-
-        if (
-          mergedTags.length !== row.link.tags.length ||
-          nextNote !== row.link.note
-        ) {
-          await stashRepo.updateLink(row.link.id, {
-            tags: mergedTags,
-            note: nextNote,
-          });
-        }
-        movedCount += 1;
+      if (deletedCount > 0 && movedCount === 0) {
+        playDelete(settings.soundEffects);
       }
 
-      if (deleteEmptySession) {
-        const remaining = (await stashRepo.getLinks()).filter(
-          (l) => l.collectionId === triageCollectionId,
+      if (movedCount > 0 && deletedCount > 0) {
+        toast.success(
+          `Categorized ${movedCount} link${movedCount === 1 ? '' : 's'} · deleted ${deletedCount}${skippedDuplicates > 0 ? ` (${skippedDuplicates} duplicate${skippedDuplicates === 1 ? '' : 's'} kept)` : ''}`,
         );
-        if (remaining.length === 0) {
-          await stashRepo.deleteCollection(triageCollectionId);
-        }
-      }
-
-      if (movedCount > 0) {
+      } else if (movedCount > 0) {
         toast.success(
           `Categorized ${movedCount} link${movedCount === 1 ? '' : 's'}${skippedDuplicates > 0 ? ` (${skippedDuplicates} duplicate${skippedDuplicates === 1 ? '' : 's'} kept)` : ''}`,
+        );
+      } else if (deletedCount > 0) {
+        toast.success(
+          `Deleted ${deletedCount} link${deletedCount === 1 ? '' : 's'} from session`,
         );
       } else if (skippedDuplicates > 0) {
         toast.info(
           `${skippedDuplicates} link${skippedDuplicates === 1 ? '' : 's'} already existed in the destination collection.`,
         );
       } else {
-        toast.info('No links were moved.');
+        toast.info('No links were changed.');
       }
 
       clearTriage();
       useBackgroundJobsStore.getState().removeJob('triage');
-
-      for (const created of createdByName.values()) {
-        void autoAssignCollectionIconIfEmpty(
-          created.id,
-          created.name,
-          created.sampleTitles,
-        );
-      }
     } finally {
       setApplying(false);
     }
@@ -393,7 +422,10 @@ export function useTriageWorkflow(
     setBulkDestination,
     availableNewCategories,
     assignedCount,
+    moveCount,
+    deleteCount,
     handleChangeDestination,
+    toggleDiscardRow,
     commitCustomCategory,
     handleApplyBulkOverride,
     handleAcceptAll,

@@ -1,4 +1,7 @@
-import { categorizeWithNano } from '@/lib/categorizer/nano-engine';
+import {
+  categorizeWithNano,
+  type NanoCategorizerSession,
+} from '@/lib/categorizer/nano-engine';
 import { evaluateTier1Rules } from '@/lib/categorizer/rules-engine';
 import type {
   CategorizationSuggestion,
@@ -10,6 +13,9 @@ export interface CategorizeLinkOptions {
   rules: readonly CategorizationRule[];
   collections: readonly Collection[];
   enableOnDeviceAi: boolean;
+  /** Optional pre-warmed base Nano session for fast cloned batch triage */
+  nanoSession?: NanoCategorizerSession | null;
+  signal?: AbortSignal;
 }
 
 export async function categorizeLink(
@@ -29,11 +35,14 @@ export async function categorizeLink(
   }
 
   // Tier 2: Optional Chrome On-Device AI (Gemini Nano)
-  if (options.enableOnDeviceAi) {
-    const nanoSuggestion = await categorizeWithNano(
-      target,
-      options.collections,
-    );
+  if (options.enableOnDeviceAi && !options.signal?.aborted) {
+    const nanoSuggestion = options.nanoSession
+      ? await options.nanoSession.categorize(
+          target,
+          options.collections,
+          options.signal,
+        )
+      : await categorizeWithNano(target, options.collections, options.signal);
     if (nanoSuggestion) {
       return nanoSuggestion;
     }

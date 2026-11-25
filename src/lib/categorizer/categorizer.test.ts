@@ -3,6 +3,8 @@ import { categorizeLink } from '@/lib/categorizer/categorizer';
 import {
   categorizeWithNano,
   checkNanoAvailability,
+  createNanoCategorizerSession,
+  findBestExistingCollectionMatch,
   parseNanoResponse,
 } from '@/lib/categorizer/nano-engine';
 import { evaluateTier1Rules } from '@/lib/categorizer/rules-engine';
@@ -291,5 +293,187 @@ describe('Tier 2 LanguageModel adapter & 2-tier orchestrator', () => {
     );
     expect(hallucinatedExisting?.collectionId).toBeUndefined();
     expect(hallucinatedExisting?.suggestedNewCollection).toBe('Writing');
+  });
+
+  it('reconciles token-subset collection names without false-matching unrelated or ambiguous collections', () => {
+    const richCollections: Collection[] = [
+      {
+        id: 'col-webdev',
+        name: 'Web Dev',
+        color: 'blue',
+        order: 0,
+        collapsed: false,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      {
+        id: 'col-finance',
+        name: 'Finance & Trading',
+        color: 'green',
+        order: 1,
+        collapsed: false,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      {
+        id: 'col-maker',
+        name: 'Hardware & 3D Printing',
+        color: 'orange',
+        order: 2,
+        collapsed: false,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      {
+        id: 'col-ui-design',
+        name: 'UI Design',
+        color: 'pink',
+        order: 3,
+        collapsed: false,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      {
+        id: 'col-3d-design',
+        name: '3D Design',
+        color: 'purple',
+        order: 4,
+        collapsed: false,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    ];
+
+    expect(
+      findBestExistingCollectionMatch('Trading', richCollections)?.id,
+    ).toBe('col-finance');
+    expect(findBestExistingCollectionMatch('Dev', richCollections)?.id).toBe(
+      'col-webdev',
+    );
+    expect(
+      findBestExistingCollectionMatch('3D Printing', richCollections)?.id,
+    ).toBe('col-maker');
+
+    // Unrelated candidate must NOT false-match
+    expect(
+      findBestExistingCollectionMatch('Cooking', richCollections),
+    ).toBeUndefined();
+
+    // Ambiguous tie ("Design" matches both "UI Design" and "3D Design") must NOT guess
+    expect(
+      findBestExistingCollectionMatch('Design', richCollections),
+    ).toBeUndefined();
+
+    // parseNanoResponse uses token-subset matching instead of proposing phantom duplicates
+    const parsedTrading = parseNanoResponse(
+      JSON.stringify({
+        tags: ['futures'],
+        summaryNote: 'Futures trading broker',
+        idealCategory: 'Trading',
+        matchesExisting: false,
+        existingCollection: '',
+      }),
+      richCollections,
+    );
+    expect(parsedTrading?.collectionId).toBe('col-finance');
+    expect(parsedTrading?.suggestedNewCollection).toBeUndefined();
+  });
+
+  it('leaves generic inbox/feed tabs unassigned when idealCategory is empty', () => {
+    const generic = parseNanoResponse(
+      JSON.stringify({
+        tags: ['email', 'inbox'],
+        summaryNote: 'Personal inbox',
+        idealCategory: '',
+        matchesExisting: false,
+        existingCollection: '',
+      }),
+      collections,
+    );
+    expect(generic).toEqual({
+      source: 'nano',
+      collectionId: undefined,
+      suggestedNewCollection: undefined,
+      tags: ['email', 'inbox'],
+      summaryNote: 'Personal inbox',
+    });
+  });
+
+  it('clones ONE base session per link in batch categorization and destroys every clone and base session', async () => {
+    const baseDestroy = vi.fn();
+    const cloneDestroys: Array<ReturnType<typeof vi.fn>> = [];
+    const cloneMock = vi.fn().mockImplementation(async () => {
+      const cloneDestroy = vi.fn();
+      cloneDestroys.push(cloneDestroy);
+      return {
+        prompt: vi.fn().mockResolvedValue(
+          JSON.stringify({
+            tags: ['react'],
+            summaryNote: 'React docs',
+            idealCategory: 'Dev',
+            matchesExisting: true,
+            existingCollection: 'Dev',
+          }),
+        ),
+        destroy: cloneDestroy,
+      };
+    });
+
+    const createMock = vi.fn().mockResolvedValue({
+      prompt: vi.fn(),
+      clone: cloneMock,
+      destroy: baseDestroy,
+    });
+
+    globalWithLm.LanguageModel = {
+      availability: vi.fn().mockResolvedValue('available'),
+      params: vi.fn().mockResolvedValue({
+        defaultTopK: 3,
+        maxTopK: 8,
+        defaultTemperature: 1,
+        maxTemperature: 2,
+      }),
+      create: createMock,
+    };
+
+    const session = await createNanoCategorizerSession();
+    expect(session).not.toBeNull();
+    if (!session) return;
+
+    try {
+      const r1 = await categorizeLink(
+        { url: 'https://react.dev', title: 'React' },
+        {
+          rules: [],
+          collections,
+          enableOnDeviceAi: true,
+          nanoSession: session,
+        },
+      );
+      const r2 = await categorizeLink(
+        { url: 'https://vitejs.dev', title: 'Vite' },
+        {
+          rules: [],
+          collections,
+          enableOnDeviceAi: true,
+          nanoSession: session,
+        },
+      );
+      expect(r1.collectionId).toBe('col-dev');
+      expect(r2.collectionId).toBe('col-dev');
+    } finally {
+      session.destroy();
+    }
+
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({ temperature: 0, topK: 1 }),
+    );
+    expect(cloneMock).toHaveBeenCalledTimes(2);
+    expect(cloneDestroys).toHaveLength(2);
+    for (const d of cloneDestroys) {
+      expect(d).toHaveBeenCalledTimes(1);
+    }
+    expect(baseDestroy).toHaveBeenCalledTimes(1);
   });
 });

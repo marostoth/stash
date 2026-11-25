@@ -1,8 +1,13 @@
+import { findBestExistingCollectionMatch } from '@/lib/categorizer/collection-matcher';
 import {
   getLanguageModel,
   normalizeAvailability,
+  resolveDeterministicSampling,
   stripJsonFences,
 } from '@/lib/categorizer/nano-helpers';
+
+export { findBestExistingCollectionMatch };
+
 import type {
   CategorizationSuggestion,
   CategorizationTarget,
@@ -18,13 +23,6 @@ export const NANO_AVAILABILITY_OPTIONS: LanguageModelAvailabilityOptions = {
   expectedOutputs: [{ type: 'text', languages: ['en'] }],
 };
 
-/**
- * Forces topic-first structured reasoning inside strict JSON:
- * 1. tags + summaryNote (analyze the page)
- * 2. idealCategory (name the true 1-3 word topic independently of user collections)
- * 3. matchesExisting + existingCollection (only match if idealCategory genuinely
- *    belongs in one of existingCollections; prevents small-model forced-choice bias)
- */
 export const NANO_RESPONSE_CONSTRAINT: Record<string, unknown> = {
   type: 'object',
   properties: {
@@ -47,6 +45,11 @@ export const NANO_RESPONSE_CONSTRAINT: Record<string, unknown> = {
   ],
 };
 
+/**
+ * Generalized few-shot examples using distinct non-colliding sample names
+ * ("Cooking", "Travel", "Software", "Fitness") so Nano does not leak common
+ * dev/finance names into unrelated user libraries.
+ */
 const NANO_INITIAL_PROMPTS: Array<{
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -57,45 +60,46 @@ const NANO_INITIAL_PROMPTS: Array<{
       'You categorize web bookmarks into collections and return strict JSON.',
       'Follow these steps in order:',
       '1. Output 1-3 short lowercase kebab-case "tags" and a concise "summaryNote" (<=100 chars).',
-      '2. Output "idealCategory": the true 1-3 word category for this page, ignoring existingCollections (e.g. "3D Printing", "Writing", "Dev", "Trading").',
-      '3. Check if "idealCategory" directly belongs to one of "existingCollections":',
-      '   - Only set "matchesExisting": true and "existingCollection" to that exact collection name when the topics clearly match (e.g. coding/extensions -> "Dev", stocks/futures -> "Trading").',
-      '   - Shopping/product stores (like a 3D printer store) are NOT "Trading". Writing tools are NOT "Trading" or "Dev".',
+      '2. Output "idealCategory": the true 1-3 word topic for this page, independent of existingCollections (e.g., "Cooking", "Travel", "Fitness", "Photography").',
+      '   - If the page is a generic inbox, social home feed, search homepage, or temporary utility tab (e.g., Gmail inbox, YouTube home feed, Google search) that does not belong in a bookmark topic, set "matchesExisting": false, "existingCollection": "", and "idealCategory": "".',
+      '3. Check if the page clearly belongs in one of "existingCollections":',
+      '   - Only set "matchesExisting": true and "existingCollection" to that exact existing collection name when the topics clearly match.',
+      '   - Do NOT force unrelated sites into an existing collection.',
       '   - If no existing collection clearly matches (or existingCollections is empty), set "matchesExisting": false and "existingCollection": "".',
     ].join('\n'),
   },
   {
     role: 'user',
     content: JSON.stringify({
-      url: 'https://developer.chrome.com/docs/extensions',
-      title: 'Build extensions with coding agents | Chrome for Developers',
-      existingCollections: [{ name: 'Dev' }, { name: 'Trading' }],
+      url: 'https://www.seriouseats.com/sourdough-bread-guide',
+      title: 'The Complete Sourdough Bread Guide | Serious Eats',
+      existingCollections: [{ name: 'Cooking' }, { name: 'Travel' }],
     }),
   },
   {
     role: 'assistant',
     content: JSON.stringify({
-      tags: ['chrome', 'extensions', 'dev'],
-      summaryNote: 'Chrome extension development guide for coding agents',
-      idealCategory: 'Dev',
+      tags: ['sourdough', 'baking', 'bread'],
+      summaryNote: 'Step-by-step guide to baking sourdough bread',
+      idealCategory: 'Cooking',
       matchesExisting: true,
-      existingCollection: 'Dev',
+      existingCollection: 'Cooking',
     }),
   },
   {
     role: 'user',
     content: JSON.stringify({
-      url: 'https://uk.store.bambulab.com/products/a1',
-      title: 'Bambu Lab A1 | Multi-color 3D Printer | Bambu Lab UK Store',
-      existingCollections: [{ name: 'Trading' }],
+      url: 'https://www.alltrails.com/trail/alps-ridge',
+      title: 'Alps Ridge Loop Trail Map & Photos | AllTrails',
+      existingCollections: [{ name: 'Software' }],
     }),
   },
   {
     role: 'assistant',
     content: JSON.stringify({
-      tags: ['3d-printing', 'bambu-lab', 'printer'],
-      summaryNote: 'Bambu Lab A1 multi-color 3D printer product page',
-      idealCategory: '3D Printing',
+      tags: ['hiking', 'trails', 'outdoors'],
+      summaryNote: 'Trail map and route photos for Alps Ridge Loop',
+      idealCategory: 'Travel',
       matchesExisting: false,
       existingCollection: '',
     }),
@@ -103,37 +107,37 @@ const NANO_INITIAL_PROMPTS: Array<{
   {
     role: 'user',
     content: JSON.stringify({
-      url: 'https://app.grammarly.com',
-      title: 'Grammarly',
-      existingCollections: [{ name: 'Trading' }],
+      url: 'https://www.strongerbyscience.com/squat-guide',
+      title: 'How to Squat: The Definitive Guide',
+      existingCollections: [{ name: 'Cooking' }, { name: 'Fitness' }],
     }),
   },
   {
     role: 'assistant',
     content: JSON.stringify({
-      tags: ['writing', 'grammar', 'editor'],
-      summaryNote: 'Online writing and grammar assistant',
-      idealCategory: 'Writing',
-      matchesExisting: false,
-      existingCollection: '',
+      tags: ['squat', 'strength', 'training'],
+      summaryNote: 'Comprehensive biomechanics and form guide for squats',
+      idealCategory: 'Fitness',
+      matchesExisting: true,
+      existingCollection: 'Fitness',
     }),
   },
   {
     role: 'user',
     content: JSON.stringify({
-      url: 'https://www.cmegroup.com',
-      title: 'Futures & Options Trading for Risk Management - CME Group',
-      existingCollections: [{ name: 'Trading' }],
+      url: 'https://mail.google.com/mail/u/0/#inbox',
+      title: 'Inbox (12) - Gmail',
+      existingCollections: [{ name: 'Cooking' }, { name: 'Software' }],
     }),
   },
   {
     role: 'assistant',
     content: JSON.stringify({
-      tags: ['trading', 'futures', 'options'],
-      summaryNote: 'CME Group futures and options trading platform',
-      idealCategory: 'Trading',
-      matchesExisting: true,
-      existingCollection: 'Trading',
+      tags: ['email', 'inbox'],
+      summaryNote: 'Personal email inbox',
+      idealCategory: '',
+      matchesExisting: false,
+      existingCollection: '',
     }),
   },
 ];
@@ -145,6 +149,7 @@ const SENTINEL_VALUES = new Set([
   'undefined',
   'n/a',
   'new',
+  'uncategorized',
 ]);
 
 interface RawNanoResponse {
@@ -166,6 +171,24 @@ function cleanOptionalString(value: unknown): string | undefined {
   return trimmed;
 }
 
+function buildPayload(
+  target: CategorizationTarget,
+  collections: readonly Collection[],
+): string {
+  return JSON.stringify({
+    url: target.url,
+    title: target.title,
+    existingCollections: collections
+      .filter((col) => !col.isSession)
+      .map((col) => ({
+        name: col.name,
+        ...(col.description
+          ? { description: col.description.slice(0, 60) }
+          : {}),
+      })),
+  });
+}
+
 export function parseNanoResponse(
   rawText: string,
   collections: readonly Collection[],
@@ -181,9 +204,6 @@ export function parseNanoResponse(
 
   const nonSessionCollections = collections.filter((c) => !c.isSession);
   const validById = new Map(nonSessionCollections.map((c) => [c.id, c]));
-  const validByLowerName = new Map(
-    nonSessionCollections.map((c) => [c.name.trim().toLowerCase(), c]),
-  );
 
   let collectionId: string | undefined;
   let suggestedNewCollection: string | undefined;
@@ -196,8 +216,9 @@ export function parseNanoResponse(
     typeof parsed.matchesExisting === 'boolean'
   ) {
     if (parsed.matchesExisting === true && existingCollectionName) {
-      const matched = validByLowerName.get(
-        existingCollectionName.toLowerCase(),
+      const matched = findBestExistingCollectionMatch(
+        existingCollectionName,
+        nonSessionCollections,
       );
       if (matched) {
         collectionId = matched.id;
@@ -205,9 +226,12 @@ export function parseNanoResponse(
     }
 
     if (!collectionId && idealCategory) {
-      const exactExisting = validByLowerName.get(idealCategory.toLowerCase());
-      if (exactExisting) {
-        collectionId = exactExisting.id;
+      const matchedExisting = findBestExistingCollectionMatch(
+        idealCategory,
+        nonSessionCollections,
+      );
+      if (matchedExisting) {
+        collectionId = matchedExisting.id;
       } else {
         suggestedNewCollection = idealCategory.slice(0, 48);
       }
@@ -216,8 +240,9 @@ export function parseNanoResponse(
     // Fallback support for legacy { matchType, collectionName } or { collectionId } shapes
     const rawCollectionName = cleanOptionalString(parsed.collectionName);
     if (rawCollectionName) {
-      const existingByName = validByLowerName.get(
-        rawCollectionName.toLowerCase(),
+      const existingByName = findBestExistingCollectionMatch(
+        rawCollectionName,
+        nonSessionCollections,
       );
       if (existingByName) {
         collectionId = existingByName.id;
@@ -236,11 +261,15 @@ export function parseNanoResponse(
       if (rawCollectionId) {
         collectionId = validById.has(rawCollectionId)
           ? rawCollectionId
-          : validByLowerName.get(rawCollectionId.toLowerCase())?.id;
+          : findBestExistingCollectionMatch(
+              rawCollectionId,
+              nonSessionCollections,
+            )?.id;
       }
       if (rawSuggestedNew) {
-        const existingMatch = validByLowerName.get(
-          rawSuggestedNew.toLowerCase(),
+        const existingMatch = findBestExistingCollectionMatch(
+          rawSuggestedNew,
+          nonSessionCollections,
         );
         if (existingMatch && !collectionId) {
           collectionId = existingMatch.id;
@@ -315,46 +344,97 @@ export async function downloadNanoModel(
   }
 }
 
-export async function categorizeWithNano(
-  target: CategorizationTarget,
-  collections: readonly Collection[],
-): Promise<CategorizationSuggestion | null> {
+export interface NanoCategorizerSession {
+  categorize: (
+    target: CategorizationTarget,
+    collections: readonly Collection[],
+    signal?: AbortSignal,
+  ) => Promise<CategorizationSuggestion | null>;
+  destroy: () => void;
+}
+
+/**
+ * Creates ONE reusable base LanguageModel session pre-warmed with few-shot
+ * instructions and deterministic sampling, cloning per link for fast, isolated
+ * batch categorization during Auto-Categorize triage.
+ */
+export async function createNanoCategorizerSession(
+  signal?: AbortSignal,
+): Promise<NanoCategorizerSession | null> {
+  if (signal?.aborted) return null;
   const lm = getLanguageModel();
   if (!lm) return null;
 
   const status = await checkNanoAvailability();
-  if (status !== 'available') {
+  if (status !== 'available') return null;
+
+  let baseSession: LanguageModelSession | null = null;
+  try {
+    const sampling = await resolveDeterministicSampling(lm);
+    baseSession = await lm.create({
+      ...NANO_AVAILABILITY_OPTIONS,
+      ...sampling,
+      signal,
+      initialPrompts: NANO_INITIAL_PROMPTS,
+    });
+  } catch {
+    baseSession?.destroy();
     return null;
   }
 
-  let session: LanguageModelSession | null = null;
+  let destroyed = false;
+  const destroy = () => {
+    if (destroyed) return;
+    destroyed = true;
+    baseSession?.destroy();
+    baseSession = null;
+  };
+
+  return {
+    async categorize(target, collections, itemSignal) {
+      if (destroyed || !baseSession || itemSignal?.aborted) return null;
+      let itemSession: LanguageModelSession | null = null;
+      let isClone = false;
+
+      try {
+        if (typeof baseSession.clone === 'function') {
+          itemSession = await baseSession.clone({ signal: itemSignal });
+          isClone = true;
+        } else {
+          itemSession = baseSession;
+        }
+
+        const rawText = await itemSession.prompt(
+          buildPayload(target, collections),
+          {
+            responseConstraint: NANO_RESPONSE_CONSTRAINT,
+            signal: itemSignal,
+          },
+        );
+        return parseNanoResponse(rawText, collections);
+      } catch {
+        return null;
+      } finally {
+        if (isClone) {
+          itemSession?.destroy();
+        }
+      }
+    },
+    destroy,
+  };
+}
+
+export async function categorizeWithNano(
+  target: CategorizationTarget,
+  collections: readonly Collection[],
+  signal?: AbortSignal,
+): Promise<CategorizationSuggestion | null> {
+  const session = await createNanoCategorizerSession(signal);
+  if (!session) return null;
+
   try {
-    session = await lm.create({
-      ...NANO_AVAILABILITY_OPTIONS,
-      initialPrompts: NANO_INITIAL_PROMPTS,
-    });
-
-    const payload = {
-      url: target.url,
-      title: target.title,
-      existingCollections: collections
-        .filter((col) => !col.isSession)
-        .map((col) => ({
-          name: col.name,
-          ...(col.description
-            ? { description: col.description.slice(0, 60) }
-            : {}),
-        })),
-    };
-
-    const rawText = await session.prompt(JSON.stringify(payload), {
-      responseConstraint: NANO_RESPONSE_CONSTRAINT,
-    });
-
-    return parseNanoResponse(rawText, collections);
-  } catch {
-    return null;
+    return await session.categorize(target, collections, signal);
   } finally {
-    session?.destroy();
+    session.destroy();
   }
 }
