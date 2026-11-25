@@ -139,4 +139,61 @@ describe('groupAndFilterCollections', () => {
       matchesSearchQuery(thirdLink, 'Electronics', 'is:starred esp32'),
     ).toBe(true);
   });
+
+  it('scopes collections and search to activeSpaceId by default, and spans all Spaces when searchAllSpaces is true', () => {
+    const [col0, col1] = collections;
+    expect(col0).toBeDefined();
+    expect(col1).toBeDefined();
+    if (!col0 || !col1) return;
+
+    const multiSpaceCols: Collection[] = [
+      { ...col0, spaceId: 'space-main' },
+      { ...col1, spaceId: 'space-reorders' },
+    ];
+
+    // Idle board shows only active Space
+    const mainIdle = groupAndFilterCollections(multiSpaceCols, links, '', {
+      activeSpaceId: 'space-main',
+      searchAllSpaces: false,
+    });
+    expect(mainIdle.map((g) => g.collection.id)).toEqual(['c1']);
+
+    // Default search (searchAllSpaces: false) stays inside active Space
+    const mainScopedSearch = groupAndFilterCollections(
+      multiSpaceCols,
+      links,
+      'esp32',
+      {
+        activeSpaceId: 'space-main',
+        searchAllSpaces: false,
+      },
+    );
+    expect(mainScopedSearch).toHaveLength(0);
+
+    // Idle board with searchAllSpaces: true still shows only active Space until a query/filter is active
+    const idleStillScoped = groupAndFilterCollections(
+      multiSpaceCols,
+      links,
+      '',
+      {
+        activeSpaceId: 'space-main',
+        searchAllSpaces: true,
+      },
+    );
+    expect(idleStillScoped.map((g) => g.collection.id)).toEqual(['c1']);
+
+    // Cross-Space search finds match in other Space when searchAllSpaces: true
+    const crossSpaceSearch = groupAndFilterCollections(
+      multiSpaceCols,
+      links,
+      'esp32',
+      {
+        activeSpaceId: 'space-main',
+        searchAllSpaces: true,
+      },
+    );
+    expect(crossSpaceSearch).toHaveLength(1);
+    expect(crossSpaceSearch[0]?.collection.id).toBe('c2');
+    expect(crossSpaceSearch[0]?.links.map((l) => l.id)).toEqual(['l2']);
+  });
 });

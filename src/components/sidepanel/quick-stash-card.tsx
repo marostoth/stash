@@ -2,7 +2,8 @@ import { BookmarkPlus, Check, Plus, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
+import { SpaceGroupedCollectionOptions } from '@/components/ui/space-grouped-collection-options';
 import { playDrop, playError } from '@/lib/audio/foley';
 import { categorizeLink } from '@/lib/categorizer/categorizer';
 import {
@@ -19,6 +20,7 @@ import {
   type CategorizationRule,
   type Collection,
   type LinkItem,
+  type Space,
   type StashSettings,
   TAB_GROUP_COLOR_SWATCH,
 } from '@/lib/types/stash';
@@ -28,6 +30,7 @@ import { extractDomain, getMonogram, parseTagsInput } from '@/lib/utils/url';
 interface QuickStashCardProps {
   activeTab: OpenTabInfo | null;
   loadingTab: boolean;
+  spaces: readonly Space[];
   collections: readonly Collection[];
   links: readonly LinkItem[];
   rules: readonly CategorizationRule[];
@@ -37,6 +40,7 @@ interface QuickStashCardProps {
 export function QuickStashCard({
   activeTab,
   loadingTab,
+  spaces,
   collections,
   links,
   rules,
@@ -269,32 +273,47 @@ export function QuickStashCard({
           ) : null}
         </div>
 
+        {spaces.length > 1 && orderedCollections.length > 0 ? (
+          <Select
+            aria-label="Target collection"
+            value={selectedCollectionId}
+            onChange={(e) => setSelectedCollectionId(e.target.value)}
+            className="h-8 text-xs"
+          >
+            <SpaceGroupedCollectionOptions
+              collections={orderedCollections}
+              spaces={spaces}
+            />
+          </Select>
+        ) : null}
+
         <div className="flex flex-wrap gap-1.5">
-          {orderedCollections.map((col) => {
-            const isSelected = col.id === selectedCollectionId;
-            return (
-              <button
-                key={col.id}
-                type="button"
-                onClick={() => setSelectedCollectionId(col.id)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-pill border px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer',
-                  isSelected
-                    ? 'border-accent bg-accent/15 text-fg ring-1 ring-accent/40'
-                    : 'border-border bg-canvas text-fg-muted hover:border-fg-muted/40 hover:text-fg',
-                )}
-              >
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{
-                    backgroundColor: TAB_GROUP_COLOR_SWATCH[col.color],
-                  }}
-                />
-                <span className="max-w-[130px] truncate">{col.name}</span>
-                {isSelected && <Check className="h-3 w-3 text-accent" />}
-              </button>
-            );
-          })}
+          {spaces.length <= 1 &&
+            orderedCollections.map((col) => {
+              const isSelected = col.id === selectedCollectionId;
+              return (
+                <button
+                  key={col.id}
+                  type="button"
+                  onClick={() => setSelectedCollectionId(col.id)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-pill border px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer',
+                    isSelected
+                      ? 'border-accent bg-accent/15 text-fg ring-1 ring-accent/40'
+                      : 'border-border bg-canvas text-fg-muted hover:border-fg-muted/40 hover:text-fg',
+                  )}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{
+                      backgroundColor: TAB_GROUP_COLOR_SWATCH[col.color],
+                    }}
+                  />
+                  <span className="max-w-[130px] truncate">{col.name}</span>
+                  {isSelected && <Check className="h-3 w-3 text-accent" />}
+                </button>
+              );
+            })}
 
           {suggestion?.suggestedNewCollection && (
             <button

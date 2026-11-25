@@ -70,6 +70,11 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
         label: 'Open Keyboard Shortcuts',
       },
       {
+        id: 'switch-space',
+        keys: ['1–9'],
+        label: 'Switch Space',
+      },
+      {
         id: 'starred-token',
         keys: ['is:starred'],
         label: 'Search token to show starred links only',

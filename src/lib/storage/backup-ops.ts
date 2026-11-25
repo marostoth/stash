@@ -10,6 +10,7 @@ import {
   linksStorage,
   rulesStorage,
   settingsStorage,
+  spacesStorage,
 } from '@/lib/storage/items';
 import type {
   SaveSessionResult,
@@ -50,6 +51,7 @@ export async function restoreBundleInStorage(
       : mergeBundleIntoSnapshot(current, bundle);
 
   await Promise.all([
+    spacesStorage.setValue(snapshot.spaces),
     collectionsStorage.setValue(snapshot.collections),
     linksStorage.setValue(snapshot.links),
     rulesStorage.setValue(snapshot.rules),
@@ -179,7 +181,12 @@ export async function deleteCustomThemeInStorage(id: string): Promise<boolean> {
 
 export async function saveSessionCollectionInStorage(
   tabs: readonly OpenTabInfo[],
-  options: { includePinned: boolean; name?: string; date?: Date },
+  options: {
+    includePinned: boolean;
+    name?: string;
+    date?: Date;
+    spaceId?: string;
+  },
 ): Promise<SaveSessionResult | null> {
   const closableTabs = selectEligibleTabsForClose(tabs, {
     includePinned: options.includePinned,
@@ -199,6 +206,7 @@ export async function saveSessionCollectionInStorage(
     id: crypto.randomUUID(),
     name: options.name?.trim() || formatSessionName(options.date),
     color: 'blue',
+    spaceId: options.spaceId,
     order: 0,
     collapsed: false,
     isSession: true,

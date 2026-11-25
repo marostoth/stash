@@ -1,5 +1,6 @@
 import {
   Check,
+  Globe,
   Palette,
   PanelRight,
   Plus,
@@ -30,6 +31,7 @@ interface TopBarProps {
   settings: StashSettings;
   totalLinks: number;
   starredCount: number;
+  spacesCount: number;
   openTabsCount: number;
 }
 
@@ -40,12 +42,15 @@ export function TopBar({
   settings,
   totalLinks,
   starredCount,
+  spacesCount,
   openTabsCount,
 }: TopBarProps) {
   const searchQuery = useUiStore((s) => s.searchQuery);
   const setSearchQuery = useUiStore((s) => s.setSearchQuery);
   const starredOnly = useUiStore((s) => s.starredOnly);
   const toggleStarredOnly = useUiStore((s) => s.toggleStarredOnly);
+  const searchAllSpaces = useUiStore((s) => s.searchAllSpaces);
+  const toggleSearchAllSpaces = useUiStore((s) => s.toggleSearchAllSpaces);
   const openCreateCollection = useUiStore((s) => s.openCreateCollection);
   const openSettings = useUiStore((s) => s.openSettings);
 
@@ -130,6 +135,33 @@ export function TopBar({
               </kbd>
             )}
           </div>
+
+          {spacesCount > 1 && (
+            <button
+              type="button"
+              onClick={toggleSearchAllSpaces}
+              aria-pressed={searchAllSpaces}
+              aria-label={
+                searchAllSpaces
+                  ? 'Search active Space only'
+                  : 'Search across all Spaces'
+              }
+              title={
+                searchAllSpaces
+                  ? 'Searching across all Spaces'
+                  : 'Search active Space only (click to search all Spaces)'
+              }
+              className={cn(
+                'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-control border px-2.5 text-xs font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+                searchAllSpaces
+                  ? 'border-accent/65 bg-accent/15 text-accent'
+                  : 'border-border bg-canvas text-fg-muted/80 hover:border-accent/45 hover:text-fg',
+              )}
+            >
+              <Globe className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">All Spaces</span>
+            </button>
+          )}
 
           {(starredCount > 0 || starredOnly) && (
             <button

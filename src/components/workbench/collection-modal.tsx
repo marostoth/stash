@@ -10,10 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
 import { autoAssignCollectionIconIfEmpty } from '@/lib/icons/auto-assign-icon';
 import { stashRepo } from '@/lib/storage/repo';
 import {
+  DEFAULT_SPACE_ID,
+  type Space,
   TAB_GROUP_COLOR_SWATCH,
   TAB_GROUP_COLORS,
   type TabGroupColor,
@@ -21,13 +23,22 @@ import {
 import { cn } from '@/lib/utils/cn';
 import { useUiStore } from '@/store/ui-store';
 
-export function CollectionModal() {
+interface CollectionModalProps {
+  spaces: readonly Space[];
+  activeSpaceId: string;
+}
+
+export function CollectionModal({
+  spaces,
+  activeSpaceId,
+}: CollectionModalProps) {
   const modal = useUiStore((s) => s.collectionModal);
   const closeCollectionModal = useUiStore((s) => s.closeCollectionModal);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState<TabGroupColor>('green');
+  const [spaceId, setSpaceId] = useState(DEFAULT_SPACE_ID);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const isEdit = modal?.mode === 'edit';
@@ -35,16 +46,19 @@ export function CollectionModal() {
   useEffect(() => {
     if (!modal) return;
     setConfirmDelete(false);
+    const fallbackSpace = spaces[0]?.id ?? DEFAULT_SPACE_ID;
     if (modal.mode === 'edit') {
       setName(modal.collection.name);
       setDescription(modal.collection.description ?? '');
       setColor(modal.collection.color);
+      setSpaceId(modal.collection.spaceId ?? fallbackSpace);
     } else {
       setName('');
       setDescription('');
       setColor('green');
+      setSpaceId(activeSpaceId || fallbackSpace);
     }
-  }, [modal]);
+  }, [modal, spaces, activeSpaceId]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -56,6 +70,7 @@ export function CollectionModal() {
         name: trimmed,
         description,
         color,
+        ...(spaces.length > 1 ? { spaceId } : {}),
       });
       toast.success(`Updated "${trimmed}"`);
     } else {
@@ -63,6 +78,7 @@ export function CollectionModal() {
         name: trimmed,
         description,
         color,
+        spaceId,
       });
       toast.success(`Created "${trimmed}"`);
       void autoAssignCollectionIconIfEmpty(created.id, created.name);
@@ -133,6 +149,28 @@ export function CollectionModal() {
               placeholder="Short context for this group of links"
             />
           </div>
+
+          {spaces.length > 1 && (
+            <div className="space-y-1.5">
+              <label
+                htmlFor="collection-space"
+                className="block text-xs font-medium text-fg"
+              >
+                Space
+              </label>
+              <Select
+                id="collection-space"
+                value={spaceId}
+                onChange={(e) => setSpaceId(e.target.value)}
+              >
+                {spaces.map((space) => (
+                  <option key={space.id} value={space.id}>
+                    {space.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <span className="block text-xs font-medium text-fg">

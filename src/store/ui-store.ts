@@ -1,5 +1,34 @@
 import { create } from 'zustand';
-import type { Collection, LinkItem } from '@/lib/types/stash';
+import { stashRepo } from '@/lib/storage/repo';
+import {
+  type Collection,
+  DEFAULT_SPACE_ID,
+  type LinkItem,
+} from '@/lib/types/stash';
+
+const ACTIVE_SPACE_LOCAL_KEY = 'stash_active_space_id';
+
+function readInitialActiveSpaceId(): string {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const saved = window.localStorage.getItem(ACTIVE_SPACE_LOCAL_KEY);
+      if (saved?.trim()) return saved.trim();
+    }
+  } catch {
+    // Ignore storage access errors in restricted contexts
+  }
+  return DEFAULT_SPACE_ID;
+}
+
+function writeLocalActiveSpaceId(spaceId: string): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(ACTIVE_SPACE_LOCAL_KEY, spaceId);
+    }
+  } catch {
+    // Ignore storage access errors
+  }
+}
 
 export type SettingsTab =
   | 'general'
@@ -40,8 +69,10 @@ export interface PreviewTarget {
 }
 
 interface UiStoreState {
+  activeSpaceId: string;
   searchQuery: string;
   starredOnly: boolean;
+  searchAllSpaces: boolean;
   keyboardFocusedLinkId: string | null;
   collectionModal: CollectionModalState;
   linkModal: LinkModalState;
@@ -57,9 +88,12 @@ interface UiStoreState {
   cascadingCollectionIds: string[];
   hoveredPreviewCandidate: PreviewTarget | null;
   activePreview: PreviewTarget | null;
+  setActiveSpaceId: (spaceId: string, persist?: boolean) => void;
   setSearchQuery: (query: string) => void;
   setStarredOnly: (starredOnly: boolean) => void;
   toggleStarredOnly: () => void;
+  setSearchAllSpaces: (allSpaces: boolean) => void;
+  toggleSearchAllSpaces: () => void;
   setKeyboardFocusedLinkId: (linkId: string | null) => void;
   openCreateCollection: () => void;
   openEditCollection: (collection: Collection) => void;
@@ -103,8 +137,10 @@ function clearPreviewTimer(): void {
 }
 
 export const useUiStore = create<UiStoreState>((set) => ({
+  activeSpaceId: readInitialActiveSpaceId(),
   searchQuery: '',
   starredOnly: false,
+  searchAllSpaces: false,
   keyboardFocusedLinkId: null,
   collectionModal: null,
   linkModal: null,
@@ -121,6 +157,14 @@ export const useUiStore = create<UiStoreState>((set) => ({
   hoveredPreviewCandidate: null,
   activePreview: null,
 
+  setActiveSpaceId: (spaceId, persist = true) => {
+    const trimmed = spaceId.trim() || DEFAULT_SPACE_ID;
+    writeLocalActiveSpaceId(trimmed);
+    if (persist) {
+      void stashRepo.setActiveSpaceId(trimmed).catch(() => undefined);
+    }
+    set({ activeSpaceId: trimmed, keyboardFocusedLinkId: null });
+  },
   setSearchQuery: (query) =>
     set({ searchQuery: query, keyboardFocusedLinkId: null }),
   setStarredOnly: (starredOnly) =>
@@ -128,6 +172,13 @@ export const useUiStore = create<UiStoreState>((set) => ({
   toggleStarredOnly: () =>
     set((state) => ({
       starredOnly: !state.starredOnly,
+      keyboardFocusedLinkId: null,
+    })),
+  setSearchAllSpaces: (allSpaces) =>
+    set({ searchAllSpaces: allSpaces, keyboardFocusedLinkId: null }),
+  toggleSearchAllSpaces: () =>
+    set((state) => ({
+      searchAllSpaces: !state.searchAllSpaces,
       keyboardFocusedLinkId: null,
     })),
   setKeyboardFocusedLinkId: (linkId) => set({ keyboardFocusedLinkId: linkId }),

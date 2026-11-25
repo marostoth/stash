@@ -167,4 +167,44 @@ describe('omnibox-handler pure helpers', () => {
     );
     expect(results[0]?.content).toBe('https://beta.dev/guide');
   });
+
+  it('appends XML-escaped Space name in <dim> when multiple Spaces exist', () => {
+    const firstCol = collections[0];
+    const starredLink = links[2];
+    expect(firstCol).toBeDefined();
+    expect(starredLink).toBeDefined();
+    if (!firstCol || !starredLink) return;
+
+    const multiCols: Collection[] = [
+      { ...firstCol, spaceId: 'space-reorders' },
+    ];
+    const spaces = [
+      {
+        id: 'space-main',
+        name: 'Main',
+        order: 0,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      {
+        id: 'space-reorders',
+        name: 'Home & Reorders',
+        order: 1,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    ];
+
+    const results = rankAndBuildOmniboxSuggestions(
+      multiCols,
+      [starredLink],
+      'trading',
+      6,
+      spaces,
+    );
+    expect(results[0]?.description).toContain('Home &amp; Reorders');
+    expect(results[0]?.description).not.toMatch(
+      /&(?!amp;|lt;|gt;|quot;|apos;)/,
+    );
+  });
 });

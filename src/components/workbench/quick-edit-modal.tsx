@@ -11,20 +11,22 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input, Select, Textarea } from '@/components/ui/input';
+import { SpaceGroupedCollectionOptions } from '@/components/ui/space-grouped-collection-options';
 import { Switch } from '@/components/ui/switch';
 import { playDrop, playError } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
 import { triggerAutoTagSingleLink } from '@/lib/tagging/trigger-auto-tag';
-import type { Collection } from '@/lib/types/stash';
+import type { Collection, Space } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 import { normalizeInputUrl, parseTagsInput } from '@/lib/utils/url';
 import { useUiStore } from '@/store/ui-store';
 
 interface QuickEditModalProps {
   collections: readonly Collection[];
+  spaces: readonly Space[];
 }
 
-export function QuickEditModal({ collections }: QuickEditModalProps) {
+export function QuickEditModal({ collections, spaces }: QuickEditModalProps) {
   const modal = useUiStore((s) => s.linkModal);
   const closeLinkModal = useUiStore((s) => s.closeLinkModal);
   const pulseLink = useUiStore((s) => s.pulseLink);
@@ -274,11 +276,10 @@ export function QuickEditModal({ collections }: QuickEditModalProps) {
               onChange={(e) => setCollectionId(e.target.value)}
               required
             >
-              {collections.map((col) => (
-                <option key={col.id} value={col.id}>
-                  {col.name}
-                </option>
-              ))}
+              <SpaceGroupedCollectionOptions
+                collections={collections}
+                spaces={spaces}
+              />
             </Select>
           </div>
 

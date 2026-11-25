@@ -1,7 +1,15 @@
-import type { Collection, LinkItem } from '@/lib/types/stash';
+import {
+  type Collection,
+  DEFAULT_SPACE_ID,
+  type LinkItem,
+} from '@/lib/types/stash';
 
 export interface SearchFilterOptions {
   starredOnly?: boolean;
+  /** When provided, restricts board/search to this Space unless `searchAllSpaces` is active with a query/filter. */
+  activeSpaceId?: string;
+  /** Opt-in cross-Space search when a query or `starredOnly` filter is active. Defaults to `false`. */
+  searchAllSpaces?: boolean;
 }
 
 interface ParsedSearchFilter {
@@ -64,6 +72,16 @@ export function groupAndFilterCollections(
 ): FilteredCollectionGroup[] {
   const { requireStarred, textTerms } = parseSearchFilter(rawQuery, options);
   const hasFilter = requireStarred || textTerms.length > 0;
+  const activeSpaceId = options?.activeSpaceId;
+  const spanAllSpaces = Boolean(options?.searchAllSpaces) && hasFilter;
+
+  const scopedCollections =
+    activeSpaceId && !spanAllSpaces
+      ? collections.filter(
+          (col) => (col.spaceId ?? DEFAULT_SPACE_ID) === activeSpaceId,
+        )
+      : collections;
+
   const linksByCollection = new Map<string, LinkItem[]>();
 
   for (const link of links) {
@@ -77,7 +95,7 @@ export function groupAndFilterCollections(
 
   const normalizedCollectionQuery = textTerms.join(' ');
   const groups: FilteredCollectionGroup[] = [];
-  for (const collection of collections) {
+  for (const collection of scopedCollections) {
     const collectionLinks = (linksByCollection.get(collection.id) ?? []).sort(
       (a, b) => a.order - b.order,
     );

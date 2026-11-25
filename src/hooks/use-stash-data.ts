@@ -9,14 +9,18 @@ import {
 import {
   type CategorizationRule,
   type Collection,
+  createDefaultSpace,
   DEFAULT_SETTINGS,
   type LinkItem,
+  type Space,
   type StashSettings,
   type ThemeDefinition,
 } from '@/lib/types/stash';
+import { useUiStore } from '@/store/ui-store';
 
 export interface StashDataState {
   loading: boolean;
+  spaces: Space[];
   collections: Collection[];
   links: LinkItem[];
   rules: CategorizationRule[];
@@ -28,6 +32,7 @@ export interface StashDataState {
 
 export function useStashData(): StashDataState {
   const [loading, setLoading] = useState(true);
+  const [spaces, setSpaces] = useState<Space[]>(() => [createDefaultSpace()]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [rules, setRules] = useState<CategorizationRule[]>([]);
@@ -37,15 +42,16 @@ export function useStashData(): StashDataState {
   useEffect(() => {
     let active = true;
 
-    stashRepo
-      .getSnapshot()
-      .then((snapshot) => {
+    Promise.all([stashRepo.getSnapshot(), stashRepo.getActiveSpaceId()])
+      .then(([snapshot, storedActiveSpaceId]) => {
         if (!active) return;
+        setSpaces(snapshot.spaces);
         setCollections(snapshot.collections);
         setLinks(snapshot.links);
         setRules(snapshot.rules);
         setSettings(snapshot.settings);
         setCustomThemes(snapshot.customThemes);
+        useUiStore.getState().setActiveSpaceId(storedActiveSpaceId, false);
         setLoading(false);
       })
       .catch((error: unknown) => {
@@ -53,6 +59,19 @@ export function useStashData(): StashDataState {
         if (active) setLoading(false);
       });
 
+    const unwatchSpaces = stashRepo.watchSpaces((nextSpaces) => {
+      setSpaces(nextSpaces);
+      const currentActive = useUiStore.getState().activeSpaceId;
+      if (
+        nextSpaces.length > 0 &&
+        !nextSpaces.some((s) => s.id === currentActive)
+      ) {
+        const fallback = nextSpaces[0];
+        if (fallback) {
+          useUiStore.getState().setActiveSpaceId(fallback.id, false);
+        }
+      }
+    });
     const unwatchCollections = stashRepo.watchCollections(setCollections);
     const unwatchLinks = stashRepo.watchLinks(setLinks);
     const unwatchRules = stashRepo.watchRules(setRules);
@@ -61,6 +80,7 @@ export function useStashData(): StashDataState {
 
     return () => {
       active = false;
+      unwatchSpaces();
       unwatchCollections();
       unwatchLinks();
       unwatchRules();
@@ -90,6 +110,7 @@ export function useStashData(): StashDataState {
 
   return {
     loading,
+    spaces,
     collections,
     links,
     rules,

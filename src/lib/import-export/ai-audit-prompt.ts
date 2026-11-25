@@ -1,11 +1,12 @@
 import { CATALOG_ICON_KEYS } from '@/lib/icons/catalog';
-import { TAB_GROUP_COLORS } from '@/lib/types/stash';
+import { type Space, TAB_GROUP_COLORS } from '@/lib/types/stash';
 
 export type AiAuditPromptMode = 'audit' | 'reorganize';
 
 export interface AiAuditLibraryStats {
   linkCount: number;
   collectionCount: number;
+  spaces?: readonly Space[];
 }
 
 /**
@@ -18,11 +19,19 @@ export function buildAiAuditPrompt(
 ): string {
   const validColors = TAB_GROUP_COLORS.join(', ');
   const validIcons = CATALOG_ICON_KEYS.join(', ');
+  const multiSpace = (stats.spaces?.length ?? 0) > 1;
+  const spacesSummary = multiSpace
+    ? (stats.spaces ?? []).map((s) => `"${s.name}" (id: "${s.id}")`).join(', ')
+    : '';
+
+  const libraryScopeText = multiSpace
+    ? `${stats.linkCount} links across ${stats.collectionCount} collections and ${stats.spaces?.length ?? 0} Spaces (${spacesSummary})`
+    : `${stats.linkCount} links across ${stats.collectionCount} collections`;
 
   const header =
     mode === 'audit'
-      ? `You are auditing my Stash bookmark library (${stats.linkCount} links across ${stats.collectionCount} collections) from the attached Stash JSON backup.`
-      : `You are reorganizing my Stash bookmark library (${stats.linkCount} links across ${stats.collectionCount} collections) from the attached Stash JSON backup — keeping 100% of my links.`;
+      ? `You are auditing my Stash bookmark library (${libraryScopeText}) from the attached Stash JSON backup.`
+      : `You are reorganizing my Stash bookmark library (${libraryScopeText}) from the attached Stash JSON backup — keeping 100% of my links.`;
 
   const stepOne =
     mode === 'audit'
@@ -46,12 +55,21 @@ export function buildAiAuditPrompt(
           'End Step 1 by asking me to confirm the proposed collections and changes. **Do NOT output the final JSON until I confirm.**',
         ].join('\n');
 
+  const spacesContractLines = multiSpace
+    ? [
+        `- **Spaces & \`collection.spaceId\`:** Preserve the top-level \`"spaces"\` array (\`id\`, \`name\`, \`icon\`, \`order\`, optional \`densityOverride\`) and keep every \`collection.spaceId\` mapped to a valid Space ID (${spacesSummary}) unless I approve moving a collection between Spaces.`,
+      ]
+    : [];
+
   const stepTwo = [
     '## Step 2 — Final Stash Backup JSON (after I confirm)',
     'Output a single, clean, valid JSON file ready for **Stash -> Settings -> Backup & Import -> Import JSON Backup -> Replace All**.',
     '',
     '### Strict Stash `schemaVersion: 1` Contract',
-    '- Top-level keys MUST be: `"app": "stash"`, `"schemaVersion": 1`, `"exportedAt"` (ISO-8601 string), `"collections"`, `"links"`, `"rules"`, `"settings"`, `"customThemes"`.',
+    multiSpace
+      ? '- Top-level keys MUST be: `"app": "stash"`, `"schemaVersion": 1`, `"exportedAt"` (ISO-8601 string), `"spaces"`, `"collections"`, `"links"`, `"rules"`, `"settings"`, `"customThemes"`.'
+      : '- Top-level keys MUST be: `"app": "stash"`, `"schemaVersion": 1`, `"exportedAt"` (ISO-8601 string), `"collections"`, `"links"`, `"rules"`, `"settings"`, `"customThemes"`.',
+    ...spacesContractLines,
     '- **Preserve existing data:** Keep original `id` values on all retained collections and links, and strictly preserve `starred`, `faviconUrl`, `createdAt`, `rules`, `settings`, and `customThemes` untouched.',
     '- **Valid `collection.color` values (use ONLY these):**',
     `  \`${validColors}\``,

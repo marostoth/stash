@@ -14,13 +14,19 @@ import {
   useReorganizeWorkflow,
   type WizardStep,
 } from '@/hooks/use-reorganize-workflow';
-import type { Collection, LinkItem, StashSettings } from '@/lib/types/stash';
+import type {
+  Collection,
+  LinkItem,
+  Space,
+  StashSettings,
+} from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 
 interface ReorganizeModalProps {
   collections: readonly Collection[];
   links: readonly LinkItem[];
   settings: StashSettings;
+  activeSpace?: Space;
 }
 
 const STEP_LABELS: ReadonlyArray<{ id: WizardStep; label: string }> = [
@@ -34,8 +40,9 @@ export function ReorganizeModal({
   collections,
   links,
   settings,
+  activeSpace,
 }: ReorganizeModalProps) {
-  const wf = useReorganizeWorkflow(collections, links, settings);
+  const wf = useReorganizeWorkflow(collections, links, settings, activeSpace);
 
   return (
     <Dialog
@@ -46,9 +53,14 @@ export function ReorganizeModal({
     >
       <DialogContent className="flex max-h-[88vh] w-[min(95vw,760px)] flex-col overflow-hidden">
         <DialogHeader className="mb-3 shrink-0">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Sparkles className="h-4 w-4 text-accent" />
             <DialogTitle>Smart Reorganize (On-Device AI)</DialogTitle>
+            {activeSpace && (
+              <span className="rounded-pill border border-accent/40 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent">
+                Reorganizing Space: {activeSpace.name}
+              </span>
+            )}
           </div>
           <DialogDescription>
             2-pass Gemini Nano workflow with a human category checkpoint, full
@@ -78,9 +90,9 @@ export function ReorganizeModal({
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           {wf.step === 'scope' ? (
             <ScopeStep
-              collections={collections}
+              collections={wf.spaceCollections}
               linkCountByCollection={wf.linkCountByCollection}
-              totalLinksCount={links.length}
+              totalLinksCount={wf.spaceLinksCount}
               mode={wf.mode}
               selectedCollectionIds={wf.selectedCollectionIds}
               removeEmptySources={wf.removeEmptySources}
@@ -101,7 +113,7 @@ export function ReorganizeModal({
               }
               onSelectAllCollections={() =>
                 wf.setSelectedCollectionIds(
-                  new Set(collections.map((c) => c.id)),
+                  new Set(wf.spaceCollections.map((c) => c.id)),
                 )
               }
               onClearCollections={() => wf.setSelectedCollectionIds(new Set())}

@@ -2,8 +2,9 @@ import { Check, RotateCcw, Trash2, X } from 'lucide-react';
 import { LinkFavicon } from '@/components/LinkFavicon';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
+import { SpaceGroupedCollectionOptions } from '@/components/ui/space-grouped-collection-options';
 import type { CategorizationSuggestion } from '@/lib/categorizer/types';
-import type { Collection, LinkItem } from '@/lib/types/stash';
+import type { Collection, LinkItem, Space } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 import { extractDomain } from '@/lib/utils/url';
 
@@ -18,6 +19,7 @@ export interface TriageRowCardProps {
   customDraft: string;
   availableNewCategories: readonly string[];
   destinationCollections: readonly Collection[];
+  spaces: readonly Space[];
   onChangeCustomDraft: (value: string) => void;
   onCommitCustomCategory: () => void;
   onCancelCustomCategory: () => void;
@@ -36,6 +38,7 @@ export function TriageRowCard({
   customDraft,
   availableNewCategories,
   destinationCollections,
+  spaces,
   onChangeCustomDraft,
   onCommitCustomCategory,
   onCancelCustomCategory,
@@ -166,11 +169,10 @@ export function TriageRowCard({
                   + Create &ldquo;{name}&rdquo;
                 </option>
               ))}
-              {destinationCollections.map((col) => (
-                <option key={col.id} value={col.id}>
-                  {col.name}
-                </option>
-              ))}
+              <SpaceGroupedCollectionOptions
+                collections={destinationCollections}
+                spaces={spaces}
+              />
               <option value={createCustomSentinel}>
                 + Custom new category...
               </option>

@@ -9,7 +9,12 @@ import {
 } from '@/lib/import-export/bundle';
 import { stashRepo } from '@/lib/storage/repo';
 import { OSCILLOSCOPE_THEME } from '@/lib/themes/built-in-themes';
-import { DEFAULT_SETTINGS, type StashExportBundle } from '@/lib/types/stash';
+import {
+  createDefaultSpace,
+  DEFAULT_SETTINGS,
+  DEFAULT_SPACE_ID,
+  type StashExportBundle,
+} from '@/lib/types/stash';
 
 const NOW = '2026-11-25T11:30:00.000Z';
 
@@ -126,6 +131,7 @@ describe('StashExportBundle validation & restore', () => {
     if (!firstCol) return;
 
     const current = {
+      spaces: [createDefaultSpace(NOW)],
       collections: [firstCol],
       links: [
         {
@@ -212,5 +218,63 @@ describe('StashExportBundle validation & restore', () => {
       reExported.links.find((l) => l.id === 'link-2')?.starred,
     ).toBeUndefined();
     expect(reExported.settings.density).toBe('micro');
+  });
+
+  it('migrates legacy schemaVersion 1 JSON without spaces/spaceId to Main and round-trips multi-Space backups', async () => {
+    // Legacy bundle has no `spaces` array and collections have no `spaceId`
+    const legacyRaw = makeValidBundle();
+    const validatedLegacy = validateExportBundle(legacyRaw);
+    expect(validatedLegacy.ok).toBe(true);
+    if (!validatedLegacy.ok) return;
+
+    expect(validatedLegacy.bundle.spaces).toHaveLength(1);
+    expect(validatedLegacy.bundle.spaces?.[0]?.id).toBe(DEFAULT_SPACE_ID);
+    expect(validatedLegacy.bundle.spaces?.[0]?.name).toBe('Main');
+    expect(
+      validatedLegacy.bundle.collections.every(
+        (c) => c.spaceId === DEFAULT_SPACE_ID,
+      ),
+    ).toBe(true);
+
+    // Multi-Space modern backup round-trip
+    const reordersSpace = {
+      id: 'space-reorders',
+      name: 'Reorders',
+      icon: 'shopping-bag',
+      order: 1,
+      densityOverride: 'micro' as const,
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+    const [col0, col1] = legacyRaw.collections;
+    expect(col0).toBeDefined();
+    expect(col1).toBeDefined();
+    if (!col0 || !col1) return;
+
+    const multiSpaceIncoming: StashExportBundle = {
+      ...makeValidBundle(),
+      spaces: [createDefaultSpace(NOW), reordersSpace],
+      collections: [
+        { ...col0, spaceId: DEFAULT_SPACE_ID },
+        { ...col1, spaceId: reordersSpace.id },
+      ],
+    };
+
+    const validatedMulti = validateExportBundle(multiSpaceIncoming);
+    expect(validatedMulti.ok).toBe(true);
+    if (!validatedMulti.ok) return;
+
+    await stashRepo.restoreBundle(validatedMulti.bundle, 'replace');
+    const restored = await stashRepo.getSnapshot();
+    const reExported = buildExportBundle(restored, NOW);
+
+    expect(reExported.spaces?.map((s) => s.id)).toEqual([
+      DEFAULT_SPACE_ID,
+      'space-reorders',
+    ]);
+    expect(reExported.spaces?.[1]?.densityOverride).toBe('micro');
+    expect(reExported.collections.find((c) => c.id === 'col-2')?.spaceId).toBe(
+      'space-reorders',
+    );
   });
 });

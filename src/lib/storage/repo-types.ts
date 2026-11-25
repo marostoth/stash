@@ -1,13 +1,34 @@
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
 import type {
+  CardDensity,
   CategorizationRule,
   Collection,
   CollectionViewMode,
   LinkItem,
+  Space,
   StashSettings,
   TabGroupColor,
   ThemeDefinition,
 } from '@/lib/types/stash';
+
+export interface CreateSpaceInput {
+  name: string;
+  icon?: string;
+  densityOverride?: CardDensity;
+}
+
+export interface UpdateSpaceInput {
+  name?: string;
+  icon?: string | null;
+  order?: number;
+  densityOverride?: CardDensity | null;
+}
+
+export interface DeleteSpaceResult {
+  deleted: boolean;
+  migratedCollections: number;
+  fallbackSpaceId: string | null;
+}
 
 export interface CreateCollectionInput {
   name: string;
@@ -16,6 +37,7 @@ export interface CreateCollectionInput {
   tintColor?: string;
   icon?: string;
   viewMode?: CollectionViewMode;
+  spaceId?: string;
   isSession?: boolean;
 }
 
@@ -26,6 +48,7 @@ export interface UpdateCollectionInput {
   tintColor?: string | null;
   icon?: string | null;
   viewMode?: CollectionViewMode;
+  spaceId?: string;
   collapsed?: boolean;
   order?: number;
 }
@@ -75,6 +98,7 @@ export interface SaveSessionResult {
 }
 
 export interface StashSnapshot {
+  spaces: Space[];
   collections: Collection[];
   links: LinkItem[];
   rules: CategorizationRule[];

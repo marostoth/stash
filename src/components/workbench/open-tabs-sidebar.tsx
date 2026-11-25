@@ -44,6 +44,7 @@ interface OpenTabsSidebarProps {
   regularTabs: readonly OpenTabInfo[];
   clearableCount: number;
   collections: readonly Collection[];
+  activeSpaceId: string;
   settings: StashSettings;
   onQuickStashTab: (tab: OpenTabInfo, collectionId: string) => Promise<void>;
 }
@@ -229,6 +230,7 @@ export function OpenTabsSidebar({
   regularTabs,
   clearableCount,
   collections,
+  activeSpaceId,
   settings,
   onQuickStashTab,
 }: OpenTabsSidebarProps) {
@@ -252,6 +254,7 @@ export function OpenTabsSidebar({
     try {
       const saved = await stashRepo.saveSessionCollection(tabs, {
         includePinned: settings.includePinnedInSessions,
+        spaceId: activeSpaceId,
       });
       if (!saved) {
         toast.info('No stashable open tabs to save.');

@@ -29,17 +29,23 @@ import {
   triggerFileDownload,
 } from '@/lib/import-export/chrome-bookmarks';
 import { stashRepo } from '@/lib/storage/repo';
-import type { StashExportBundle, StashSettings } from '@/lib/types/stash';
+import type {
+  Space,
+  StashExportBundle,
+  StashSettings,
+} from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 
 interface BackupImportPanelProps {
   settings: StashSettings;
+  spaces: readonly Space[];
   linkCount: number;
   collectionCount: number;
 }
 
 export function BackupImportPanel({
   settings,
+  spaces,
   linkCount,
   collectionCount,
 }: BackupImportPanelProps) {
@@ -81,6 +87,7 @@ export function BackupImportPanel({
     const prompt = buildAiAuditPrompt(promptMode, {
       linkCount,
       collectionCount,
+      spaces,
     });
     try {
       await navigator.clipboard.writeText(prompt);

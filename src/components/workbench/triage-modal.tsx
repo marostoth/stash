@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Select } from '@/components/ui/input';
+import { SpaceGroupedCollectionOptions } from '@/components/ui/space-grouped-collection-options';
 import { TriageRowCard } from '@/components/workbench/triage-row-card';
 import {
   TRIAGE_CREATE_CUSTOM_SENTINEL,
@@ -21,10 +22,12 @@ import type {
   CategorizationRule,
   Collection,
   LinkItem,
+  Space,
   StashSettings,
 } from '@/lib/types/stash';
 
 interface TriageModalProps {
+  spaces: readonly Space[];
   collections: readonly Collection[];
   links: readonly LinkItem[];
   rules: readonly CategorizationRule[];
@@ -32,6 +35,7 @@ interface TriageModalProps {
 }
 
 export function TriageModal({
+  spaces,
   collections,
   links,
   rules,
@@ -76,11 +80,10 @@ export function TriageModal({
                 <option value={TRIAGE_DELETE_SENTINEL}>
                   Delete from session
                 </option>
-                {wf.destinationCollections.map((col) => (
-                  <option key={col.id} value={col.id}>
-                    {col.name}
-                  </option>
-                ))}
+                <SpaceGroupedCollectionOptions
+                  collections={wf.destinationCollections}
+                  spaces={spaces}
+                />
                 {wf.availableNewCategories.map((name) => (
                   <option key={name} value={`${TRIAGE_NEW_PREFIX}${name}`}>
                     + Create &ldquo;{name}&rdquo;
@@ -140,6 +143,7 @@ export function TriageModal({
                 customDraft={wf.customDraft}
                 availableNewCategories={wf.availableNewCategories}
                 destinationCollections={wf.destinationCollections}
+                spaces={spaces}
                 onChangeCustomDraft={wf.setCustomDraft}
                 onCommitCustomCategory={() => wf.commitCustomCategory(link.id)}
                 onCancelCustomCategory={() => wf.setEditingCustomRowId(null)}

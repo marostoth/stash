@@ -41,6 +41,35 @@ describe('buildAiAuditPrompt', () => {
     expect(prompt).toContain('"schemaVersion": 1');
     expect(prompt).toContain(TAB_GROUP_COLORS.join(', '));
   });
+
+  it('includes spaces array and collection.spaceId rules when multiple Spaces exist', () => {
+    const prompt = buildAiAuditPrompt('audit', {
+      linkCount: 90,
+      collectionCount: 6,
+      spaces: [
+        {
+          id: 'space-main',
+          name: 'Main',
+          icon: 'layers',
+          order: 0,
+          createdAt: '2026-11-25T10:00:00.000Z',
+          updatedAt: '2026-11-25T10:00:00.000Z',
+        },
+        {
+          id: 'space-reorders',
+          name: 'Reorders',
+          icon: 'shopping-bag',
+          order: 1,
+          createdAt: '2026-11-25T10:00:00.000Z',
+          updatedAt: '2026-11-25T10:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(prompt).toContain('"spaces"');
+    expect(prompt).toContain('collection.spaceId');
+    expect(prompt).toContain('"Reorders" (id: "space-reorders")');
+  });
 });
 
 describe('getBackupStaleness', () => {

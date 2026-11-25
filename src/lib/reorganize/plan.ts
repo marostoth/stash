@@ -5,6 +5,7 @@ import {
 } from '@/lib/reorganize/digest';
 import {
   type Collection,
+  DEFAULT_SPACE_ID,
   type LinkItem,
   TAB_GROUP_COLORS,
 } from '@/lib/types/stash';
@@ -43,6 +44,7 @@ export interface ReorganizePlanResult {
 export interface BuildPlanOptions {
   nowIso?: string;
   createId?: () => string;
+  spaceId?: string;
 }
 
 function normalizeNameKey(name: string): string {
@@ -144,6 +146,7 @@ export function buildReorganizationPlan(
       description: description?.trim() || undefined,
       icon: validIcon,
       color,
+      ...(options.spaceId ? { spaceId: options.spaceId } : {}),
       order: workingCollections.length,
       collapsed: false,
       createdAt: nowIso,
@@ -265,5 +268,31 @@ export function buildReorganizationPlan(
       targetCollectionsCount: populatedTargetIds.size,
       uncategorizedCount,
     },
+  };
+}
+
+/**
+ * Merges a Space-scoped reorganization result back into the full board state,
+ * leaving collections and links from every other Space completely untouched.
+ */
+export function mergeSpaceReorganization(
+  allCollections: readonly Collection[],
+  allLinks: readonly LinkItem[],
+  activeSpaceId: string,
+  spaceNextState: LibraryBoardState,
+): LibraryBoardState {
+  const otherCollections = allCollections.filter(
+    (col) => (col.spaceId ?? DEFAULT_SPACE_ID) !== activeSpaceId,
+  );
+  const otherCollectionIds = new Set(otherCollections.map((c) => c.id));
+  const otherLinks = allLinks.filter((link) =>
+    otherCollectionIds.has(link.collectionId),
+  );
+
+  return {
+    collections: [...otherCollections, ...spaceNextState.collections].map(
+      (col, idx) => ({ ...col, order: idx }),
+    ),
+    links: [...otherLinks, ...spaceNextState.links],
   };
 }

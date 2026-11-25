@@ -3,8 +3,13 @@ import {
   parseLink,
   parseRule,
   parseSettings,
+  parseSpace,
 } from '@/lib/import-export/bundle-parsers';
 import type { StashSnapshot } from '@/lib/storage/repo-types';
+import {
+  ensureSpacesList,
+  normalizeCollectionsSpaceIds,
+} from '@/lib/storage/spaces-ops';
 import { BUILT_IN_THEMES } from '@/lib/themes/built-in-themes';
 import {
   normalizeImportedCustomTheme,
@@ -15,6 +20,7 @@ import {
   type Collection,
   DEFAULT_SETTINGS,
   type LinkItem,
+  type Space,
   type StashExportBundle,
   type ThemeDefinition,
 } from '@/lib/types/stash';
@@ -40,11 +46,13 @@ export function buildExportBundle(
   snapshot: StashSnapshot,
   exportedAt: string = new Date().toISOString(),
 ): StashExportBundle {
+  const spaces = ensureSpacesList(snapshot.spaces, exportedAt);
   return {
     app: 'stash',
     schemaVersion: 1,
     exportedAt,
-    collections: sortByOrder(snapshot.collections),
+    spaces,
+    collections: normalizeCollectionsSpaceIds(snapshot.collections, spaces),
     links: sortByOrder(snapshot.links),
     rules: snapshot.rules,
     settings: { ...DEFAULT_SETTINGS, ...snapshot.settings },
@@ -83,14 +91,32 @@ export function validateExportBundle(raw: unknown): BundleValidationResult {
     };
   }
 
-  const collections: Collection[] = [];
+  const rawSpaces: Space[] = [];
+  if (Array.isArray(obj.spaces)) {
+    const seenSpaceIds = new Set<string>();
+    for (let i = 0; i < obj.spaces.length; i++) {
+      const parsed = parseSpace(obj.spaces[i], i);
+      if (parsed && !seenSpaceIds.has(parsed.id)) {
+        seenSpaceIds.add(parsed.id);
+        rawSpaces.push(parsed);
+      }
+    }
+  }
+  const exportedAt =
+    typeof obj.exportedAt === 'string'
+      ? obj.exportedAt
+      : new Date().toISOString();
+  const spaces = ensureSpacesList(rawSpaces, exportedAt);
+
+  const rawCollections: Collection[] = [];
   for (let i = 0; i < obj.collections.length; i++) {
     const parsed = parseCollection(obj.collections[i], i);
     if (!parsed) {
       return { ok: false, error: `Invalid collection entry at index ${i}.` };
     }
-    collections.push(parsed);
+    rawCollections.push(parsed);
   }
+  const collections = normalizeCollectionsSpaceIds(rawCollections, spaces);
 
   const links: LinkItem[] = [];
   for (let i = 0; i < obj.links.length; i++) {
@@ -124,10 +150,8 @@ export function validateExportBundle(raw: unknown): BundleValidationResult {
     bundle: {
       app: 'stash',
       schemaVersion: 1,
-      exportedAt:
-        typeof obj.exportedAt === 'string'
-          ? obj.exportedAt
-          : new Date().toISOString(),
+      exportedAt,
+      spaces,
       collections,
       links,
       rules,
@@ -141,7 +165,11 @@ export function prepareReplaceSnapshot(bundle: StashExportBundle): {
   snapshot: StashSnapshot;
   stats: RestoreStats;
 } {
-  const collections = sortByOrder(bundle.collections).map((col, idx) => ({
+  const spaces = ensureSpacesList(bundle.spaces ?? [], bundle.exportedAt);
+  const collections = normalizeCollectionsSpaceIds(
+    bundle.collections,
+    spaces,
+  ).map((col, idx) => ({
     ...col,
     order: idx,
   }));
@@ -179,6 +207,7 @@ export function prepareReplaceSnapshot(bundle: StashExportBundle): {
 
   return {
     snapshot: {
+      spaces,
       collections,
       links,
       rules,
@@ -200,7 +229,19 @@ export function mergeBundleIntoSnapshot(
   current: StashSnapshot,
   incoming: StashExportBundle,
 ): { snapshot: StashSnapshot; stats: RestoreStats } {
-  const existingCollections = sortByOrder(current.collections);
+  const mergedSpaces = [...ensureSpacesList(current.spaces)];
+  const spaceIds = new Set(mergedSpaces.map((s) => s.id));
+  for (const space of sortByOrder(incoming.spaces ?? [])) {
+    if (spaceIds.has(space.id)) continue;
+    spaceIds.add(space.id);
+    mergedSpaces.push({ ...space, order: mergedSpaces.length });
+  }
+  const fallbackSpaceId = mergedSpaces[0]?.id;
+
+  const existingCollections = normalizeCollectionsSpaceIds(
+    current.collections,
+    mergedSpaces,
+  );
   const collectionIds = new Set(existingCollections.map((c) => c.id));
   const mergedCollections = [...existingCollections];
   let addedCollections = 0;
@@ -212,7 +253,13 @@ export function mergeBundleIntoSnapshot(
       continue;
     }
     collectionIds.add(col.id);
-    mergedCollections.push({ ...col, order: mergedCollections.length });
+    const resolvedSpaceId =
+      col.spaceId && spaceIds.has(col.spaceId) ? col.spaceId : fallbackSpaceId;
+    mergedCollections.push({
+      ...col,
+      spaceId: resolvedSpaceId,
+      order: mergedCollections.length,
+    });
     addedCollections += 1;
   }
 
@@ -284,6 +331,7 @@ export function mergeBundleIntoSnapshot(
 
   return {
     snapshot: {
+      spaces: mergedSpaces,
       collections: mergedCollections,
       links: mergedLinks,
       rules: mergedRules,

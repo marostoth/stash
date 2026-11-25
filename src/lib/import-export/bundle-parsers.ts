@@ -2,10 +2,12 @@ import { normalizeHexColor } from '@/lib/themes/contrast';
 import { VALID_BACKDROP_STYLE_SET } from '@/lib/themes/presets';
 import {
   type BackdropOverride,
+  type CardDensity,
   type CategorizationRule,
   type Collection,
   DEFAULT_SETTINGS,
   type LinkItem,
+  type Space,
   type StashSettings,
   TAB_GROUP_COLORS,
   type TabGroupColor,
@@ -13,6 +15,34 @@ import {
 import { normalizeTags } from '@/lib/utils/url';
 
 const VALID_COLORS = new Set<string>(TAB_GROUP_COLORS);
+
+function parseDensity(raw: unknown): CardDensity | undefined {
+  if (raw === 'micro' || raw === 'compact' || raw === 'comfortable') {
+    return raw;
+  }
+  return undefined;
+}
+
+export function parseSpace(raw: unknown, fallbackOrder: number): Space | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.id !== 'string' || !obj.id.trim()) return null;
+  if (typeof obj.name !== 'string' || !obj.name.trim()) return null;
+
+  const now = new Date().toISOString();
+  return {
+    id: obj.id.trim(),
+    name: obj.name.trim(),
+    icon:
+      typeof obj.icon === 'string' && obj.icon.trim()
+        ? obj.icon.trim()
+        : undefined,
+    order: typeof obj.order === 'number' ? obj.order : fallbackOrder,
+    densityOverride: parseDensity(obj.densityOverride),
+    createdAt: typeof obj.createdAt === 'string' ? obj.createdAt : now,
+    updatedAt: typeof obj.updatedAt === 'string' ? obj.updatedAt : now,
+  };
+}
 
 export function parseCollection(
   raw: unknown,
@@ -49,6 +79,10 @@ export function parseCollection(
         ? obj.icon.trim()
         : undefined,
     viewMode,
+    spaceId:
+      typeof obj.spaceId === 'string' && obj.spaceId.trim()
+        ? obj.spaceId.trim()
+        : undefined,
     order: typeof obj.order === 'number' ? obj.order : fallbackOrder,
     collapsed: Boolean(obj.collapsed),
     isSession: obj.isSession === true ? true : undefined,

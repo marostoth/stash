@@ -4,16 +4,13 @@ import {
   ArrowUpRight,
   ChevronDown,
   ChevronRight,
-  ExternalLink,
   GripVertical,
   Image as ImageIcon,
+  Layers,
   LayoutGrid,
-  MoreHorizontal,
-  Pencil,
   Plus,
   Sparkles,
   Tag,
-  Trash2,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { CSSProperties } from 'react';
@@ -21,14 +18,8 @@ import { toast } from 'sonner';
 import { CollectionAppearancePopover } from '@/components/CollectionAppearancePopover';
 import { InlineProgressPill } from '@/components/ui/ai-activity-panel';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { OdometerCounter } from '@/components/ui/odometer-counter';
+import { CollectionActionsMenu } from '@/components/workbench/collection-actions-menu';
 import { LinkCard } from '@/components/workbench/link-card';
 import { useAutoTagSweep } from '@/hooks/use-auto-tag-sweep';
 import { COLLAPSE_SPRING } from '@/lib/motion/physics';
@@ -42,8 +33,10 @@ import { getCuratedCollectionIcon } from '@/lib/themes/collection-icons';
 import {
   type CardDensity,
   type Collection,
+  DEFAULT_SPACE_ID,
   type LinkItem,
   type MotionMode,
+  type Space,
   TAB_GROUP_COLOR_SWATCH,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
@@ -53,6 +46,9 @@ interface CollectionSectionProps {
   collection: Collection;
   index: number;
   links: readonly LinkItem[];
+  spaces: readonly Space[];
+  spaceBadge?: Space;
+  onSwitchSpace?: (spaceId: string) => void;
   openInNewTab: boolean;
   density: CardDensity;
   wideBoard?: boolean;
@@ -67,6 +63,9 @@ export function CollectionSection({
   collection,
   index,
   links,
+  spaces,
+  spaceBadge,
+  onSwitchSpace,
   openInNewTab,
   density,
   wideBoard = false,
@@ -141,6 +140,20 @@ export function CollectionSection({
     await stashRepo.deleteCollection(collection.id);
     toast.success(`Deleted "${collection.name}"`);
   };
+
+  const handleMoveToSpace = async (targetSpace: Space) => {
+    const moved = await stashRepo.moveCollectionToSpace(
+      collection.id,
+      targetSpace.id,
+    );
+    if (moved) {
+      toast.success(`Moved "${collection.name}" to ${targetSpace.name}`);
+    }
+  };
+
+  const currentSpaceId =
+    collection.spaceId ?? spaces[0]?.id ?? DEFAULT_SPACE_ID;
+  const otherSpaces = spaces.filter((s) => s.id !== currentSpaceId);
 
   const handleWakeUp = async () => {
     if (links.length === 0) {
@@ -252,6 +265,18 @@ export function CollectionSection({
                 </span>
               )}
             </button>
+
+            {spaceBadge && onSwitchSpace && (
+              <button
+                type="button"
+                onClick={() => onSwitchSpace(spaceBadge.id)}
+                title={`Switch to ${spaceBadge.name} Space`}
+                className="inline-flex shrink-0 items-center gap-1 rounded-pill border border-border bg-panel px-2 py-0.5 font-mono text-[10px] text-fg-muted transition-colors hover:border-accent/50 hover:text-accent cursor-pointer"
+              >
+                <Layers className="h-2.5 w-2.5" />
+                <span>{spaceBadge.name}</span>
+              </button>
+            )}
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
@@ -344,54 +369,19 @@ export function CollectionSection({
               sampleLinkTitles={links.slice(0, 5).map((l) => l.title)}
             />
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Collection actions for ${collection.name}`}
-                  className="h-7 w-7"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onSelect={() => openCreateLink(collection.id)}
-                >
-                  <Plus className="h-3.5 w-3.5 text-fg-muted" />
-                  Add link
-                </DropdownMenuItem>
-                {links.length > 0 && (
-                  <>
-                    <DropdownMenuItem onSelect={() => void handleWakeUp()}>
-                      <ArrowUpRight className="h-3.5 w-3.5 text-fg-muted" />
-                      Wake Up (Tab Group)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => void handleOpenInNewWindow()}
-                    >
-                      <ExternalLink className="h-3.5 w-3.5 text-fg-muted" />
-                      Open in New Window
-                    </DropdownMenuItem>
-                  </>
-                )}
-                <DropdownMenuItem
-                  onSelect={() => openEditCollection(collection)}
-                >
-                  <Pencil className="h-3.5 w-3.5 text-fg-muted" />
-                  Edit collection
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={() => void handleDeleteCollection()}
-                  className="text-danger focus:text-danger"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete collection
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <CollectionActionsMenu
+              collectionName={collection.name}
+              hasLinks={links.length > 0}
+              otherSpaces={otherSpaces}
+              onAddLink={() => openCreateLink(collection.id)}
+              onWakeUp={() => void handleWakeUp()}
+              onOpenInNewWindow={() => void handleOpenInNewWindow()}
+              onEditCollection={() => openEditCollection(collection)}
+              onMoveToSpace={(targetSpace) =>
+                void handleMoveToSpace(targetSpace)
+              }
+              onDeleteCollection={() => void handleDeleteCollection()}
+            />
           </div>
         </div>
 

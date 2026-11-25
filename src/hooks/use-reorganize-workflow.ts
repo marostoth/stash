@@ -18,10 +18,17 @@ import {
 } from '@/lib/reorganize/engine';
 import {
   buildReorganizationPlan,
+  mergeSpaceReorganization,
   type ReorganizeScope,
 } from '@/lib/reorganize/plan';
 import { stashRepo } from '@/lib/storage/repo';
-import type { Collection, LinkItem, StashSettings } from '@/lib/types/stash';
+import {
+  type Collection,
+  DEFAULT_SPACE_ID,
+  type LinkItem,
+  type Space,
+  type StashSettings,
+} from '@/lib/types/stash';
 import { extractDomain } from '@/lib/utils/url';
 import { useBackgroundJobsStore } from '@/store/background-jobs-store';
 import { useUiStore } from '@/store/ui-store';
@@ -29,10 +36,31 @@ import { useUiStore } from '@/store/ui-store';
 export type WizardStep = 'scope' | 'checkpoint' | 'sorting' | 'preview';
 
 export function useReorganizeWorkflow(
-  collections: readonly Collection[],
-  links: readonly LinkItem[],
+  allCollections: readonly Collection[],
+  allLinks: readonly LinkItem[],
   settings: StashSettings,
+  activeSpace?: Space,
 ) {
+  const activeSpaceId = activeSpace?.id ?? DEFAULT_SPACE_ID;
+
+  // Strictly scope Smart Reorganize to the active Space so AI never mixes Spaces
+  const collections = useMemo(
+    () =>
+      allCollections.filter(
+        (col) => (col.spaceId ?? DEFAULT_SPACE_ID) === activeSpaceId,
+      ),
+    [allCollections, activeSpaceId],
+  );
+
+  const spaceCollectionIds = useMemo(
+    () => new Set(collections.map((c) => c.id)),
+    [collections],
+  );
+
+  const links = useMemo(
+    () => allLinks.filter((link) => spaceCollectionIds.has(link.collectionId)),
+    [allLinks, spaceCollectionIds],
+  );
   const open = useUiStore((s) => s.reorganizeOpen);
   const openReorganize = useUiStore((s) => s.openReorganize);
   const closeReorganize = useUiStore((s) => s.closeReorganize);
@@ -184,8 +212,17 @@ export function useReorganizeWorkflow(
         categories,
         assignments,
         removeEmptySources,
+        { spaceId: activeSpaceId },
       ),
-    [collections, links, scope, categories, assignments, removeEmptySources],
+    [
+      collections,
+      links,
+      scope,
+      categories,
+      assignments,
+      removeEmptySources,
+      activeSpaceId,
+    ],
   );
 
   const handleExportBackup = async () => {
@@ -369,10 +406,16 @@ export function useReorganizeWorkflow(
         categories,
         assignments,
         removeEmptySources,
+        { spaceId: activeSpaceId },
       );
-      const previousSnapshot = await stashRepo.applyReorganization(
+      const mergedNextState = mergeSpaceReorganization(
+        allCollections,
+        allLinks,
+        activeSpaceId,
         plan.nextState,
       );
+      const previousSnapshot =
+        await stashRepo.applyReorganization(mergedNextState);
 
       playSessionFreeze(settings.soundEffects, settings.motionMode);
       useBackgroundJobsStore.getState().removeJob('reorganize');
@@ -412,6 +455,8 @@ export function useReorganizeWorkflow(
   return {
     open,
     closeReorganize,
+    spaceCollections: collections,
+    spaceLinksCount: links.length,
     step,
     setStep,
     nanoReady,

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { stashRepo } from '@/lib/storage/repo';
-import { DEFAULT_SETTINGS } from '@/lib/types/stash';
+import { DEFAULT_SETTINGS, DEFAULT_SPACE_ID } from '@/lib/types/stash';
 
 describe('stashRepo', () => {
   beforeEach(() => {
@@ -522,5 +522,57 @@ describe('stashRepo', () => {
 
     const microSettings = await stashRepo.updateSettings({ density: 'micro' });
     expect(microSettings.density).toBe('micro');
+  });
+
+  it('manages Spaces, migrates collections to Main on deleteSpace without losing links, and blocks deleting last Space', async () => {
+    const initialSpaces = await stashRepo.getSpaces();
+    expect(initialSpaces).toHaveLength(1);
+    expect(initialSpaces[0]?.id).toBe(DEFAULT_SPACE_ID);
+
+    // Deleting the sole remaining Space must be blocked
+    const blockedDelete = await stashRepo.deleteSpace(DEFAULT_SPACE_ID);
+    expect(blockedDelete.deleted).toBe(false);
+    expect(await stashRepo.getSpaces()).toHaveLength(1);
+
+    // Create a second Space ("Reorders") and a collection + link inside it
+    const reorders = await stashRepo.createSpace({
+      name: 'Reorders',
+      icon: 'shopping-bag',
+      densityOverride: 'compact',
+    });
+    const col = await stashRepo.createCollection({
+      name: 'Coffee & Supplies',
+      spaceId: reorders.id,
+    });
+    expect(col.spaceId).toBe(reorders.id);
+
+    const savedLink = await stashRepo.addLink({
+      collectionId: col.id,
+      url: 'https://amazon.com/dp/B000001',
+      title: 'Espresso Beans',
+    });
+    expect(savedLink.ok).toBe(true);
+
+    // Move collection to Main and back to Reorders
+    const movedToMain = await stashRepo.moveCollectionToSpace(
+      col.id,
+      DEFAULT_SPACE_ID,
+    );
+    expect(movedToMain?.spaceId).toBe(DEFAULT_SPACE_ID);
+    await stashRepo.moveCollectionToSpace(col.id, reorders.id);
+
+    // Delete Reorders -> collection migrates to Main, link remains intact
+    const deleted = await stashRepo.deleteSpace(reorders.id);
+    expect(deleted.deleted).toBe(true);
+    expect(deleted.migratedCollections).toBe(1);
+    expect(deleted.fallbackSpaceId).toBe(DEFAULT_SPACE_ID);
+
+    const remainingCols = await stashRepo.getCollections();
+    expect(remainingCols.find((c) => c.id === col.id)?.spaceId).toBe(
+      DEFAULT_SPACE_ID,
+    );
+    const remainingLinks = await stashRepo.getLinks();
+    expect(remainingLinks).toHaveLength(1);
+    expect(remainingLinks[0]?.url).toBe('https://amazon.com/dp/B000001');
   });
 });

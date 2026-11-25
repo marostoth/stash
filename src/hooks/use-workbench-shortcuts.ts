@@ -1,7 +1,7 @@
 import type * as React from 'react';
 import { useEffect } from 'react';
 import { stashRepo } from '@/lib/storage/repo';
-import type { LinkItem } from '@/lib/types/stash';
+import type { LinkItem, Space } from '@/lib/types/stash';
 import { useUiStore } from '@/store/ui-store';
 
 function isEditableElement(target: EventTarget | null): boolean {
@@ -40,21 +40,25 @@ interface UseWorkbenchShortcutsOptions {
   searchInputRef: React.RefObject<HTMLInputElement | null>;
   hoverPreviews: boolean;
   visibleLinks: readonly LinkItem[];
+  spaces: readonly Space[];
   openLinkInNewTab: boolean;
 }
 
 /**
  * Global keyboard shortcuts for the Stash New Tab workbench:
  * - Ctrl/Cmd+K or `/`: focus live search
+ * - 1–9: switch active Space directly
  * - ArrowDown / ArrowUp: cycle keyboard focus across visible link cards
  * - Enter: open the highlighted link card immediately
  * - Space: immediately open hovered link preview
+ * - ?: toggle Keyboard Shortcuts panel
  * - Esc: dismiss preview, clear search/highlight, or clear active Starred filter
  */
 export function useWorkbenchShortcuts({
   searchInputRef,
   hoverPreviews,
   visibleLinks,
+  spaces,
   openLinkInNewTab,
 }: UseWorkbenchShortcutsOptions): void {
   useEffect(() => {
@@ -105,6 +109,23 @@ export function useWorkbenchShortcuts({
         event.preventDefault();
         searchInputRef.current?.focus();
         return;
+      }
+
+      if (
+        event.key >= '1' &&
+        event.key <= '9' &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !isEditableElement(event.target) &&
+        !isAnyModalOpen()
+      ) {
+        const targetSpace = spaces[Number(event.key) - 1];
+        if (targetSpace) {
+          event.preventDefault();
+          useUiStore.getState().setActiveSpaceId(targetSpace.id);
+          return;
+        }
       }
 
       const ui = useUiStore.getState();
@@ -203,5 +224,5 @@ export function useWorkbenchShortcuts({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [hoverPreviews, openLinkInNewTab, searchInputRef, visibleLinks]);
+  }, [hoverPreviews, openLinkInNewTab, searchInputRef, spaces, visibleLinks]);
 }

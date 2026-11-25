@@ -1,15 +1,13 @@
 import {
   DragDropProvider,
-  type DragEndEvent,
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
 } from '@dnd-kit/react';
-import { isSortable } from '@dnd-kit/react/sortable';
-import { SearchX } from 'lucide-react';
+import { FolderPlus, SearchX } from 'lucide-react';
 import { MotionConfig } from 'motion/react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Toaster, toast } from 'sonner';
+import { useEffect, useMemo, useRef } from 'react';
+import { Toaster } from 'sonner';
 import { HealthCheckModal } from '@/components/HealthCheckModal';
 import { ReorganizeModal } from '@/components/reorganize/ReorganizeModal';
 import { SettingsModal } from '@/components/settings/settings-modal';
@@ -22,18 +20,17 @@ import { EmptyState } from '@/components/workbench/empty-state';
 import { LinkPreviewPopover } from '@/components/workbench/link-preview-popover';
 import { OpenTabsSidebar } from '@/components/workbench/open-tabs-sidebar';
 import { QuickEditModal } from '@/components/workbench/quick-edit-modal';
+import { SpaceBar } from '@/components/workbench/space-bar';
 import { TopBar } from '@/components/workbench/top-bar';
 import { TriageModal } from '@/components/workbench/triage-modal';
 import { WallpaperLayer } from '@/components/workbench/wallpaper-layer';
 import { useOpenTabs } from '@/hooks/use-open-tabs';
 import { useStashData } from '@/hooks/use-stash-data';
+import { useWorkbenchDnd } from '@/hooks/use-workbench-dnd';
 import { useWorkbenchShortcuts } from '@/hooks/use-workbench-shortcuts';
-import { playDrop, playError, playPickup } from '@/lib/audio/foley';
-import { isDragItemData, isDropTargetData } from '@/lib/dnd/types';
+import { isDragItemData } from '@/lib/dnd/types';
 import { resolveReducedMotionPolicy } from '@/lib/motion/physics';
-import { stashRepo } from '@/lib/storage/repo';
-import type { OpenTabInfo } from '@/lib/tabs/session-filter';
-import { triggerAutoTagSingleLink } from '@/lib/tagging/trigger-auto-tag';
+import { DEFAULT_SPACE_ID } from '@/lib/types/stash';
 import { groupAndFilterCollections } from '@/lib/utils/search';
 import { useBackgroundJobsStore } from '@/store/background-jobs-store';
 import { useUiStore } from '@/store/ui-store';
@@ -55,6 +52,7 @@ const WORKBENCH_SENSORS = [
 export function Workbench() {
   const {
     loading,
+    spaces,
     collections,
     links,
     rules,
@@ -63,15 +61,23 @@ export function Workbench() {
     activeTheme,
   } = useStashData();
   const { tabs, pinnedTabs, regularTabs, clearableCount } = useOpenTabs();
+  const activeSpaceId = useUiStore((s) => s.activeSpaceId);
+  const setActiveSpaceId = useUiStore((s) => s.setActiveSpaceId);
   const searchQuery = useUiStore((s) => s.searchQuery);
   const setSearchQuery = useUiStore((s) => s.setSearchQuery);
   const starredOnly = useUiStore((s) => s.starredOnly);
   const setStarredOnly = useUiStore((s) => s.setStarredOnly);
-  const pulseLink = useUiStore((s) => s.pulseLink);
-  const settleLink = useUiStore((s) => s.settleLink);
+  const searchAllSpaces = useUiStore((s) => s.searchAllSpaces);
+  const openCreateCollection = useUiStore((s) => s.openCreateCollection);
   const dismissPreview = useUiStore((s) => s.dismissPreview);
   const trayHeightPx = useBackgroundJobsStore((s) => s.trayHeightPx);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  const { handleQuickStashTab, handleDragStart, handleDragEnd } =
+    useWorkbenchDnd({
+      soundEffects: settings.soundEffects,
+      motionMode: settings.motionMode,
+    });
 
   // Hydrate initial search query when opened from Chrome's `s <query>` omnibox
   useEffect(() => {
@@ -86,149 +92,22 @@ export function Workbench() {
     searchInputRef.current?.focus();
   }, [setSearchQuery]);
 
-  const revealDuplicate = useCallback(
-    async (existingLinkId: string, targetCollectionId: string) => {
-      await stashRepo.updateCollection(targetCollectionId, {
-        collapsed: false,
-      });
-      pulseLink(existingLinkId);
-      playError(settings.soundEffects);
-      toast.info('Already in this collection');
-      requestAnimationFrame(() => {
-        const el = document.querySelector<HTMLElement>(
-          `[data-link-id="${CSS.escape(existingLinkId)}"]`,
-        );
-        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      });
-    },
-    [pulseLink, settings.soundEffects],
+  const activeSpace = useMemo(
+    () => spaces.find((s) => s.id === activeSpaceId) ?? spaces[0],
+    [spaces, activeSpaceId],
+  );
+  const resolvedSpaceId = activeSpace?.id ?? DEFAULT_SPACE_ID;
+  const spaceById = useMemo(
+    () => new Map(spaces.map((s) => [s.id, s])),
+    [spaces],
   );
 
-  const handleQuickStashTab = useCallback(
-    async (tab: OpenTabInfo, collectionId: string, targetIndex?: number) => {
-      const result = await stashRepo.addLink(
-        {
-          collectionId,
-          url: tab.url,
-          title: tab.title,
-          faviconUrl: tab.favIconUrl,
-        },
-        targetIndex,
-      );
-
-      if (!result.ok) {
-        await revealDuplicate(result.existingLink.id, collectionId);
-        return;
-      }
-
-      await stashRepo.updateCollection(collectionId, { collapsed: false });
-      playDrop(settings.soundEffects, settings.motionMode);
-      settleLink(result.link.id);
-      toast.success(`Stashed "${result.link.title}"`);
-      void triggerAutoTagSingleLink(result.link.id);
-    },
-    [revealDuplicate, settings.motionMode, settings.soundEffects, settleLink],
-  );
-
-  const handleDragStart = useCallback(() => {
-    dismissPreview();
-    playPickup(settings.soundEffects);
-  }, [dismissPreview, settings.soundEffects]);
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      if (event.canceled) return;
-      const { source, target } = event.operation;
-      if (!source || !target) return;
-
-      const sourceData = source.data;
-      const targetData = target.data;
-      if (!isDragItemData(sourceData) || !isDropTargetData(targetData)) return;
-
-      // 1. Reorder collections vertically
-      if (
-        sourceData.kind === 'collection' &&
-        targetData.kind === 'collection'
-      ) {
-        const nextIndex =
-          isSortable(source) && source.index !== source.initialIndex
-            ? source.index
-            : targetData.index;
-        if (nextIndex !== sourceData.index) {
-          playDrop(settings.soundEffects);
-          void stashRepo.reorderCollections(
-            sourceData.collection.id,
-            nextIndex,
-          );
-        }
-        return;
-      }
-
-      // 2. Drop open browser tab onto a specific link card or collection container
-      if (sourceData.kind === 'open-tab') {
-        if (targetData.kind === 'link') {
-          void handleQuickStashTab(
-            sourceData.tab,
-            targetData.collectionId,
-            targetData.index,
-          );
-          return;
-        }
-        if (targetData.kind === 'collection-drop') {
-          void handleQuickStashTab(sourceData.tab, targetData.collectionId);
-        }
-        return;
-      }
-
-      // 3. Reorder or move a link card within or across collections
-      if (sourceData.kind === 'link') {
-        const moveLink = async (
-          targetCollectionId: string,
-          targetIndex?: number,
-        ) => {
-          const result = await stashRepo.moveOrReorderLink(
-            sourceData.link.id,
-            targetCollectionId,
-            targetIndex,
-          );
-          if (!result.ok && result.reason === 'duplicate') {
-            await revealDuplicate(result.existingLink.id, targetCollectionId);
-            return;
-          }
-          if (result.ok) {
-            playDrop(settings.soundEffects);
-            settleLink(sourceData.link.id);
-          }
-        };
-
-        if (targetData.kind === 'link') {
-          const isSelfAfterOptimisticMove =
-            target.id === source.id && isSortable(source);
-          const destCollectionId =
-            isSelfAfterOptimisticMove && typeof source.group === 'string'
-              ? source.group
-              : targetData.collectionId;
-          const destIndex = isSelfAfterOptimisticMove
-            ? source.index
-            : targetData.index;
-
-          const sameCollection = sourceData.collectionId === destCollectionId;
-          if (!sameCollection || destIndex !== sourceData.index) {
-            void moveLink(destCollectionId, destIndex);
-          }
-          return;
-        }
-
-        if (targetData.kind === 'collection-drop') {
-          if (sourceData.collectionId !== targetData.collectionId) {
-            void moveLink(targetData.collectionId);
-          } else if (isSortable(source) && source.index !== sourceData.index) {
-            void moveLink(sourceData.collectionId, source.index);
-          }
-        }
-      }
-    },
-    [handleQuickStashTab, revealDuplicate, settings.soundEffects, settleLink],
+  const activeSpaceCollections = useMemo(
+    () =>
+      collections.filter(
+        (col) => (col.spaceId ?? DEFAULT_SPACE_ID) === resolvedSpaceId,
+      ),
+    [collections, resolvedSpaceId],
   );
 
   const starredCount = useMemo(
@@ -240,8 +119,17 @@ export function Workbench() {
     () =>
       groupAndFilterCollections(collections, links, searchQuery, {
         starredOnly,
+        activeSpaceId: resolvedSpaceId,
+        searchAllSpaces,
       }),
-    [collections, links, searchQuery, starredOnly],
+    [
+      collections,
+      links,
+      searchQuery,
+      starredOnly,
+      resolvedSpaceId,
+      searchAllSpaces,
+    ],
   );
 
   const isFiltering = searchQuery.trim().length > 0 || starredOnly;
@@ -257,9 +145,11 @@ export function Workbench() {
     searchInputRef,
     hoverPreviews: settings.hoverPreviews,
     visibleLinks,
+    spaces,
     openLinkInNewTab: settings.openLinkInNewTab,
   });
 
+  const effectiveDensity = activeSpace?.densityOverride ?? settings.density;
   const wideBoard = settings.boardWidth === 'wide';
 
   return (
@@ -282,7 +172,16 @@ export function Workbench() {
               settings={settings}
               totalLinks={links.length}
               starredCount={starredCount}
+              spacesCount={spaces.length}
               openTabsCount={tabs.length}
+            />
+
+            <SpaceBar
+              spaces={spaces}
+              collections={collections}
+              activeSpaceId={resolvedSpaceId}
+              wideBoard={wideBoard}
+              onSelectSpace={setActiveSpaceId}
             />
 
             <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -303,6 +202,26 @@ export function Workbench() {
                     </div>
                   ) : collections.length === 0 ? (
                     <EmptyState />
+                  ) : !isFiltering && activeSpaceCollections.length === 0 ? (
+                    <div className="mx-auto flex max-w-md flex-col items-center justify-center rounded-card border border-dashed border-border bg-panel/70 px-6 py-12 text-center">
+                      <FolderPlus className="mb-3 h-7 w-7 text-accent" />
+                      <p className="text-sm font-medium text-fg">
+                        No collections in {activeSpace?.name ?? 'this Space'}{' '}
+                        yet
+                      </p>
+                      <p className="mt-1 text-xs text-fg-muted">
+                        Create a collection here or move an existing collection
+                        from another Space via its menu.
+                      </p>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={openCreateCollection}
+                        className="mt-4"
+                      >
+                        New Collection
+                      </Button>
+                    </div>
                   ) : groups.length === 0 ? (
                     <div className="mx-auto flex max-w-md flex-col items-center justify-center rounded-card border border-border bg-panel px-6 py-12 text-center">
                       <SearchX className="mb-3 h-7 w-7 text-fg-muted" />
@@ -316,7 +235,9 @@ export function Workbench() {
                       <p className="mt-1 text-xs text-fg-muted">
                         {starredOnly && !searchQuery.trim()
                           ? 'Star any link card to highlight it and filter it here.'
-                          : 'Try searching by domain, title, tag, or note.'}
+                          : !searchAllSpaces && spaces.length > 1
+                            ? 'Searching active Space only. Enable "All Spaces" to search every board.'
+                            : 'Try searching by domain, title, tag, or note.'}
                       </p>
                       <Button
                         variant="secondary"
@@ -337,22 +258,35 @@ export function Workbench() {
                   ) : (
                     <div className="space-y-8">
                       {groups.map(
-                        ({ collection, links: collectionLinks }, colIndex) => (
-                          <CollectionSection
-                            key={collection.id}
-                            collection={collection}
-                            index={colIndex}
-                            links={collectionLinks}
-                            openInNewTab={settings.openLinkInNewTab}
-                            density={settings.density}
-                            wideBoard={wideBoard}
-                            forceExpanded={isFiltering}
-                            dragDisabled={isFiltering}
-                            motionMode={settings.motionMode}
-                            soundEffects={settings.soundEffects}
-                            hoverPreviews={settings.hoverPreviews}
-                          />
-                        ),
+                        ({ collection, links: collectionLinks }, colIndex) => {
+                          const colSpaceId =
+                            collection.spaceId ?? DEFAULT_SPACE_ID;
+                          const outsideActiveSpace =
+                            isFiltering &&
+                            searchAllSpaces &&
+                            colSpaceId !== resolvedSpaceId
+                              ? spaceById.get(colSpaceId)
+                              : undefined;
+                          return (
+                            <CollectionSection
+                              key={collection.id}
+                              collection={collection}
+                              index={colIndex}
+                              links={collectionLinks}
+                              spaces={spaces}
+                              spaceBadge={outsideActiveSpace}
+                              onSwitchSpace={setActiveSpaceId}
+                              openInNewTab={settings.openLinkInNewTab}
+                              density={effectiveDensity}
+                              wideBoard={wideBoard}
+                              forceExpanded={isFiltering}
+                              dragDisabled={isFiltering}
+                              motionMode={settings.motionMode}
+                              soundEffects={settings.soundEffects}
+                              hoverPreviews={settings.hoverPreviews}
+                            />
+                          );
+                        },
                       )}
                     </div>
                   )}
@@ -365,7 +299,8 @@ export function Workbench() {
                   pinnedTabs={pinnedTabs}
                   regularTabs={regularTabs}
                   clearableCount={clearableCount}
-                  collections={collections}
+                  collections={activeSpaceCollections}
+                  activeSpaceId={resolvedSpaceId}
                   settings={settings}
                   onQuickStashTab={handleQuickStashTab}
                 />
@@ -373,9 +308,10 @@ export function Workbench() {
             </div>
           </div>
 
-          <CollectionModal />
-          <QuickEditModal collections={collections} />
+          <CollectionModal spaces={spaces} activeSpaceId={resolvedSpaceId} />
+          <QuickEditModal collections={collections} spaces={spaces} />
           <SettingsModal
+            spaces={spaces}
             collections={collections}
             links={links}
             rules={rules}
@@ -388,8 +324,10 @@ export function Workbench() {
             collections={collections}
             links={links}
             settings={settings}
+            activeSpace={activeSpace}
           />
           <TriageModal
+            spaces={spaces}
             collections={collections}
             links={links}
             rules={rules}

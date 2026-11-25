@@ -35,6 +35,31 @@ export const TAB_GROUP_COLOR_SWATCH: Record<TabGroupColor, string> = {
 
 export type CollectionViewMode = 'compact' | 'cover';
 
+export const DEFAULT_SPACE_ID = 'space-main';
+
+export interface Space {
+  id: string;
+  name: string;
+  icon?: string;
+  order: number;
+  densityOverride?: CardDensity;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function createDefaultSpace(
+  timestamp: string = new Date().toISOString(),
+): Space {
+  return {
+    id: DEFAULT_SPACE_ID,
+    name: 'Main',
+    icon: 'layers',
+    order: 0,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
 export interface Collection {
   id: string;
   name: string;
@@ -43,6 +68,7 @@ export interface Collection {
   tintColor?: string;
   icon?: string;
   viewMode?: CollectionViewMode;
+  spaceId?: string;
   order: number;
   collapsed: boolean;
   isSession?: boolean;
@@ -168,6 +194,7 @@ export interface StashExportBundle {
   app: 'stash';
   schemaVersion: 1;
   exportedAt: string;
+  spaces?: Space[];
   collections: Collection[];
   links: LinkItem[];
   rules: CategorizationRule[];

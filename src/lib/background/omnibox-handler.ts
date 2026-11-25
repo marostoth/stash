@@ -1,5 +1,10 @@
 import { stashRepo } from '@/lib/storage/repo';
-import type { Collection, LinkItem } from '@/lib/types/stash';
+import {
+  type Collection,
+  DEFAULT_SPACE_ID,
+  type LinkItem,
+  type Space,
+} from '@/lib/types/stash';
 import { matchesSearchQuery } from '@/lib/utils/search';
 import { extractDomain } from '@/lib/utils/url';
 
@@ -126,8 +131,11 @@ export function rankAndBuildOmniboxSuggestions(
   links: readonly LinkItem[],
   rawQuery: string,
   limit = MAX_OMNIBOX_RESULTS,
+  spaces?: readonly Space[],
 ): OmniboxSuggestionItem[] {
-  const colNameById = new Map(collections.map((c) => [c.id, c.name]));
+  const colById = new Map(collections.map((c) => [c.id, c]));
+  const spaceNameById = new Map((spaces ?? []).map((s) => [s.id, s.name]));
+  const includeSpaceName = (spaces?.length ?? 0) > 1;
   const rawTerms = rawQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const textTerms = rawTerms.filter((t) => t !== 'is:starred');
   const normalizedQuery = textTerms.join(' ');
@@ -135,17 +143,23 @@ export function rankAndBuildOmniboxSuggestions(
   const scored: Array<{
     link: LinkItem;
     collectionName: string;
+    spaceName: string;
     score: number;
   }> = [];
 
   for (const link of links) {
     if (!isSafeHttpUrl(link.url)) continue;
-    const collectionName = colNameById.get(link.collectionId) ?? '';
+    const col = colById.get(link.collectionId);
+    const collectionName = col?.name ?? '';
+    const spaceName = includeSpaceName
+      ? (spaceNameById.get(col?.spaceId ?? DEFAULT_SPACE_ID) ?? '')
+      : '';
     if (!matchesSearchQuery(link, collectionName, rawQuery)) continue;
 
     scored.push({
       link,
       collectionName,
+      spaceName,
       score: scoreOmniboxLink(link, collectionName, normalizedQuery, textTerms),
     });
   }
@@ -157,11 +171,12 @@ export function rankAndBuildOmniboxSuggestions(
     return bTime.localeCompare(aTime);
   });
 
-  return scored.slice(0, limit).map(({ link, collectionName }) => {
+  return scored.slice(0, limit).map(({ link, collectionName, spaceName }) => {
     const domain = extractDomain(link.url);
     const starPrefix = link.starred ? '★ ' : '';
     const titlePart = highlightOmniboxText(link.title, textTerms);
     const metaPieces = [
+      spaceName,
       collectionName,
       ...link.tags.slice(0, 2).map((tag) => `#${tag}`),
     ].filter(Boolean);
@@ -204,13 +219,18 @@ export function registerOmniboxHandler(): void {
   }
 
   browser.omnibox.onInputChanged.addListener((text, suggest) => {
-    void Promise.all([stashRepo.getCollections(), stashRepo.getLinks()])
-      .then(([collections, links]) => {
+    void Promise.all([
+      stashRepo.getCollections(),
+      stashRepo.getLinks(),
+      stashRepo.getSpaces(),
+    ])
+      .then(([collections, links, spaces]) => {
         const results = rankAndBuildOmniboxSuggestions(
           collections,
           links,
           text,
           MAX_OMNIBOX_RESULTS,
+          spaces,
         );
         suggest(results);
       })

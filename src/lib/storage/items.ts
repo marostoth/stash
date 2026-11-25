@@ -3,10 +3,25 @@ import {
   type CategorizationRule,
   type Collection,
   DEFAULT_SETTINGS,
+  DEFAULT_SPACE_ID,
   type LinkItem,
+  type Space,
   type StashSettings,
   type ThemeDefinition,
 } from '@/lib/types/stash';
+
+export const spacesStorage = storage.defineItem<Space[]>('local:stash_spaces', {
+  version: 1,
+  fallback: [],
+});
+
+export const activeSpaceIdStorage = storage.defineItem<string>(
+  'local:stash_active_space_id',
+  {
+    version: 1,
+    fallback: DEFAULT_SPACE_ID,
+  },
+);
 
 export const collectionsStorage = storage.defineItem<Collection[]>(
   'local:stash_collections',

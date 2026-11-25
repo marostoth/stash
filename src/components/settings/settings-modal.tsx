@@ -25,6 +25,7 @@ import type {
   CategorizationRule,
   Collection,
   LinkItem,
+  Space,
   StashSettings,
   ThemeDefinition,
 } from '@/lib/types/stash';
@@ -32,6 +33,7 @@ import { cn } from '@/lib/utils/cn';
 import { type SettingsTab, useUiStore } from '@/store/ui-store';
 
 interface SettingsModalProps {
+  spaces: readonly Space[];
   collections: readonly Collection[];
   links: readonly LinkItem[];
   rules: readonly CategorizationRule[];
@@ -99,10 +101,11 @@ function readExtensionVersion(): string {
   } catch {
     // Fallback outside extension runtime
   }
-  return 'v1.12.0';
+  return 'v1.13.0';
 }
 
 export function SettingsModal({
+  spaces,
   collections,
   links,
   rules,
@@ -283,6 +286,7 @@ export function SettingsModal({
           ) : (
             <BackupImportPanel
               settings={settings}
+              spaces={spaces}
               linkCount={links.length}
               collectionCount={collections.length}
             />
