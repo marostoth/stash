@@ -101,7 +101,7 @@ function readExtensionVersion(): string {
   } catch {
     // Fallback outside extension runtime
   }
-  return 'v1.15.1';
+  return 'v1.15.2';
 }
 
 export function SettingsModal({

@@ -35,9 +35,22 @@ export function useActiveTab(): ActiveTabState {
       setRawUrl(url);
       if (url && isStashableUrl(url)) {
         const [normalized] = normalizeRawTabs([tab]);
-        setActiveTab(normalized ?? null);
+        const next = normalized ?? null;
+        setActiveTab((prev) => {
+          if (
+            prev &&
+            next &&
+            prev.id === next.id &&
+            prev.url === next.url &&
+            prev.title === next.title &&
+            prev.favIconUrl === next.favIconUrl
+          ) {
+            return prev;
+          }
+          return next;
+        });
       } else {
-        setActiveTab(null);
+        setActiveTab((prev) => (prev === null ? prev : null));
       }
     } catch (error: unknown) {
       console.warn('Stash: failed to read active tab', error);
@@ -54,13 +67,35 @@ export function useActiveTab(): ActiveTabState {
       void queryActive();
     };
 
+    const handleUpdated = (
+      _tabId: number,
+      changeInfo: {
+        status?: string;
+        url?: string;
+        title?: string;
+        favIconUrl?: string;
+      },
+      tab: { active?: boolean },
+    ) => {
+      if (!tab.active) return;
+      if (
+        changeInfo.url === undefined &&
+        changeInfo.title === undefined &&
+        changeInfo.favIconUrl === undefined &&
+        changeInfo.status !== 'complete'
+      ) {
+        return;
+      }
+      void queryActive();
+    };
+
     browser.tabs.onActivated.addListener(handleChange);
-    browser.tabs.onUpdated.addListener(handleChange);
+    browser.tabs.onUpdated.addListener(handleUpdated);
     browser.windows?.onFocusChanged?.addListener(handleChange);
 
     return () => {
       browser.tabs.onActivated.removeListener(handleChange);
-      browser.tabs.onUpdated.removeListener(handleChange);
+      browser.tabs.onUpdated.removeListener(handleUpdated);
       browser.windows?.onFocusChanged?.removeListener(handleChange);
     };
   }, [queryActive]);

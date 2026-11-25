@@ -3,7 +3,7 @@ export interface CategorizationTarget {
   title: string;
 }
 
-export type CategorizationSource = 'rule' | 'nano' | 'none';
+export type CategorizationSource = 'rule' | 'library' | 'nano' | 'none';
 
 export interface CategorizationSuggestion {
   source: CategorizationSource;
@@ -13,6 +13,7 @@ export interface CategorizationSuggestion {
   summaryNote?: string;
   matchedRuleId?: string;
   matchedRuleName?: string;
+  matchedLibraryReason?: 'domain' | 'name';
 }
 
 export type NanoAvailabilityStatus =

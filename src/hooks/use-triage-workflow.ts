@@ -217,6 +217,7 @@ export function useTriageWorkflow(
               {
                 rules,
                 collections: destinationCollections,
+                links,
                 enableOnDeviceAi: Boolean(nanoSession),
                 nanoSession,
                 signal: controller.signal,
@@ -279,6 +280,7 @@ export function useTriageWorkflow(
     triageCollectionId,
     sessionCollection,
     sessionLinks,
+    links,
     rules,
     destinationCollections,
     settings.enableOnDeviceAi,

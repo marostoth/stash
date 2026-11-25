@@ -25,8 +25,15 @@ import { groupAndFilterCollections } from '@/lib/utils/search';
 import { extractDomain } from '@/lib/utils/url';
 
 export function SidePanelApp() {
-  const { spaces, collections, links, rules, settings, activeTheme } =
-    useStashData();
+  const {
+    loading: loadingData,
+    spaces,
+    collections,
+    links,
+    rules,
+    settings,
+    activeTheme,
+  } = useStashData();
   const { activeTab, loading: loadingTab } = useActiveTab();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
@@ -96,6 +103,7 @@ export function SidePanelApp() {
           <QuickStashCard
             activeTab={activeTab}
             loadingTab={loadingTab}
+            loadingData={loadingData}
             spaces={spaces}
             collections={collections}
             links={links}

@@ -180,18 +180,25 @@ function cleanOptionalString(value: unknown): string | undefined {
 function buildPayload(
   target: CategorizationTarget,
   collections: readonly Collection[],
+  spaceNamesById?: ReadonlyMap<string, string>,
 ): string {
   return JSON.stringify({
     url: target.url,
     title: target.title,
     existingCollections: collections
       .filter((col) => !col.isSession)
-      .map((col) => ({
-        name: col.name,
-        ...(col.description
-          ? { description: col.description.slice(0, 60) }
-          : {}),
-      })),
+      .map((col) => {
+        const spaceName = col.spaceId
+          ? spaceNamesById?.get(col.spaceId)
+          : undefined;
+        return {
+          name: col.name,
+          ...(spaceName ? { space: spaceName } : {}),
+          ...(col.description
+            ? { description: col.description.slice(0, 60) }
+            : {}),
+        };
+      }),
   });
 }
 
@@ -357,6 +364,7 @@ export interface NanoCategorizerSession {
     target: CategorizationTarget,
     collections: readonly Collection[],
     signal?: AbortSignal,
+    spaceNamesById?: ReadonlyMap<string, string>,
   ) => Promise<CategorizationSuggestion | null>;
   destroy: () => void;
 }
@@ -399,7 +407,7 @@ export async function createNanoCategorizerSession(
   };
 
   return {
-    async categorize(target, collections, itemSignal) {
+    async categorize(target, collections, itemSignal, spaceNamesById) {
       if (destroyed || !baseSession || itemSignal?.aborted) return null;
       let itemSession: LanguageModelSession | null = null;
       let isClone = false;
@@ -421,7 +429,7 @@ export async function createNanoCategorizerSession(
         }
 
         const rawText = await itemSession.prompt(
-          buildPayload(target, collections),
+          buildPayload(target, collections, spaceNamesById),
           {
             responseConstraint: NANO_RESPONSE_CONSTRAINT,
             signal: controller.signal,
@@ -446,12 +454,18 @@ export async function categorizeWithNano(
   target: CategorizationTarget,
   collections: readonly Collection[],
   signal?: AbortSignal,
+  spaceNamesById?: ReadonlyMap<string, string>,
 ): Promise<CategorizationSuggestion | null> {
   const session = await createNanoCategorizerSession(signal);
   if (!session) return null;
 
   try {
-    return await session.categorize(target, collections, signal);
+    return await session.categorize(
+      target,
+      collections,
+      signal,
+      spaceNamesById,
+    );
   } finally {
     session.destroy();
   }
