@@ -8,15 +8,17 @@ import {
 import { MotionConfig } from 'motion/react';
 import { useMemo, useState } from 'react';
 import { Toaster } from 'sonner';
+import { LinkFavicon } from '@/components/LinkFavicon';
 import { QuickStashCard } from '@/components/sidepanel/quick-stash-card';
 import { Button } from '@/components/ui/button';
 import { useActiveTab } from '@/hooks/use-active-tab';
 import { useStashData } from '@/hooks/use-stash-data';
 import { resolveReducedMotionPolicy } from '@/lib/motion/physics';
 import { stashRepo } from '@/lib/storage/repo';
+import { getCuratedCollectionIcon } from '@/lib/themes/collection-icons';
 import { TAB_GROUP_COLOR_SWATCH } from '@/lib/types/stash';
 import { groupAndFilterCollections } from '@/lib/utils/search';
-import { extractDomain, getMonogram } from '@/lib/utils/url';
+import { extractDomain } from '@/lib/utils/url';
 
 export function SidePanelApp() {
   const { collections, links, rules, settings, activeTheme } = useStashData();
@@ -128,6 +130,10 @@ export function SidePanelApp() {
                 collection.id,
                 collection.collapsed,
               );
+              const CuratedIcon = getCuratedCollectionIcon(collection.icon);
+              const colorHex =
+                collection.tintColor ??
+                TAB_GROUP_COLOR_SWATCH[collection.color];
               return (
                 <div
                   key={collection.id}
@@ -145,13 +151,25 @@ export function SidePanelApp() {
                       ) : (
                         <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
                       )}
-                      <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{
-                          backgroundColor:
-                            TAB_GROUP_COLOR_SWATCH[collection.color],
-                        }}
-                      />
+                      {CuratedIcon ? (
+                        <CuratedIcon
+                          className="h-3.5 w-3.5 shrink-0"
+                          style={{ color: colorHex }}
+                          aria-hidden="true"
+                        />
+                      ) : collection.icon ? (
+                        <span
+                          className="shrink-0 text-xs leading-none"
+                          aria-hidden="true"
+                        >
+                          {collection.icon}
+                        </span>
+                      ) : (
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: colorHex }}
+                        />
+                      )}
                       <span className="truncate">{collection.name}</span>
                     </span>
                     <span className="shrink-0 font-mono text-[10px] text-fg-muted">
@@ -170,18 +188,12 @@ export function SidePanelApp() {
                           onClick={() => void stashRepo.markLinkOpened(link.id)}
                           className="flex items-start gap-2 rounded-control px-2 py-1.5 transition-colors hover:bg-card"
                         >
-                          <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-canvas font-mono text-[10px] font-semibold text-accent">
-                            {link.faviconUrl ? (
-                              <img
-                                src={link.faviconUrl}
-                                alt=""
-                                width={14}
-                                height={14}
-                                className="h-3.5 w-3.5 object-contain"
-                              />
-                            ) : (
-                              <span>{getMonogram(link.title, link.url)}</span>
-                            )}
+                          <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-canvas">
+                            <LinkFavicon
+                              url={link.url}
+                              faviconUrl={link.faviconUrl}
+                              size="sm"
+                            />
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-xs font-medium text-fg">

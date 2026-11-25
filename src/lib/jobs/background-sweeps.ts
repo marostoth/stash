@@ -102,7 +102,8 @@ export async function startAutoIconSweep(
           : 'Canceled icon assignment.',
       );
     } else if (applied > 0) {
-      playSessionFreeze();
+      const settings = await stashRepo.getSettings();
+      playSessionFreeze(settings.soundEffects, settings.motionMode);
       toast.success(
         `Assigned AI icons to ${applied} ${applied === 1 ? 'collection' : 'collections'}`,
       );
@@ -146,6 +147,7 @@ export async function startAutoTagSweep(collectionId?: string): Promise<void> {
   });
 
   try {
+    const initialSettings = await stashRepo.getSettings();
     const { addTaggingLink, removeTaggingLink } = useUiStore.getState();
     const result = await runBatchAutoTagSweep({
       collectionId,
@@ -170,7 +172,7 @@ export async function startAutoTagSweep(collectionId?: string): Promise<void> {
       onLinkEnd: (id, tags) => {
         removeTaggingLink(id);
         if (tags && tags.length > 0) {
-          playTagPop();
+          playTagPop(initialSettings.soundEffects, initialSettings.motionMode);
         }
       },
     });
@@ -192,7 +194,8 @@ export async function startAutoTagSweep(collectionId?: string): Promise<void> {
     }
 
     if (result.tagged > 0) {
-      playSessionFreeze();
+      const latestSettings = await stashRepo.getSettings();
+      playSessionFreeze(latestSettings.soundEffects, latestSettings.motionMode);
       toast.success(
         `Auto-tagged ${result.tagged} of ${result.total} link${result.total === 1 ? '' : 's'}`,
       );

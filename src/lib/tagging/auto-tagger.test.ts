@@ -11,7 +11,10 @@ import {
   runBatchAutoTagSweep,
   sanitizeGeneratedTags,
 } from '@/lib/tagging/auto-tagger';
+import { triggerAutoTagSingleLink } from '@/lib/tagging/trigger-auto-tag';
 import type { LinkItem } from '@/lib/types/stash';
+import { useBackgroundJobsStore } from '@/store/background-jobs-store';
+import { useUiStore } from '@/store/ui-store';
 
 const globalWithLm = globalThis as { LanguageModel?: LanguageModelAPI };
 
@@ -290,5 +293,79 @@ describe('auto-tagger LanguageModel integration & tagsLocked protection', () => 
       expect(d).toHaveBeenCalledTimes(1);
     }
     expect(baseDestroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts hung autoTagSingleLink sessions on timeout and always invokes onLinkEnd cleanup', async () => {
+    const col = await stashRepo.createCollection({ name: 'Reading' });
+    const added = await stashRepo.addLink({
+      collectionId: col.id,
+      url: 'https://stalled.example',
+      title: 'Stalled Article',
+    });
+    expect(added.ok).toBe(true);
+    if (!added.ok) return;
+
+    const destroyMock = vi.fn();
+    let capturedSignal: AbortSignal | undefined;
+
+    globalWithLm.LanguageModel = {
+      availability: vi.fn().mockResolvedValue('available'),
+      create: vi
+        .fn()
+        .mockImplementation(async (opts?: { signal?: AbortSignal }) => {
+          capturedSignal = opts?.signal;
+          return {
+            prompt: vi.fn().mockImplementation(
+              () => new Promise<string>(() => {}), // Never resolves
+            ),
+            destroy: destroyMock,
+          };
+        }),
+    };
+
+    const onLinkStart = vi.fn();
+    const onLinkEnd = vi.fn();
+
+    const result = await autoTagSingleLink(added.link.id, {
+      timeoutMs: 30,
+      onLinkStart,
+      onLinkEnd,
+    });
+
+    expect(result).toBeNull();
+    expect(capturedSignal?.aborted).toBe(true);
+    expect(destroyMock).toHaveBeenCalledTimes(1);
+    expect(onLinkStart).toHaveBeenCalledWith(added.link.id);
+    expect(onLinkEnd).toHaveBeenCalledWith(added.link.id, null);
+  });
+
+  it('skips triggerAutoTagSingleLink when another Nano background job is active and clears taggingLinkIds', async () => {
+    useBackgroundJobsStore.getState().resetForTests();
+    const col = await stashRepo.createCollection({ name: 'Dev' });
+    const added = await stashRepo.addLink({
+      collectionId: col.id,
+      url: 'https://wxt.dev',
+      title: 'WXT',
+    });
+    expect(added.ok).toBe(true);
+    if (!added.ok) return;
+
+    const createMock = vi.fn();
+    globalWithLm.LanguageModel = {
+      availability: vi.fn().mockResolvedValue('available'),
+      create: createMock,
+    };
+
+    useBackgroundJobsStore.getState().upsertJob({
+      id: 'reorganize',
+      title: 'Smart Reorganize',
+      status: 'running',
+      usesNano: true,
+    });
+
+    expect(await triggerAutoTagSingleLink(added.link.id)).toBeNull();
+    expect(createMock).not.toHaveBeenCalled();
+    expect(useUiStore.getState().taggingLinkIds).not.toContain(added.link.id);
+    useBackgroundJobsStore.getState().resetForTests();
   });
 });

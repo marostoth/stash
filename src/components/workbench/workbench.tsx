@@ -296,6 +296,7 @@ export function Workbench() {
 
   const isSearching = searchQuery.trim().length > 0;
   const compact = settings.density === 'compact';
+  const wideBoard = settings.boardWidth === 'wide';
 
   return (
     <MotionConfig
@@ -324,7 +325,13 @@ export function Workbench() {
                 onScroll={dismissPreview}
                 className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6"
               >
-                <div className="mx-auto max-w-[1320px]">
+                <div
+                  className={
+                    wideBoard
+                      ? 'mx-auto max-w-[1720px]'
+                      : 'mx-auto max-w-[1320px]'
+                  }
+                >
                   {loading ? (
                     <div className="py-20 text-center font-mono text-xs text-fg-muted">
                       Loading workspace...
@@ -360,6 +367,7 @@ export function Workbench() {
                             links={collectionLinks}
                             openInNewTab={settings.openLinkInNewTab}
                             compact={compact}
+                            wideBoard={wideBoard}
                             forceExpanded={isSearching}
                             dragDisabled={isSearching}
                             motionMode={settings.motionMode}

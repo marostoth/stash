@@ -1,3 +1,5 @@
+import { decodeHtmlEntities } from '@/lib/utils/html-entities';
+
 export interface ParsedOgMetadata {
   ogTitle?: string;
   ogDescription?: string;
@@ -5,21 +7,6 @@ export interface ParsedOgMetadata {
 }
 
 const MAX_HTML_SCAN_BYTES = 65_536;
-
-function decodeEntities(text: string): string {
-  return text
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
-      String.fromCodePoint(Number.parseInt(hex, 16)),
-    )
-    .replace(/&#(\d+);/g, (_, dec: string) =>
-      String.fromCodePoint(Number.parseInt(dec, 10)),
-    );
-}
 
 function parseAttributes(tagBody: string): Map<string, string> {
   const attrs = new Map<string, string>();
@@ -30,7 +17,7 @@ function parseAttributes(tagBody: string): Map<string, string> {
     const key = match[1]?.toLowerCase();
     const rawValue = match[2] ?? match[3] ?? match[4] ?? '';
     if (key) {
-      attrs.set(key, decodeEntities(rawValue).trim());
+      attrs.set(key, decodeHtmlEntities(rawValue).trim());
     }
   }
   return attrs;
@@ -82,7 +69,7 @@ export function parseOgFromHtml(
 
   const titleMatch = headSlice.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i);
   const pageTitle = titleMatch?.[1]
-    ? decodeEntities(titleMatch[1].replace(/\s+/g, ' ')).trim()
+    ? decodeHtmlEntities(titleMatch[1].replace(/\s+/g, ' ')).trim()
     : undefined;
 
   const rawTitle =

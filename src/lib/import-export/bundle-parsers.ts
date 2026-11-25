@@ -222,6 +222,10 @@ export function parseSettings(raw: unknown): StashSettings {
       obj.density === 'compact' || obj.density === 'comfortable'
         ? obj.density
         : DEFAULT_SETTINGS.density,
+    boardWidth:
+      obj.boardWidth === 'standard' || obj.boardWidth === 'wide'
+        ? obj.boardWidth
+        : DEFAULT_SETTINGS.boardWidth,
     customThemes: [],
   };
 }

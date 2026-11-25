@@ -82,6 +82,7 @@ export interface CategorizationRule {
 }
 
 export type MotionMode = 'arcade' | 'tactile' | 'reduced' | 'off';
+export type BoardWidthMode = 'standard' | 'wide';
 export type CardRadiusPreset = 'sharp' | 'standard' | 'rounded';
 export type BackdropStyle =
   | 'flat'
@@ -110,6 +111,7 @@ export interface StashSettings {
   hoverPreviews: boolean;
   visualPreviewsEnabled: boolean;
   density: 'compact' | 'comfortable';
+  boardWidth: BoardWidthMode;
   customThemes?: ThemeDefinition[];
 }
 
@@ -187,5 +189,6 @@ export const DEFAULT_SETTINGS: StashSettings = {
   hoverPreviews: true,
   visualPreviewsEnabled: false,
   density: 'comfortable',
+  boardWidth: 'standard',
   customThemes: [],
 };

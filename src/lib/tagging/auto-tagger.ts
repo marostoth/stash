@@ -2,14 +2,21 @@ import {
   checkNanoAvailability,
   NANO_AVAILABILITY_OPTIONS,
 } from '@/lib/categorizer/nano-engine';
+import {
+  clampDeterministicSampling,
+  getLanguageModel,
+  resolveDeterministicSampling,
+  stripJsonFences,
+} from '@/lib/categorizer/nano-helpers';
 import type {
-  LanguageModelAPI,
   LanguageModelParams,
   LanguageModelSession,
 } from '@/lib/categorizer/types';
 import { stashRepo } from '@/lib/storage/repo';
 import type { LinkItem } from '@/lib/types/stash';
 import { extractDomain } from '@/lib/utils/url';
+
+export const AUTO_TAG_SINGLE_TIMEOUT_MS = 12_000;
 
 export const AUTO_TAG_RESPONSE_CONSTRAINT: Record<string, unknown> = {
   type: 'object',
@@ -39,28 +46,13 @@ export interface AutoTagSweepResult {
 export interface AutoTagLifecycleHooks {
   onLinkStart?: (linkId: string) => void;
   onLinkEnd?: (linkId: string, tags: string[] | null) => void;
+  timeoutMs?: number;
 }
 
 export interface BatchAutoTagOptions extends AutoTagLifecycleHooks {
   collectionId?: string;
   signal?: AbortSignal;
   onProgress?: (progress: AutoTagProgress) => void;
-}
-
-function getLanguageModel(): LanguageModelAPI | undefined {
-  const globalObj = globalThis as { LanguageModel?: unknown };
-  const candidate = globalObj.LanguageModel;
-  if (
-    candidate &&
-    (typeof candidate === 'object' || typeof candidate === 'function') &&
-    'availability' in candidate &&
-    'create' in candidate &&
-    typeof (candidate as LanguageModelAPI).availability === 'function' &&
-    typeof (candidate as LanguageModelAPI).create === 'function'
-  ) {
-    return candidate as LanguageModelAPI;
-  }
-  return undefined;
 }
 
 export function isEligibleForAutoTag(link: LinkItem): boolean {
@@ -141,12 +133,6 @@ export function sanitizeGeneratedTags(
   return result;
 }
 
-function stripJsonFences(rawText: string): string {
-  const trimmed = rawText.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return fenced?.[1] ? fenced[1].trim() : trimmed;
-}
-
 export function parseAutoTagResponse(
   rawText: string,
   collectionName?: string,
@@ -166,23 +152,7 @@ export function parseAutoTagResponse(
 export function clampDeterministicParams(
   params: LanguageModelParams | null | undefined,
 ): { temperature: number; topK: number } {
-  const maxTemp =
-    typeof params?.maxTemperature === 'number' &&
-    Number.isFinite(params.maxTemperature) &&
-    params.maxTemperature >= 0
-      ? params.maxTemperature
-      : 2;
-  const maxTopK =
-    typeof params?.maxTopK === 'number' &&
-    Number.isFinite(params.maxTopK) &&
-    params.maxTopK >= 1
-      ? Math.floor(params.maxTopK)
-      : 1;
-
-  return {
-    temperature: Math.max(0, Math.min(0, maxTemp)),
-    topK: Math.max(1, Math.min(1, maxTopK)),
-  };
+  return clampDeterministicSampling(params);
 }
 
 function buildTaggingInitialPrompts(
@@ -235,23 +205,34 @@ function buildLinkPromptPayload(
   });
 }
 
-async function resolveSamplingParams(
-  lm: LanguageModelAPI,
-): Promise<{ temperature: number; topK: number }> {
-  if (typeof lm.params !== 'function') {
-    return { temperature: 0, topK: 1 };
-  }
-  try {
-    const params = await lm.params();
-    return clampDeterministicParams(params);
-  } catch {
-    return { temperature: 0, topK: 1 };
-  }
+function raceWithAbortTimeout<T>(
+  work: Promise<T>,
+  controller: AbortController,
+  timeoutMs: number,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error('Auto-tag timed out'));
+    }, timeoutMs);
+
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err: unknown) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
 }
 
 /**
  * Trigger A — Non-blocking single-link auto-tagging after manual save.
- * Gracefully no-ops if disabled, unavailable, or if link was edited/deleted mid-flight.
+ * Enforces a 12-second AbortController timeout so a stalled Nano session can
+ * never hang indefinitely, and guarantees `onLinkEnd` runs in `finally`.
  */
 export async function autoTagSingleLink(
   linkId: string,
@@ -274,22 +255,42 @@ export async function autoTagSingleLink(
     snapshot.collections.find((c) => c.id === targetLink.collectionId)?.name ??
     '';
   const existingTags = extractTopExistingTags(snapshot.links, 50);
+  const timeoutMs = hooks?.timeoutMs ?? AUTO_TAG_SINGLE_TIMEOUT_MS;
+  const controller = new AbortController();
 
-  let session: LanguageModelSession | null = null;
+  const sessionHolder: { current: LanguageModelSession | null } = {
+    current: null,
+  };
   let appliedTags: string[] | null = null;
   hooks?.onLinkStart?.(linkId);
   try {
-    const sampling = await resolveSamplingParams(lm);
-    session = await lm.create({
-      ...NANO_AVAILABILITY_OPTIONS,
-      ...sampling,
-      initialPrompts: buildTaggingInitialPrompts(existingTags),
-    });
-
-    const rawText = await session.prompt(
-      buildLinkPromptPayload(targetLink, collectionName),
-      { responseConstraint: AUTO_TAG_RESPONSE_CONSTRAINT },
+    const rawText = await raceWithAbortTimeout(
+      (async () => {
+        const sampling = await resolveDeterministicSampling(lm);
+        const created = await lm.create({
+          ...NANO_AVAILABILITY_OPTIONS,
+          ...sampling,
+          signal: controller.signal,
+          initialPrompts: buildTaggingInitialPrompts(existingTags),
+        });
+        if (controller.signal.aborted) {
+          created.destroy();
+          throw new Error('Auto-tag timed out');
+        }
+        sessionHolder.current = created;
+        return created.prompt(
+          buildLinkPromptPayload(targetLink, collectionName),
+          {
+            responseConstraint: AUTO_TAG_RESPONSE_CONSTRAINT,
+            signal: controller.signal,
+          },
+        );
+      })(),
+      controller,
+      timeoutMs,
     );
+
+    if (controller.signal.aborted) return null;
 
     const tags = parseAutoTagResponse(rawText, collectionName);
     if (tags.length === 0) return null;
@@ -300,7 +301,8 @@ export async function autoTagSingleLink(
   } catch {
     return null;
   } finally {
-    session?.destroy();
+    controller.abort();
+    sessionHolder.current?.destroy();
     hooks?.onLinkEnd?.(linkId, appliedTags);
   }
 }
@@ -340,7 +342,7 @@ export async function runBatchAutoTagSweep(
   let skipped = 0;
 
   try {
-    const sampling = await resolveSamplingParams(lm);
+    const sampling = await resolveDeterministicSampling(lm);
     baseSession = await lm.create({
       ...NANO_AVAILABILITY_OPTIONS,
       ...sampling,

@@ -1,4 +1,5 @@
 import { isStashableUrl } from '@/lib/tabs/session-filter';
+import { decodeHtmlEntities } from '@/lib/utils/html-entities';
 import { extractDomain } from '@/lib/utils/url';
 
 export interface ImportedBookmarkLink {
@@ -29,21 +30,6 @@ const ROOT_WRAPPER_NAMES = new Set([
   'mobile bookmarks',
   'unfiled bookmarks',
 ]);
-
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
-      String.fromCodePoint(Number.parseInt(hex, 16)),
-    )
-    .replace(/&#(\d+);/g, (_, dec: string) =>
-      String.fromCodePoint(Number.parseInt(dec, 10)),
-    );
-}
 
 function readAttr(attrs: string, name: string): string | undefined {
   const regex = new RegExp(

@@ -477,16 +477,19 @@ describe('stashRepo', () => {
     expect(settings.wallpaperEnabled).toBe(false);
     expect(settings.wallpaperDim).toBe(45);
     expect(settings.wallpaperBlur).toBe(4);
+    expect(settings.boardWidth).toBe('standard');
 
     const updated = await stashRepo.updateSettings({
       backdropOverride: 'noise-grain',
       wallpaperEnabled: true,
       wallpaperDim: 60,
       wallpaperBlur: 8,
+      boardWidth: 'wide',
     });
     expect(updated.backdropOverride).toBe('noise-grain');
     expect(updated.wallpaperEnabled).toBe(true);
     expect(updated.wallpaperDim).toBe(60);
     expect(updated.wallpaperBlur).toBe(8);
+    expect(updated.boardWidth).toBe('wide');
   });
 });

@@ -226,7 +226,9 @@ export function ThemesPanel({
       {/* Live Theme Studio Editor */}
       {editingTheme ? (
         <ThemeStudio
+          key={editingTheme.id}
           theme={editingTheme}
+          backdropOverride={settings.backdropOverride}
           onClose={() => setEditingThemeId(null)}
           onDelete={handleDelete}
         />

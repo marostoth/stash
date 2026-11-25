@@ -1,7 +1,11 @@
+import {
+  getLanguageModel,
+  normalizeAvailability,
+  stripJsonFences,
+} from '@/lib/categorizer/nano-helpers';
 import type {
   CategorizationSuggestion,
   CategorizationTarget,
-  LanguageModelAPI,
   LanguageModelAvailabilityOptions,
   LanguageModelSession,
   NanoAvailabilityStatus,
@@ -155,48 +159,11 @@ interface RawNanoResponse {
   summaryNote?: unknown;
 }
 
-function getLanguageModel(): LanguageModelAPI | undefined {
-  const globalObj = globalThis as { LanguageModel?: unknown };
-  const candidate = globalObj.LanguageModel;
-  if (
-    candidate &&
-    (typeof candidate === 'object' || typeof candidate === 'function') &&
-    'availability' in candidate &&
-    'create' in candidate &&
-    typeof (candidate as LanguageModelAPI).availability === 'function' &&
-    typeof (candidate as LanguageModelAPI).create === 'function'
-  ) {
-    return candidate as LanguageModelAPI;
-  }
-  return undefined;
-}
-
-function normalizeAvailability(raw: string): NanoAvailabilityStatus {
-  switch (raw) {
-    case 'available':
-    case 'readily':
-      return 'available';
-    case 'downloadable':
-    case 'after-download':
-      return 'downloadable';
-    case 'downloading':
-      return 'downloading';
-    default:
-      return 'unavailable';
-  }
-}
-
 function cleanOptionalString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   if (SENTINEL_VALUES.has(trimmed.toLowerCase())) return undefined;
   return trimmed;
-}
-
-function stripJsonFences(rawText: string): string {
-  const trimmed = rawText.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return fenced?.[1] ? fenced[1].trim() : trimmed;
 }
 
 export function parseNanoResponse(

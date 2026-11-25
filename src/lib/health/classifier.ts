@@ -1,3 +1,5 @@
+import { decodeHtmlEntities } from '@/lib/utils/html-entities';
+
 export type LinkHealthStatus = 'alive' | 'dead' | 'needs_review';
 
 export interface FetchProbeResult {
@@ -57,24 +59,6 @@ const SOFT_404_PATTERNS: ReadonlyArray<{ pattern: RegExp; reason: string }> = [
 
 const SUSPICIOUS_HINT_PATTERN =
   /\b(for\s+sale|parked|coming\s+soon|under\s+construction|expired|suspended|not\s+found|404)\b/i;
-
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => {
-      const code = Number.parseInt(hex, 16);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : '';
-    })
-    .replace(/&#(\d+);/g, (_, dec: string) => {
-      const code = Number.parseInt(dec, 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : '';
-    });
-}
 
 /**
  * Pure MV3-service-worker-safe HTML title & short head/body snippet extractor.

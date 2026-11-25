@@ -33,6 +33,7 @@ import { startNanoModelDownload } from '@/lib/jobs/background-sweeps';
 import { stashRepo } from '@/lib/storage/repo';
 import { filterEligibleLinks } from '@/lib/tagging/auto-tagger';
 import type {
+  BoardWidthMode,
   CategorizationRule,
   Collection,
   LinkItem,
@@ -222,6 +223,23 @@ export function SettingsModal({
                     className="h-4 w-4 accent-[var(--stash-accent)] cursor-pointer"
                   />
                 </label>
+
+                <div className="flex items-center justify-between gap-3 py-1 text-xs text-fg">
+                  <label htmlFor="settings-board-width">Board width</label>
+                  <Select
+                    id="settings-board-width"
+                    value={settings.boardWidth}
+                    onChange={(e) =>
+                      void stashRepo.updateSettings({
+                        boardWidth: e.target.value as BoardWidthMode,
+                      })
+                    }
+                    className="h-8 w-36 text-xs"
+                  >
+                    <option value="standard">Standard</option>
+                    <option value="wide">Ultrawide</option>
+                  </Select>
+                </div>
 
                 <label className="flex cursor-pointer items-center justify-between gap-3 py-1 text-xs text-fg">
                   <span>Include pinned tabs when saving sessions</span>

@@ -188,7 +188,7 @@ describe('health/classifier', () => {
       </html>
     `;
     const extracted = extractTitleAndSnippetFromHtml(html);
-    expect(extracted.title).toBe('Buy & Sell &mdash; Example');
+    expect(extracted.title).toBe('Buy & Sell — Example');
     expect(extracted.snippet).toContain('Welcome to Example');
     expect(extracted.snippet).toContain('Clean readable body snippet.');
     expect(extracted.snippet).not.toContain('window.__ignored');

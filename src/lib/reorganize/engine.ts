@@ -2,8 +2,12 @@ import {
   checkNanoAvailability,
   NANO_AVAILABILITY_OPTIONS,
 } from '@/lib/categorizer/nano-engine';
+import {
+  getLanguageModel,
+  resolveDeterministicSampling,
+  stripJsonFences,
+} from '@/lib/categorizer/nano-helpers';
 import type {
-  LanguageModelAPI,
   LanguageModelSession,
   NanoAvailabilityStatus,
 } from '@/lib/categorizer/types';
@@ -15,7 +19,6 @@ import {
   sanitizeProposedCategories,
   UNCATEGORIZED_CATEGORY_NAME,
 } from '@/lib/reorganize/digest';
-import { clampDeterministicParams } from '@/lib/tagging/auto-tagger';
 import type { LinkItem } from '@/lib/types/stash';
 import { extractDomain } from '@/lib/utils/url';
 
@@ -65,41 +68,6 @@ export type SortLinksResult =
       reason: string;
     }
   | { status: 'error'; reason: string; assignments: Record<string, string> };
-
-function getLanguageModel(): LanguageModelAPI | undefined {
-  const globalObj = globalThis as { LanguageModel?: unknown };
-  const candidate = globalObj.LanguageModel;
-  if (
-    candidate &&
-    (typeof candidate === 'object' || typeof candidate === 'function') &&
-    'availability' in candidate &&
-    'create' in candidate &&
-    typeof (candidate as LanguageModelAPI).availability === 'function' &&
-    typeof (candidate as LanguageModelAPI).create === 'function'
-  ) {
-    return candidate as LanguageModelAPI;
-  }
-  return undefined;
-}
-
-function stripJsonFences(rawText: string): string {
-  const trimmed = rawText.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return fenced?.[1] ? fenced[1].trim() : trimmed;
-}
-
-async function resolveSamplingParams(
-  lm: LanguageModelAPI,
-): Promise<{ temperature: number; topK: number }> {
-  if (typeof lm.params !== 'function') {
-    return { temperature: 0, topK: 1 };
-  }
-  try {
-    return clampDeterministicParams(await lm.params());
-  } catch {
-    return { temperature: 0, topK: 1 };
-  }
-}
 
 async function fitDigestToQuota(
   session: LanguageModelSession,
@@ -173,7 +141,7 @@ export async function proposeCategories(
 
   let session: LanguageModelSession | null = null;
   try {
-    const sampling = await resolveSamplingParams(lm);
+    const sampling = await resolveDeterministicSampling(lm);
     session = await lm.create({
       ...NANO_AVAILABILITY_OPTIONS,
       ...sampling,
@@ -307,7 +275,7 @@ export async function sortLinksIntoCategories(
   let baseSession: LanguageModelSession | null = null;
 
   try {
-    const sampling = await resolveSamplingParams(lm);
+    const sampling = await resolveDeterministicSampling(lm);
     baseSession = await lm.create({
       ...NANO_AVAILABILITY_OPTIONS,
       ...sampling,

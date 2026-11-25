@@ -128,13 +128,30 @@ export async function putPreviewEntry(
       const store = tx.objectStore(PREVIEW_STORE_NAME);
       store.put(record);
 
-      const getAllReq = store.getAll();
-      getAllReq.onsuccess = () => {
-        const all = getAllReq.result as PreviewCacheEntry[];
-        const evictKeys = selectLruEvictionKeys(all, PREVIEW_CACHE_MAX_ENTRIES);
-        for (const evictKey of evictKeys) {
-          store.delete(evictKey);
+      const countReq = store.count();
+      countReq.onsuccess = () => {
+        if (countReq.result <= PREVIEW_CACHE_MAX_ENTRIES) {
+          return;
         }
+        const meta: Array<Pick<PreviewCacheEntry, 'url' | 'lastAccessedAt'>> =
+          [];
+        const cursorReq = store.openCursor();
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (cursor) {
+            const val = cursor.value as PreviewCacheEntry;
+            meta.push({ url: val.url, lastAccessedAt: val.lastAccessedAt });
+            cursor.continue();
+            return;
+          }
+          const evictKeys = selectLruEvictionKeys(
+            meta,
+            PREVIEW_CACHE_MAX_ENTRIES,
+          );
+          for (const evictKey of evictKeys) {
+            store.delete(evictKey);
+          }
+        };
       };
 
       tx.oncomplete = () => resolve();

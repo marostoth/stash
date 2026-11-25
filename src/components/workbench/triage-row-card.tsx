@@ -1,9 +1,10 @@
 import { Check, X } from 'lucide-react';
+import { LinkFavicon } from '@/components/LinkFavicon';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import type { CategorizationSuggestion } from '@/lib/categorizer/types';
 import type { Collection, LinkItem } from '@/lib/types/stash';
-import { extractDomain, getMonogram } from '@/lib/utils/url';
+import { extractDomain } from '@/lib/utils/url';
 
 export interface TriageRowCardProps {
   link: LinkItem;
@@ -41,18 +42,8 @@ export function TriageRowCard({
   return (
     <div className="flex flex-col gap-2.5 rounded-card border border-border bg-canvas p-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 flex-1 items-start gap-2.5">
-        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-panel font-mono text-[10px] font-semibold text-accent">
-          {link.faviconUrl ? (
-            <img
-              src={link.faviconUrl}
-              alt=""
-              width={14}
-              height={14}
-              className="h-3.5 w-3.5 object-contain"
-            />
-          ) : (
-            <span>{getMonogram(link.title, link.url)}</span>
-          )}
+        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-panel">
+          <LinkFavicon url={link.url} faviconUrl={link.faviconUrl} size="sm" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-medium text-fg">

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { isTactileMotion, MODAL_SPRING } from '@/lib/motion/presets';
 import type { PreviewCacheEntry } from '@/lib/previews/cache';
@@ -108,13 +108,29 @@ export function LinkPreviewPopover({
     };
   }, [entry?.screenshotBlob]);
 
-  useLayoutEffect(() => {
-    if (!activePreview || !popoverRef.current) return;
-    const rect = popoverRef.current.getBoundingClientRect();
-    if (rect.height > 0 && Math.abs(rect.height - measuredHeight) > 4) {
-      setMeasuredHeight(rect.height);
+  const remeasure = useCallback(() => {
+    const el = popoverRef.current;
+    if (!el) return;
+    const nextHeight = Math.ceil(el.getBoundingClientRect().height);
+    if (nextHeight > 0) {
+      setMeasuredHeight((prev) =>
+        Math.abs(nextHeight - prev) > 2 ? nextHeight : prev,
+      );
     }
-  });
+  }, []);
+
+  useEffect(() => {
+    if (!activePreview) return;
+    const el = popoverRef.current;
+    if (!el) return;
+
+    remeasure();
+
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(remeasure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [activePreview, remeasure]);
 
   if (!hoverPreviews || typeof document === 'undefined') {
     return null;
@@ -152,6 +168,7 @@ export function LinkPreviewPopover({
               <img
                 src={screenshotUrl}
                 alt=""
+                onLoad={remeasure}
                 className="h-full w-full object-cover object-top"
               />
               <span className="absolute right-2 top-2 rounded-pill border border-border bg-panel/85 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-accent backdrop-blur-xs">
@@ -165,6 +182,7 @@ export function LinkPreviewPopover({
               <img
                 src={entry.ogImageUrl}
                 alt=""
+                onLoad={remeasure}
                 onError={() => setOgImageBroken(true)}
                 className="h-full w-full object-cover"
               />

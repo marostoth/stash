@@ -2,11 +2,12 @@ import {
   checkNanoAvailability,
   NANO_AVAILABILITY_OPTIONS,
 } from '@/lib/categorizer/nano-engine';
-import type {
-  LanguageModelAPI,
-  LanguageModelSession,
-} from '@/lib/categorizer/types';
-import { clampDeterministicParams } from '@/lib/tagging/auto-tagger';
+import {
+  getLanguageModel,
+  resolveDeterministicSampling,
+  stripJsonFences,
+} from '@/lib/categorizer/nano-helpers';
+import type { LanguageModelSession } from '@/lib/categorizer/types';
 
 const NANO_TIEBREAKER_TIMEOUT_MS = 3500;
 
@@ -22,22 +23,6 @@ const TIEBREAKER_SCHEMA: Record<string, unknown> = {
 export interface NanoSoftDeadVerdict {
   isDead: boolean;
   reason: string;
-}
-
-function getLanguageModel(): LanguageModelAPI | undefined {
-  const globalObj = globalThis as { LanguageModel?: unknown };
-  const candidate = globalObj.LanguageModel;
-  if (
-    candidate &&
-    (typeof candidate === 'object' || typeof candidate === 'function') &&
-    'availability' in candidate &&
-    'create' in candidate &&
-    typeof (candidate as LanguageModelAPI).availability === 'function' &&
-    typeof (candidate as LanguageModelAPI).create === 'function'
-  ) {
-    return candidate as LanguageModelAPI;
-  }
-  return undefined;
 }
 
 /**
@@ -66,11 +51,7 @@ export async function verifySuspiciousPageWithNano(
 
   let session: LanguageModelSession | null = null;
   try {
-    const params =
-      typeof lm.params === 'function'
-        ? await lm.params().catch(() => null)
-        : null;
-    const sampling = clampDeterministicParams(params);
+    const sampling = await resolveDeterministicSampling(lm);
 
     session = await lm.create({
       ...NANO_AVAILABILITY_OPTIONS,
@@ -97,7 +78,7 @@ export async function verifySuspiciousPageWithNano(
       },
     );
 
-    const parsed = JSON.parse(raw.trim()) as {
+    const parsed = JSON.parse(stripJsonFences(raw)) as {
       isDead?: unknown;
       reason?: unknown;
     };

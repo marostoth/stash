@@ -1,5 +1,5 @@
 import { AlertTriangle, Check, Copy, Palette, Trash2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,9 @@ import {
   inferCardRadiusPreset,
 } from '@/lib/themes/presets';
 import { encodeThemeShareCode } from '@/lib/themes/share';
+import { applyThemeToDocument } from '@/lib/themes/theme-engine';
 import type {
+  BackdropOverride,
   BackdropStyle,
   CardRadiusPreset,
   CoreThemeColors,
@@ -24,8 +26,11 @@ import type {
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 
+const SAVE_DEBOUNCE_MS = 120;
+
 interface ThemeStudioProps {
   theme: ThemeDefinition;
+  backdropOverride?: BackdropOverride;
   onClose: () => void;
   onDelete: (theme: ThemeDefinition) => Promise<void>;
 }
@@ -47,7 +52,12 @@ const RADIUS_ORDER: readonly CardRadiusPreset[] = [
   'rounded',
 ];
 
-export function ThemeStudio({ theme, onClose, onDelete }: ThemeStudioProps) {
+export function ThemeStudio({
+  theme,
+  backdropOverride = 'theme',
+  onClose,
+  onDelete,
+}: ThemeStudioProps) {
   const [name, setName] = useState(theme.name);
   const [core, setCore] = useState<CoreThemeColors>(() =>
     extractCoreThemeColors(theme),
@@ -63,15 +73,35 @@ export function ThemeStudio({ theme, onClose, onDelete }: ThemeStudioProps) {
   );
   const [copied, setCopied] = useState(false);
 
-  // Sync studio inputs if user switches which custom theme they are editing
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingThemeRef = useRef<ThemeDefinition | null>(null);
+
+  const cancelPendingSave = useCallback(() => {
+    if (saveTimerRef.current !== null) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    pendingThemeRef.current = null;
+  }, []);
+
+  const flushPendingSave = useCallback(() => {
+    if (saveTimerRef.current !== null) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const pending = pendingThemeRef.current;
+    pendingThemeRef.current = null;
+    if (pending) {
+      void stashRepo.saveCustomTheme(pending);
+    }
+  }, []);
+
+  // Flush any debounced color/name edit on unmount so zero changes are lost
   useEffect(() => {
-    const nextCore = extractCoreThemeColors(theme);
-    setName(theme.name);
-    setCore(nextCore);
-    setHexDrafts(nextCore);
-    setCardRadius(theme.cardRadius ?? inferCardRadiusPreset(theme.radius.card));
-    setBackdropStyle(theme.backdropStyle ?? 'flat');
-  }, [theme.id, theme]);
+    return () => {
+      flushPendingSave();
+    };
+  }, [flushPendingSave]);
 
   const persistLive = (next: {
     name?: string;
@@ -87,7 +117,22 @@ export function ThemeStudio({ theme, onClose, onDelete }: ThemeStudioProps) {
       cardRadius: next.cardRadius ?? cardRadius,
       backdropStyle: next.backdropStyle ?? backdropStyle,
     });
-    void stashRepo.saveCustomTheme(built);
+
+    // Apply CSS custom properties immediately for 60fps preview while debouncing storage writes
+    applyThemeToDocument(built, document.documentElement, backdropOverride);
+    pendingThemeRef.current = built;
+
+    if (saveTimerRef.current !== null) {
+      clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      const toSave = pendingThemeRef.current;
+      pendingThemeRef.current = null;
+      if (toSave) {
+        void stashRepo.saveCustomTheme(toSave);
+      }
+    }, SAVE_DEBOUNCE_MS);
   };
 
   const handleNameChange = (value: string) => {
@@ -172,7 +217,10 @@ export function ThemeStudio({ theme, onClose, onDelete }: ThemeStudioProps) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => void onDelete(theme)}
+            onClick={() => {
+              cancelPendingSave();
+              void onDelete(theme);
+            }}
             className="h-7 gap-1 px-2 text-[11px] hover:text-danger"
             title="Delete custom theme"
           >
@@ -182,7 +230,10 @@ export function ThemeStudio({ theme, onClose, onDelete }: ThemeStudioProps) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={onClose}
+            onClick={() => {
+              flushPendingSave();
+              onClose();
+            }}
             aria-label="Close Theme Studio"
             className="h-7 w-7"
           >

@@ -54,6 +54,7 @@ interface CollectionSectionProps {
   links: readonly LinkItem[];
   openInNewTab: boolean;
   compact: boolean;
+  wideBoard?: boolean;
   forceExpanded: boolean;
   dragDisabled: boolean;
   motionMode: MotionMode;
@@ -66,6 +67,7 @@ export function CollectionSection({
   links,
   openInNewTab,
   compact,
+  wideBoard = false,
   forceExpanded,
   dragDisabled,
   motionMode,
@@ -405,7 +407,9 @@ export function CollectionSection({
                 {links.length > 0 ? (
                   <div
                     className={cn(
-                      'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4',
+                      wideBoard
+                        ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1900px]:grid-cols-6'
+                        : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4',
                       compact ? 'gap-2.5' : 'gap-3.5',
                     )}
                   >

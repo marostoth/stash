@@ -1,8 +1,9 @@
 import { ArrowUpRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
+import { LinkFavicon } from '@/components/LinkFavicon';
 import type { LinkItem } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
-import { extractDomain, getMonogram } from '@/lib/utils/url';
+import { extractDomain } from '@/lib/utils/url';
 
 export interface HealthTriageRow {
   link: LinkItem;
@@ -24,23 +25,9 @@ interface HealthGroupSectionProps {
 }
 
 function HealthRowFavicon({ link }: { link: LinkItem }) {
-  const [failed, setFailed] = useState(false);
-
-  if (link.faviconUrl && !failed) {
-    return (
-      <img
-        src={link.faviconUrl}
-        alt=""
-        loading="lazy"
-        onError={() => setFailed(true)}
-        className="h-4 w-4 shrink-0 rounded-sm object-contain"
-      />
-    );
-  }
-
   return (
-    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-border bg-panel font-mono text-[9px] font-semibold text-fg-muted">
-      {getMonogram(link.title, link.url)}
+    <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border bg-panel">
+      <LinkFavicon url={link.url} faviconUrl={link.faviconUrl} size="sm" />
     </span>
   );
 }

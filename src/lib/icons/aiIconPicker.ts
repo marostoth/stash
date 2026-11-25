@@ -1,10 +1,15 @@
 import { NANO_AVAILABILITY_OPTIONS } from '@/lib/categorizer/nano-engine';
+import {
+  getLanguageModel,
+  normalizeAvailability,
+  resolveDeterministicSampling,
+  stripJsonFences,
+} from '@/lib/categorizer/nano-helpers';
 import type {
   LanguageModelAPI,
   LanguageModelSession,
 } from '@/lib/categorizer/types';
 import { CATALOG_ICON_KEYS, isValidCatalogIcon } from '@/lib/icons/catalog';
-import { clampDeterministicParams } from '@/lib/tagging/auto-tagger';
 
 export interface CollectionIconInput {
   id: string;
@@ -29,35 +34,6 @@ const ICON_RESPONSE_SCHEMA: Record<string, unknown> = {
   required: ['icon'],
 };
 
-function getLanguageModel(): LanguageModelAPI | undefined {
-  const globalObj = globalThis as { LanguageModel?: unknown };
-  const candidate = globalObj.LanguageModel;
-  if (
-    candidate &&
-    (typeof candidate === 'object' || typeof candidate === 'function') &&
-    'availability' in candidate &&
-    'create' in candidate &&
-    typeof (candidate as LanguageModelAPI).availability === 'function' &&
-    typeof (candidate as LanguageModelAPI).create === 'function'
-  ) {
-    return candidate as LanguageModelAPI;
-  }
-  return undefined;
-}
-
-async function resolveDeterministicSampling(
-  lm: LanguageModelAPI,
-): Promise<{ temperature: number; topK: number }> {
-  if (typeof lm.params !== 'function') {
-    return { temperature: 0, topK: 1 };
-  }
-  try {
-    return clampDeterministicParams(await lm.params());
-  } catch {
-    return { temperature: 0, topK: 1 };
-  }
-}
-
 function buildSystemPrompt(): string {
   return [
     'You select the single best Lucide icon key for a browser bookmark collection.',
@@ -81,12 +57,6 @@ function buildItemPrompt(
     return `Collection title: "${cleanTitle}"`;
   }
   return `Collection title: "${cleanTitle}"\nSample bookmarks: ${samples.join(' | ')}`;
-}
-
-function stripJsonFences(rawText: string): string {
-  const trimmed = rawText.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return fenced?.[1] ? fenced[1].trim() : trimmed;
 }
 
 function parseValidatedIcon(raw: string): string | null {
@@ -133,8 +103,8 @@ async function createBaseIconSession(
   signal?: AbortSignal,
 ): Promise<LanguageModelSession | null> {
   try {
-    const availability = await lm.availability(NANO_AVAILABILITY_OPTIONS);
-    if (availability !== 'available') {
+    const rawAvailability = await lm.availability(NANO_AVAILABILITY_OPTIONS);
+    if (normalizeAvailability(rawAvailability) !== 'available') {
       return null;
     }
   } catch {
