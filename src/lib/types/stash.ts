@@ -173,6 +173,7 @@ export interface StashSettings {
   soundEffects: boolean;
   soundVolume: number;
   soundPack: SoundPack;
+  customSoundsEnabled: boolean;
   hoverPreviews: boolean;
   visualPreviewsEnabled: boolean;
   density: CardDensity;
@@ -262,6 +263,7 @@ export const DEFAULT_SETTINGS: StashSettings = {
   soundEffects: true,
   soundVolume: 75,
   soundPack: 'studio-desk',
+  customSoundsEnabled: true,
   hoverPreviews: true,
   visualPreviewsEnabled: false,
   density: 'comfortable',

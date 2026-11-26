@@ -4,6 +4,7 @@ import {
   Palette,
   SlidersHorizontal,
   Sparkles,
+  Volume2,
   Wrench,
   Zap,
 } from 'lucide-react';
@@ -15,6 +16,7 @@ import { EffectsPanel } from '@/components/settings/effects-panel';
 import { GeneralPanel } from '@/components/settings/general-panel';
 import { LibraryToolsPanel } from '@/components/settings/library-tools-panel';
 import { ShortcutsPanel } from '@/components/settings/shortcuts-panel';
+import { SoundsPanel } from '@/components/settings/sounds-panel';
 import {
   Dialog,
   DialogContent,
@@ -70,8 +72,15 @@ const NAV_ITEMS: readonly NavItemSpec[] = [
     id: 'effects',
     label: 'Effects',
     description:
-      'Motion physics, drop shockwaves, mechanical foley, and effect volume.',
+      'Motion feel, perimeter drop shockwaves, hover sheen, and action waves.',
     Icon: Zap,
+  },
+  {
+    id: 'sounds',
+    label: 'Sounds',
+    description:
+      'Synthesized sound packs, volume, audition board, and custom audio clips.',
+    Icon: Volume2,
   },
   {
     id: 'ai-rules',
@@ -276,6 +285,8 @@ export function SettingsModal({
             />
           ) : activeTab === 'effects' ? (
             <EffectsPanel settings={settings} />
+          ) : activeTab === 'sounds' ? (
+            <SoundsPanel settings={settings} />
           ) : activeTab === 'ai-rules' ? (
             <AiRulesPanel
               collections={collections}

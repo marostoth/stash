@@ -35,6 +35,7 @@ export type SettingsTab =
   | 'general'
   | 'appearance'
   | 'effects'
+  | 'sounds'
   | 'ai-rules'
   | 'library-tools'
   | 'shortcuts'

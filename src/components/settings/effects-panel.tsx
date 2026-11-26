@@ -1,7 +1,6 @@
 import { Flame, Sparkles, Zap } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
-import { EffectsSoundCard } from '@/components/settings/effects-sound-card';
 import { EffectsTogglesCard } from '@/components/settings/effects-toggles-card';
 import { SettingsSectionCard } from '@/components/settings/settings-section-card';
 import { Button } from '@/components/ui/button';
@@ -292,12 +291,6 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
 
       {/* 3. Fine-Tune Physics & Waves */}
       <EffectsTogglesCard settings={settings} />
-
-      {/* 4. Sound Effects, Sound Packs & Volume */}
-      <EffectsSoundCard
-        settings={settings}
-        onTriggerTestSlam={() => triggerTestSlam()}
-      />
     </div>
   );
 }

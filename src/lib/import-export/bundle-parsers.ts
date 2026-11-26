@@ -366,6 +366,10 @@ export function parseSettings(raw: unknown): StashSettings {
       obj.soundPack === 'glass-ceramic'
         ? obj.soundPack
         : DEFAULT_SETTINGS.soundPack,
+    customSoundsEnabled:
+      typeof obj.customSoundsEnabled === 'boolean'
+        ? obj.customSoundsEnabled
+        : DEFAULT_SETTINGS.customSoundsEnabled,
     hoverPreviews:
       typeof obj.hoverPreviews === 'boolean'
         ? obj.hoverPreviews

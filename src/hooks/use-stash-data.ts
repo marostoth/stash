@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
+import { customSfxStore } from '@/lib/audio/custom-sfx-store';
 import {
+  setCustomSfxClips,
+  setCustomSoundsEnabled,
   setFoleyMotionMode,
   setSoundEffectsEnabled,
   setSoundPack,
@@ -84,6 +87,15 @@ export function useStashData(): StashDataState {
     const unwatchRules = stashRepo.watchRules(setRules);
     const unwatchSettings = stashRepo.watchSettings(setSettings);
     const unwatchThemes = stashRepo.watchCustomThemes(setCustomThemes);
+    void customSfxStore
+      .getAll()
+      .then((clips) => {
+        if (active) setCustomSfxClips(clips);
+      })
+      .catch(() => undefined);
+    const unwatchCustomSfx = customSfxStore.watch((clips) => {
+      setCustomSfxClips(clips);
+    });
 
     return () => {
       active = false;
@@ -93,6 +105,7 @@ export function useStashData(): StashDataState {
       unwatchRules();
       unwatchSettings();
       unwatchThemes();
+      unwatchCustomSfx();
     };
   }, []);
 
@@ -138,6 +151,7 @@ export function useStashData(): StashDataState {
     setSoundEffectsEnabled(settings.soundEffects);
     setSoundVolume(settings.soundVolume);
     setSoundPack(settings.soundPack ?? 'studio-desk');
+    setCustomSoundsEnabled(settings.customSoundsEnabled !== false);
     setFoleyMotionMode(settings.motionMode);
     if (typeof document !== 'undefined') {
       document.documentElement.dataset.motion = settings.motionMode;
@@ -146,6 +160,7 @@ export function useStashData(): StashDataState {
     settings.soundEffects,
     settings.soundVolume,
     settings.soundPack,
+    settings.customSoundsEnabled,
     settings.motionMode,
   ]);
 

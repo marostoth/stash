@@ -133,5 +133,6 @@ Execute **one milestone at a time**. At the end of each milestone, run all four 
 - [x] **Pinned Quick Launch Strip:** Compact favicon dock right below the Space bar for 1-click launch of pinned or starred daily sites, with inline `+ Pin` search popover and Settings toggle.
 - [x] **Smart Filter Views & Cross-Space Duplicate Finder:** Top Bar **Views** dropdown (*Recently Added 7d*, *Recently Opened*, *Untagged*) + 1-click cross-Space duplicate URL scanner inside *Settings → Library Tools*.
 
-### Milestone D (v1.21.0) — Custom Audio Pack Uploader (In Progress)
-- [ ] **Custom Audio Pack (`.mp3` / `.wav` / `.ogg` per-event clips):** Upload your own sound files for any of the 7 events (`Drop Slam`, `Pickup`, `Star / Tag`, `Session Lock`, `Hover Riffle`, `Delete`, `Blocked`) stored locally in IndexedDB, routed through the Cinematic DSP bus (Volume + soft limiter + subtle ±4% pitch jitter), with automatic fallback to your chosen base pack for any unfilled slots.
+### Milestone D (v1.21.0) — Custom Audio Pack Uploader & Dedicated Sounds Settings (Shipped)
+- [x] **Custom Audio Pack (`.mp3` / `.wav` / `.ogg` per-event clips):** Upload your own sound files for any of the 7 events (`Drop Slam`, `Pickup`, `Star / Tag`, `Session Lock`, `Hover Riffle`, `Delete`, `Blocked`) stored locally via WXT storage, decoded into an instant 0ms `AudioBuffer` cache, routed through the shared master Volume + soft limiter with subtle ±3.5% pitch jitter, and automatic fallback to your active Sound Pack for unfilled slots.
+- [x] **Dedicated Settings → Sounds Page:** Split **Sounds** (Sound Packs, Volume, Audition Soundboard, and Custom Audio Clips) into its own Settings tab separate from visual **Effects**.

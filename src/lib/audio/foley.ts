@@ -9,8 +9,16 @@ import {
   createCooldownGate,
   HOVER_RIFFLE_COOLDOWN_MS,
 } from '@/lib/audio/combo';
+import {
+  resetCustomSfxCacheForTests,
+  setCustomSfxClips,
+  setCustomSoundsEnabled,
+  tryPlayCustomSfx,
+} from '@/lib/audio/custom-sfx-player';
 import { SOUND_PACK_RECIPES } from '@/lib/audio/sound-packs';
 import type { MotionMode, SoundPack } from '@/lib/types/stash';
+
+export { setCustomSfxClips, setCustomSoundsEnabled };
 
 let globalSoundEnabled = true;
 let globalMotionMode: MotionMode = 'tactile';
@@ -37,6 +45,7 @@ export function setSoundPack(pack: SoundPack): void {
 
 export function resetFoleyContextForTests(): void {
   resetAudioBusForTests();
+  resetCustomSfxCacheForTests();
   globalSoundEnabled = true;
   globalMotionMode = 'tactile';
   globalSoundPack = 'studio-desk';
@@ -62,6 +71,7 @@ export function playPickup(enabled?: boolean): void {
   if (!shouldPlay(enabled)) return;
   const bus = getReadyAudioBus();
   if (!bus) return;
+  if (tryPlayCustomSfx(bus, 'pickup', { gain: 0.9 })) return;
   try {
     getActiveRecipe().pickup({
       ctx: bus.ctx,
@@ -82,6 +92,14 @@ export function playDrop(enabled?: boolean, mode?: MotionMode): void {
   if (!bus) return;
   const arcade = isArcade(mode);
   const pitch = arcade ? comboTracker.next().multiplier : 1;
+  if (
+    tryPlayCustomSfx(bus, 'drop', {
+      pitchMultiplier: arcade ? 0.95 + (pitch - 1) * 0.25 : 1,
+      gain: 1.0,
+    })
+  ) {
+    return;
+  }
   try {
     getActiveRecipe().drop({
       ctx: bus.ctx,
@@ -102,6 +120,7 @@ export function playSessionFreeze(enabled?: boolean, mode?: MotionMode): void {
   if (!bus) return;
   const arcade = isArcade(mode);
   const pitch = arcade ? comboTracker.next().multiplier : 1;
+  if (tryPlayCustomSfx(bus, 'sessionFreeze', { gain: 1.0 })) return;
   try {
     getActiveRecipe().sessionFreeze({
       ctx: bus.ctx,
@@ -121,6 +140,14 @@ export function playTagPop(enabled?: boolean, mode?: MotionMode): void {
   const bus = getReadyAudioBus();
   if (!bus) return;
   const pitch = comboTracker.next().multiplier;
+  if (
+    tryPlayCustomSfx(bus, 'tagPop', {
+      pitchMultiplier: 0.98 + (pitch - 1) * 0.3,
+      gain: 0.95,
+    })
+  ) {
+    return;
+  }
   try {
     getActiveRecipe().tagPop({
       ctx: bus.ctx,
@@ -145,6 +172,9 @@ export function playHoverRiffle(
 
   const bus = getReadyAudioBus();
   if (!bus) return false;
+  if (tryPlayCustomSfx(bus, 'hoverRiffle', { gain: 0.6, jitterAmount: 0.05 })) {
+    return true;
+  }
   try {
     getActiveRecipe().hoverRiffle({
       ctx: bus.ctx,
@@ -164,6 +194,7 @@ export function playDelete(enabled?: boolean): void {
   if (!shouldPlay(enabled)) return;
   const bus = getReadyAudioBus();
   if (!bus) return;
+  if (tryPlayCustomSfx(bus, 'delete', { gain: 0.95 })) return;
   try {
     getActiveRecipe().delete({
       ctx: bus.ctx,
@@ -182,6 +213,7 @@ export function playError(enabled?: boolean): void {
   if (!shouldPlay(enabled)) return;
   const bus = getReadyAudioBus();
   if (!bus) return;
+  if (tryPlayCustomSfx(bus, 'error', { gain: 0.95 })) return;
   try {
     getActiveRecipe().error({
       ctx: bus.ctx,
