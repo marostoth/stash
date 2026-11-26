@@ -105,3 +105,45 @@ export function formatCurrencySummaries(
     .map((entry) => formatPrice(entry.total, entry.currency, entry.hasEstimate))
     .join(' + ');
 }
+
+export interface PriceDelta {
+  amount: number;
+  direction: 'down' | 'up';
+}
+
+/**
+ * Computes the unit price delta between current and previous prices.
+ * Returns null when previousPrice is missing or differs by less than 0.01.
+ */
+export function computePriceDelta(
+  currentPrice?: number,
+  previousPrice?: number,
+): PriceDelta | null {
+  if (
+    typeof currentPrice !== 'number' ||
+    !Number.isFinite(currentPrice) ||
+    typeof previousPrice !== 'number' ||
+    !Number.isFinite(previousPrice)
+  ) {
+    return null;
+  }
+  const diff = Math.round((currentPrice - previousPrice) * 100) / 100;
+  if (Math.abs(diff) < 0.01) return null;
+  return {
+    amount: Math.abs(diff),
+    direction: diff < 0 ? 'down' : 'up',
+  };
+}
+
+/**
+ * Sums prices for unchecked (`checked !== true`) links only.
+ */
+export function summarizeRemainingPrices(
+  links: readonly LinkItem[],
+  fallbackCurrency = 'GBP',
+): CurrencySummary[] {
+  return summarizePrices(
+    links.filter((link) => link.checked !== true),
+    fallbackCurrency,
+  );
+}

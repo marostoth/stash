@@ -29,6 +29,7 @@ export interface UpdateSpaceInput {
   densityOverride?: CardDensity | null;
   viewMode?: SpaceViewMode;
   groupBy?: SpaceGroupBy;
+  hideChecked?: boolean;
 }
 
 export interface DeleteSpaceResult {
@@ -69,6 +70,7 @@ export interface AddLinkInput {
   tags?: string[];
   tagsLocked?: boolean;
   starred?: boolean;
+  checked?: boolean;
   product?: ProductMeta;
   faviconUrl?: string;
 }
@@ -81,6 +83,7 @@ export interface UpdateLinkInput {
   tags?: string[];
   tagsLocked?: boolean;
   starred?: boolean;
+  checked?: boolean;
   product?: ProductMeta | null;
   faviconUrl?: string;
   order?: number;

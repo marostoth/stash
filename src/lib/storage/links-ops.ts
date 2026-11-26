@@ -40,6 +40,7 @@ export function findDuplicateLinkInList(
 
 function normalizeProductMeta(
   raw: ProductMeta | null | undefined,
+  previous?: ProductMeta,
 ): ProductMeta | undefined {
   if (!raw) return undefined;
   const store = raw.store?.trim() || undefined;
@@ -50,6 +51,41 @@ function normalizeProductMeta(
     raw.price >= 0
       ? Math.round(raw.price * 100) / 100
       : undefined;
+  const explicitPreviousPrice =
+    typeof raw.previousPrice === 'number' &&
+    Number.isFinite(raw.previousPrice) &&
+    raw.previousPrice >= 0
+      ? Math.round(raw.previousPrice * 100) / 100
+      : undefined;
+  const priorStoredPrice =
+    typeof previous?.price === 'number' &&
+    Number.isFinite(previous.price) &&
+    previous.price >= 0
+      ? Math.round(previous.price * 100) / 100
+      : undefined;
+
+  // Automatically record previousPrice whenever price changes to a new value
+  let previousPrice: number | undefined;
+  if (price !== undefined) {
+    if (
+      priorStoredPrice !== undefined &&
+      Math.abs(price - priorStoredPrice) >= 0.01
+    ) {
+      previousPrice = priorStoredPrice;
+    } else if (explicitPreviousPrice !== undefined) {
+      previousPrice =
+        Math.abs(price - explicitPreviousPrice) >= 0.01
+          ? explicitPreviousPrice
+          : undefined;
+    } else if (
+      typeof previous?.previousPrice === 'number' &&
+      Number.isFinite(previous.previousPrice) &&
+      Math.abs(price - previous.previousPrice) >= 0.01
+    ) {
+      previousPrice = Math.round(previous.previousPrice * 100) / 100;
+    }
+  }
+
   const currency =
     typeof raw.currency === 'string' &&
     /^[a-zA-Z]{3}$/.test(raw.currency.trim())
@@ -75,6 +111,7 @@ function normalizeProductMeta(
   return {
     ...(store !== undefined ? { store } : {}),
     ...(price !== undefined ? { price } : {}),
+    ...(previousPrice !== undefined ? { previousPrice } : {}),
     ...(currency !== undefined ? { currency } : {}),
     ...(priceIsEstimate ? { priceIsEstimate: true } : {}),
     ...(spec !== undefined ? { spec } : {}),
@@ -110,6 +147,7 @@ export async function addLinkInStorage(
     tags: normalizeTags(input.tags ?? []),
     ...(input.tagsLocked === true ? { tagsLocked: true } : {}),
     ...(input.starred === true ? { starred: true } : {}),
+    ...(input.checked === true ? { checked: true } : {}),
     ...(product ? { product } : {}),
     faviconUrl: input.faviconUrl?.trim() || undefined,
     order: 0,
@@ -170,9 +208,16 @@ export async function updateLinkInStorage(
         : undefined
       : current.starred;
 
+  const nextChecked =
+    patch.checked !== undefined
+      ? patch.checked
+        ? true
+        : undefined
+      : current.checked;
+
   const nextProduct =
     patch.product !== undefined
-      ? normalizeProductMeta(patch.product)
+      ? normalizeProductMeta(patch.product, current.product)
       : current.product;
 
   const updated: LinkItem = {
@@ -187,6 +232,7 @@ export async function updateLinkInStorage(
     tags: patch.tags !== undefined ? normalizeTags(patch.tags) : current.tags,
     tagsLocked: nextTagsLocked,
     starred: nextStarred,
+    checked: nextChecked,
     product: nextProduct,
     faviconUrl:
       patch.faviconUrl !== undefined
@@ -286,6 +332,37 @@ export async function setLinksStarredInStorage(
     return {
       ...item,
       starred: starred ? true : undefined,
+      updatedAt: timestamp,
+    };
+  });
+
+  if (changedIds.length > 0) {
+    await linksStorage.setValue(next);
+  }
+  return changedIds;
+}
+
+/**
+ * Batch-updates `checked` (Bought / Done) on multiple links in a single write.
+ */
+export async function setLinksCheckedInStorage(
+  ids: readonly string[],
+  checked: boolean,
+): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const idSet = new Set(ids);
+  const existing = await linksStorage.getValue();
+  const changedIds: string[] = [];
+  const timestamp = nowIso();
+
+  const next = existing.map((item) => {
+    if (!idSet.has(item.id)) return item;
+    const currentlyChecked = item.checked === true;
+    if (currentlyChecked === checked) return item;
+    changedIds.push(item.id);
+    return {
+      ...item,
+      checked: checked ? true : undefined,
       updatedAt: timestamp,
     };
   });

@@ -1,5 +1,7 @@
 import { useDroppable } from '@dnd-kit/react';
 import {
+  Check,
+  EyeOff,
   Layers,
   LayoutGrid,
   List,
@@ -173,6 +175,7 @@ interface SpaceBarProps {
   spaces: readonly Space[];
   collections: readonly Collection[];
   activeSpaceId: string;
+  checkedCountInSpace: number;
   wideBoard: boolean;
   motionMode: MotionMode;
   fxAmbientWaves: boolean;
@@ -183,6 +186,7 @@ export function SpaceBar({
   spaces,
   collections,
   activeSpaceId,
+  checkedCountInSpace,
   wideBoard,
   motionMode,
   fxAmbientWaves,
@@ -235,6 +239,7 @@ export function SpaceBar({
   const activeSpace = spaces.find((s) => s.id === activeSpaceId) ?? spaces[0];
   const activeViewMode: SpaceViewMode = activeSpace?.viewMode ?? 'grid';
   const activeGroupBy: SpaceGroupBy = activeSpace?.groupBy ?? 'collection';
+  const hideChecked = activeSpace?.hideChecked === true;
 
   const handleSetViewMode = (mode: SpaceViewMode) => {
     if (!activeSpace || activeViewMode === mode) return;
@@ -244,6 +249,11 @@ export function SpaceBar({
   const handleSetGroupBy = (groupBy: SpaceGroupBy) => {
     if (!activeSpace || activeGroupBy === groupBy) return;
     void stashRepo.updateSpace(activeSpace.id, { groupBy });
+  };
+
+  const handleToggleHideChecked = () => {
+    if (!activeSpace) return;
+    void stashRepo.updateSpace(activeSpace.id, { hideChecked: !hideChecked });
   };
 
   const handleCreateSpace = async (name: string, icon: string) => {
@@ -308,6 +318,36 @@ export function SpaceBar({
 
           {/* Per-Space View & Group Controls */}
           <div className="flex shrink-0 items-center gap-1.5">
+            {checkedCountInSpace > 0 && (
+              <button
+                type="button"
+                aria-pressed={hideChecked}
+                onClick={handleToggleHideChecked}
+                title={
+                  hideChecked
+                    ? `Showing unchecked items only (${checkedCountInSpace} hidden) — click to show all`
+                    : `Hide ${checkedCountInSpace} checked item${checkedCountInSpace === 1 ? '' : 's'}`
+                }
+                className={cn(
+                  'inline-flex h-6 items-center gap-1 rounded-control border px-2 font-mono text-[10px] font-medium transition-colors cursor-pointer',
+                  hideChecked
+                    ? 'border-accent/60 bg-accent/15 text-accent'
+                    : 'border-border bg-canvas/80 text-fg-muted hover:border-accent/45 hover:text-fg',
+                )}
+              >
+                {hideChecked ? (
+                  <EyeOff className="h-3 w-3" />
+                ) : (
+                  <Check className="h-3 w-3 text-accent" />
+                )}
+                <span>
+                  {hideChecked
+                    ? `${checkedCountInSpace} hidden`
+                    : `Hide ${checkedCountInSpace} done`}
+                </span>
+              </button>
+            )}
+
             {activeViewMode === 'details' && (
               <fieldset
                 aria-label="Details grouping"

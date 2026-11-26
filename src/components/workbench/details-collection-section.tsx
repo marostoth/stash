@@ -12,6 +12,7 @@ import {
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { RollingCurrency } from '@/components/ui/rolling-currency';
+import { CopyListButton } from '@/components/workbench/details-inline-cells';
 import { DetailsRow } from '@/components/workbench/details-row';
 import { isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
@@ -27,8 +28,11 @@ import {
 import { cn } from '@/lib/utils/cn';
 import {
   formatCurrencySummaries,
+  formatPrice,
   summarizePrices,
+  summarizeRemainingPrices,
 } from '@/lib/utils/price-math';
+import { formatShoppingListMarkdown } from '@/lib/utils/shopping-export';
 
 interface DetailsCollectionSectionProps {
   collection: Collection;
@@ -37,6 +41,7 @@ interface DetailsCollectionSectionProps {
   isCollapsed: boolean;
   outsideSpace?: Space;
   dragDisabled: boolean;
+  hideChecked?: boolean;
   sortActive: boolean;
   showPriceColumn: boolean;
   defaultCurrency: string;
@@ -63,6 +68,7 @@ export function DetailsCollectionSection({
   isCollapsed,
   outsideSpace,
   dragDisabled,
+  hideChecked = false,
   sortActive,
   showPriceColumn,
   defaultCurrency,
@@ -111,6 +117,13 @@ export function DetailsCollectionSection({
   const totalText = formatCurrencySummaries(
     summarizePrices(sortedLinks, defaultCurrency),
   );
+  const checkedCount = sortedLinks.filter((l) => l.checked === true).length;
+  const remainingText = formatCurrencySummaries(
+    summarizeRemainingPrices(sortedLinks, defaultCurrency),
+  );
+  const visibleRows = hideChecked
+    ? sortedLinks.filter((l) => l.checked !== true)
+    : sortedLinks;
   const colStarred = sortedLinks.filter((l) => l.starred === true);
   const starredText = formatCurrencySummaries(
     summarizePrices(colStarred, defaultCurrency),
@@ -222,6 +235,20 @@ export function DetailsCollectionSection({
 
           <div className="flex shrink-0 items-center gap-1">
             {sortedLinks.length > 0 && (
+              <CopyListButton
+                label="Copy"
+                title={`Copy ${collection.name} list`}
+                onBuildText={() =>
+                  formatShoppingListMarkdown({
+                    title: collection.name,
+                    groups: [{ name: collection.name, links: sortedLinks }],
+                    defaultCurrency,
+                    includeChecked: !hideChecked,
+                  })
+                }
+              />
+            )}
+            {sortedLinks.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -249,24 +276,31 @@ export function DetailsCollectionSection({
             {sortedLinks.length > 0 ? (
               <>
                 {renderTableHeader()}
-                <div>
-                  {sortedLinks.map((link, idx) => (
-                    <DetailsRow
-                      key={link.id}
-                      link={link}
-                      index={idx}
-                      dragMode={rowDragMode}
-                      showPriceColumn={showPriceColumn}
-                      defaultCurrency={defaultCurrency}
-                      openInNewTab={openInNewTab}
-                      motionMode={motionMode}
-                      dropEffectStyle={dropEffectStyle}
-                      soundEffects={soundEffects}
-                      hoverPreviews={hoverPreviews}
-                      gridTemplateClass={gridTemplateClass}
-                    />
-                  ))}
-                </div>
+                {visibleRows.length > 0 ? (
+                  <div>
+                    {visibleRows.map((link, idx) => (
+                      <DetailsRow
+                        key={link.id}
+                        link={link}
+                        index={idx}
+                        dragMode={rowDragMode}
+                        showPriceColumn={showPriceColumn}
+                        defaultCurrency={defaultCurrency}
+                        openInNewTab={openInNewTab}
+                        motionMode={motionMode}
+                        dropEffectStyle={dropEffectStyle}
+                        soundEffects={soundEffects}
+                        hoverPreviews={hoverPreviews}
+                        gridTemplateClass={gridTemplateClass}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-3 py-3 text-center font-mono text-[11px] text-fg-muted">
+                    All {sortedLinks.length} item
+                    {sortedLinks.length === 1 ? '' : 's'} checked off ✓
+                  </div>
+                )}
                 {showPriceColumn && totalText && (
                   <div
                     className={cn(
@@ -278,17 +312,26 @@ export function DetailsCollectionSection({
                       aria-hidden="true"
                       className="col-span-5 max-lg:col-span-4 max-md:col-span-3"
                     />
-                    <div className="col-span-2 flex items-center justify-end gap-2.5 whitespace-nowrap">
+                    <div className="col-span-2 flex items-center justify-end gap-2 whitespace-nowrap">
                       <span className="text-[10px] uppercase tracking-wider text-fg-muted">
-                        Subtotal
+                        {checkedCount > 0 ? 'Remaining' : 'Subtotal'}
                       </span>
                       <strong className="font-semibold text-fg tabular-nums">
                         <RollingCurrency
-                          value={totalText}
+                          value={
+                            checkedCount > 0
+                              ? remainingText || formatPrice(0, defaultCurrency)
+                              : totalText
+                          }
                           motionMode={motionMode}
                           enabled={fxAmbientWaves}
                         />
                       </strong>
+                      {checkedCount > 0 && (
+                        <span className="hidden text-[10px] text-fg-muted sm:inline">
+                          / {totalText}
+                        </span>
+                      )}
                     </div>
                     <span aria-hidden="true" />
                   </div>

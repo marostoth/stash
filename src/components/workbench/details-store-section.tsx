@@ -11,12 +11,19 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { RollingCurrency } from '@/components/ui/rolling-currency';
+import { CopyListButton } from '@/components/workbench/details-inline-cells';
 import { DetailsRow } from '@/components/workbench/details-row';
 import { isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import type { DropEffectStyle, LinkItem, MotionMode } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+import {
+  formatCurrencySummaries,
+  formatPrice,
+  summarizeRemainingPrices,
+} from '@/lib/utils/price-math';
 import { normalizeStoreName } from '@/lib/utils/product-url';
+import { formatShoppingListMarkdown } from '@/lib/utils/shopping-export';
 
 export type DetailsSortColumn = 'starred' | 'title' | 'context' | 'price';
 
@@ -161,6 +168,7 @@ interface DetailsStoreSectionProps {
   activeSpaceName: string;
   collectionNameById: ReadonlyMap<string, string>;
   dragDisabled: boolean;
+  hideChecked?: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onOpenStoreStarred: () => void;
@@ -182,6 +190,7 @@ export function DetailsStoreSection({
   activeSpaceName,
   collectionNameById,
   dragDisabled,
+  hideChecked = false,
   collapsed,
   onToggleCollapse,
   onOpenStoreStarred,
@@ -220,6 +229,13 @@ export function DetailsStoreSection({
   });
 
   const tactile = isTactileMotion(motionMode);
+  const checkedCount = group.items.filter((l) => l.checked === true).length;
+  const remainingText = formatCurrencySummaries(
+    summarizeRemainingPrices(group.items, defaultCurrency),
+  );
+  const visibleItems = hideChecked
+    ? group.items.filter((l) => l.checked !== true)
+    : group.items;
 
   return (
     <section
@@ -265,47 +281,70 @@ export function DetailsStoreSection({
           )}
         </button>
 
-        {group.starredItems.length > 0 && (
-          <div className="flex shrink-0 items-center gap-1.5">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onOpenStoreStarred}
-              className="h-7 gap-1 border-accent/45 px-2 text-[11px] text-accent hover:bg-accent/10"
-            >
-              <span>Open Starred ({group.starredItems.length})</span>
-              <ArrowUpRight className="h-3 w-3" />
-            </Button>
-            <StoreClearStarredButton
-              storeName={group.storeName}
-              starredLinks={group.starredItems}
-            />
-          </div>
-        )}
+        <div className="flex shrink-0 items-center gap-1.5">
+          <CopyListButton
+            label="Copy"
+            title={`Copy ${group.storeName} list`}
+            onBuildText={() =>
+              formatShoppingListMarkdown({
+                title: group.storeName,
+                groups: [{ name: group.storeName, links: group.items }],
+                defaultCurrency,
+                includeChecked: !hideChecked,
+              })
+            }
+          />
+          {group.starredItems.length > 0 && (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onOpenStoreStarred}
+                className="h-7 gap-1 border-accent/45 px-2 text-[11px] text-accent hover:bg-accent/10"
+              >
+                <span>Open Starred ({group.starredItems.length})</span>
+                <ArrowUpRight className="h-3 w-3" />
+              </Button>
+              <StoreClearStarredButton
+                storeName={group.storeName}
+                starredLinks={group.starredItems}
+              />
+            </>
+          )}
+        </div>
       </div>
 
       {!collapsed && (
         <div>
           {renderTableHeader()}
-          <div>
-            {group.items.map((link, idx) => (
-              <DetailsRow
-                key={link.id}
-                link={link}
-                index={idx}
-                dragMode={dragDisabled ? 'none' : 'cross-only'}
-                contextLabel={collectionNameById.get(link.collectionId) ?? '—'}
-                showPriceColumn={showPriceColumn}
-                defaultCurrency={defaultCurrency}
-                openInNewTab={openInNewTab}
-                motionMode={motionMode}
-                dropEffectStyle={dropEffectStyle}
-                soundEffects={soundEffects}
-                hoverPreviews={hoverPreviews}
-                gridTemplateClass={gridTemplateClass}
-              />
-            ))}
-          </div>
+          {visibleItems.length > 0 ? (
+            <div>
+              {visibleItems.map((link, idx) => (
+                <DetailsRow
+                  key={link.id}
+                  link={link}
+                  index={idx}
+                  dragMode={dragDisabled ? 'none' : 'cross-only'}
+                  contextLabel={
+                    collectionNameById.get(link.collectionId) ?? '—'
+                  }
+                  showPriceColumn={showPriceColumn}
+                  defaultCurrency={defaultCurrency}
+                  openInNewTab={openInNewTab}
+                  motionMode={motionMode}
+                  dropEffectStyle={dropEffectStyle}
+                  soundEffects={soundEffects}
+                  hoverPreviews={hoverPreviews}
+                  gridTemplateClass={gridTemplateClass}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="px-3 py-3 text-center font-mono text-[11px] text-fg-muted">
+              All {group.items.length} item{group.items.length === 1 ? '' : 's'}{' '}
+              checked off ✓
+            </div>
+          )}
           {showPriceColumn && group.totalText && (
             <div
               className={cn(
@@ -317,17 +356,26 @@ export function DetailsStoreSection({
                 aria-hidden="true"
                 className="col-span-5 max-lg:col-span-4 max-md:col-span-3"
               />
-              <div className="col-span-2 flex items-center justify-end gap-2.5 whitespace-nowrap">
+              <div className="col-span-2 flex items-center justify-end gap-2 whitespace-nowrap">
                 <span className="text-[10px] uppercase tracking-wider text-fg-muted">
-                  Subtotal
+                  {checkedCount > 0 ? 'Remaining' : 'Subtotal'}
                 </span>
                 <strong className="font-semibold text-fg tabular-nums">
                   <RollingCurrency
-                    value={group.totalText}
+                    value={
+                      checkedCount > 0
+                        ? remainingText || formatPrice(0, defaultCurrency)
+                        : group.totalText
+                    }
                     motionMode={motionMode}
                     enabled={fxAmbientWaves}
                   />
                 </strong>
+                {checkedCount > 0 && (
+                  <span className="hidden text-[10px] text-fg-muted sm:inline">
+                    / {group.totalText}
+                  </span>
+                )}
               </div>
               <span aria-hidden="true" />
             </div>

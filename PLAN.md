@@ -122,13 +122,13 @@ Execute **one milestone at a time**. At the end of each milestone, run all four 
 - [x] **Arcade Drag Trail:** Subtle glowing trailing echoes following the dragged card/tab ghost in Arcade mode.
 - [x] **Accordion Deal & Search Match Highlight:** Smooth diagonal card-deal fan on manual collection expand + highlighted matching text snippets with subtle pop when searching.
 
-### Milestone B (v1.19.0) — Shopping Lists Pro & Checkboxes (In Progress)
-- [ ] **Checked / Bought ✓ Mode** on links (works in Details view + Grid cards for both Shopping Lists and Study/Watch lists, with animated checkmark + per-Space *Hide checked* toggle).
-- [ ] **Live Remaining Total Odometer:** Checking off items smoothly rolls down the remaining subtotal & Space total (showing Remaining vs Total when items are checked).
-- [ ] **Automatic Price Change Badges:** Save `previousPrice` whenever a price is updated or re-captured from the Side Panel and display green `↓ £X.XX` / red `↑ £X.XX` badges.
-- [ ] **1-Click Copy Shopping List:** Clean formatted text/Markdown copy button on collections and Space Details footer (items, store, qty, price, subtotals, grand total).
+### Milestone B (v1.19.0) — Shopping Lists Pro & Checkboxes (Shipped)
+- [x] **Checked / Bought ✓ Mode** on links (works in Details view + Grid cards for both Shopping Lists and Study/Watch lists, with animated checkmark + per-Space *Hide checked* toggle).
+- [x] **Live Remaining Total Odometer:** Checking off items smoothly rolls down the remaining subtotal & Space total (showing Remaining vs Total when items are checked).
+- [x] **Automatic Price Change Badges:** Save `previousPrice` whenever a price is updated or re-captured from the Side Panel and display green `↓ £X.XX` / red `↑ £X.XX` badges.
+- [x] **1-Click Copy Shopping List:** Clean formatted text/Markdown copy button on collections and Space Details footer (items, store, qty, price, subtotals, grand total).
 
-### Milestone C (v1.20.0) — Power Workbench (Queued)
+### Milestone C (v1.20.0) — Power Workbench (In Progress)
 - [ ] **Multi-Select Bulk Bar:** `Ctrl/Cmd+Click` or `Shift+Click` cards/rows to select multiple links, springing up a floating bottom bar for Bulk Move, Tag, Star, Check, Open Tabs, and Delete.
 - [ ] **Pinned Quick Launch Strip:** Optional compact favicon dock right below the Space bar for 1-click launch of top daily sites.
 - [ ] **Smart Filter Views & Cross-Space Duplicate Finder:** Quick filters (*Recently Added*, *Most Opened*, *Untagged*) + 1-click cross-Space duplicate URL scanner inside *Settings → Library Tools*.

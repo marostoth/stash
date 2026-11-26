@@ -1,8 +1,10 @@
-import { ArrowDown, ArrowUp, Star } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, RotateCcw, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import { RollingCurrency } from '@/components/ui/rolling-currency';
 import { DetailsCollectionSection } from '@/components/workbench/details-collection-section';
+import { CopyListButton } from '@/components/workbench/details-inline-cells';
 import {
   type DetailsSortColumn,
   type DetailsSortState,
@@ -10,6 +12,7 @@ import {
   type StoreGroupSummary,
   sortDetailsLinks,
 } from '@/components/workbench/details-store-section';
+import { stashRepo } from '@/lib/storage/repo';
 import {
   openLinksInNamedTabGroup,
   wakeUpCollectionInTabGroup,
@@ -25,10 +28,13 @@ import {
 import { cn } from '@/lib/utils/cn';
 import {
   formatCurrencySummaries,
+  formatPrice,
   summarizePrices,
+  summarizeRemainingPrices,
 } from '@/lib/utils/price-math';
 import { normalizeStoreName } from '@/lib/utils/product-url';
 import type { FilteredCollectionGroup } from '@/lib/utils/search';
+import { formatShoppingListMarkdown } from '@/lib/utils/shopping-export';
 import { useUiStore } from '@/store/ui-store';
 
 interface DetailsViewProps {
@@ -36,6 +42,7 @@ interface DetailsViewProps {
   groups: readonly FilteredCollectionGroup[];
   spaces: readonly Space[];
   isFiltering: boolean;
+  hideChecked?: boolean;
   searchAllSpaces: boolean;
   openInNewTab: boolean;
   defaultCurrency: string;
@@ -52,6 +59,7 @@ export function DetailsView({
   groups,
   spaces,
   isFiltering,
+  hideChecked = false,
   searchAllSpaces,
   openInNewTab,
   defaultCurrency,
@@ -93,10 +101,10 @@ export function DetailsView({
     [allLinks],
   );
 
-  // Column 1 is 44px to house the left drag handle (16px) + star toggle (24px) cleanly
+  // Column 1 is 64px to house drag handle + checkbox + star; Price widens for delta badges
   const gridTemplateClass = showPriceColumn
-    ? 'grid-cols-[44px_minmax(180px,2.2fr)_minmax(100px,1.2fr)_minmax(96px,0.9fr)_minmax(88px,1fr)_76px_96px_56px] max-lg:grid-cols-[44px_minmax(160px,2fr)_minmax(96px,1.1fr)_minmax(88px,0.9fr)_72px_92px_56px] max-md:grid-cols-[44px_minmax(130px,1.8fr)_minmax(76px,0.8fr)_70px_86px_52px]'
-    : 'grid-cols-[44px_minmax(180px,2.2fr)_minmax(110px,1.4fr)_minmax(96px,0.95fr)_minmax(90px,1.1fr)_56px] max-lg:grid-cols-[44px_minmax(160px,2fr)_minmax(100px,1.3fr)_minmax(90px,0.95fr)_56px] max-md:grid-cols-[44px_minmax(140px,1.8fr)_90px_52px]';
+    ? 'grid-cols-[64px_minmax(170px,2.1fr)_minmax(100px,1.15fr)_minmax(92px,0.85fr)_minmax(84px,0.95fr)_74px_138px_54px] max-lg:grid-cols-[64px_minmax(150px,1.9fr)_minmax(92px,1.05fr)_minmax(84px,0.85fr)_72px_124px_54px] max-md:grid-cols-[64px_minmax(120px,1.7fr)_minmax(72px,0.8fr)_68px_98px_50px]'
+    : 'grid-cols-[64px_minmax(180px,2.2fr)_minmax(110px,1.4fr)_minmax(96px,0.95fr)_minmax(90px,1.1fr)_56px] max-lg:grid-cols-[64px_minmax(160px,2fr)_minmax(100px,1.3fr)_minmax(90px,0.95fr)_56px] max-md:grid-cols-[64px_minmax(140px,1.8fr)_90px_52px]';
 
   const cycleSort = (column: DetailsSortColumn) => {
     setSort((prev) => {
@@ -205,6 +213,17 @@ export function DetailsView({
     [allLinks, defaultCurrency],
   );
   const spaceTotalText = formatCurrencySummaries(spaceTotals);
+  const checkedAll = useMemo(
+    () => allLinks.filter((l) => l.checked === true),
+    [allLinks],
+  );
+  const remainingTotalText = useMemo(
+    () =>
+      formatCurrencySummaries(
+        summarizeRemainingPrices(allLinks, defaultCurrency),
+      ),
+    [allLinks, defaultCurrency],
+  );
   const starredAll = useMemo(
     () => allLinks.filter((l) => l.starred === true),
     [allLinks],
@@ -214,6 +233,36 @@ export function DetailsView({
   );
   const pricedCount = spaceTotals.reduce((acc, s) => acc + s.pricedCount, 0);
   const unpricedCount = Math.max(0, allLinks.length - pricedCount);
+
+  const handleUncheckAll = async () => {
+    const ids = checkedAll.map((l) => l.id);
+    if (ids.length === 0) return;
+    const changed = await stashRepo.setLinksChecked(ids, false);
+    if (changed.length === 0) return;
+    toast(
+      `Unchecked ${changed.length} item${changed.length === 1 ? '' : 's'}`,
+      {
+        duration: 5000,
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void stashRepo.setLinksChecked(changed, true);
+          },
+        },
+      },
+    );
+  };
+
+  const buildSpaceExportText = () =>
+    formatShoppingListMarkdown({
+      title: activeSpaceName,
+      groups:
+        groupBy === 'store'
+          ? storeGroups.map((g) => ({ name: g.storeName, links: g.items }))
+          : groups.map((g) => ({ name: g.collection.name, links: g.links })),
+      defaultCurrency,
+      includeChecked: !hideChecked,
+    });
 
   const handleOpenStoreStarred = async (
     storeName: string,
@@ -250,6 +299,7 @@ export function DetailsView({
                 activeSpaceName={activeSpaceName}
                 collectionNameById={collectionNameById}
                 dragDisabled={isFiltering}
+                hideChecked={hideChecked}
                 collapsed={collapsed}
                 onToggleCollapse={() =>
                   setCollapsedStores((prev) => ({
@@ -296,6 +346,7 @@ export function DetailsView({
                 isCollapsed={isCollapsed}
                 outsideSpace={outsideSpace}
                 dragDisabled={isFiltering}
+                hideChecked={hideChecked}
                 sortActive={sort !== null}
                 showPriceColumn={showPriceColumn}
                 defaultCurrency={defaultCurrency}
@@ -317,14 +368,35 @@ export function DetailsView({
           })}
 
       {/* Details Space Summary Footer (aligned directly under the Price column) */}
-      {showPriceColumn && spaceTotalText && (
+      {(showPriceColumn && spaceTotalText) || allLinks.length > 0 ? (
         <footer
           className={cn(
             'grid items-center gap-3.5 rounded-card border border-border bg-panel/90 px-3 py-2 font-mono text-[11px]',
             gridTemplateClass,
           )}
         >
-          <div className="col-span-5 flex flex-wrap items-center gap-3 max-lg:col-span-4 max-md:col-span-3">
+          <div className="col-span-5 flex flex-wrap items-center gap-2.5 max-lg:col-span-4 max-md:col-span-3">
+            <CopyListButton
+              label="Copy Space List"
+              title={`Copy ${activeSpaceName} list as Markdown`}
+              onBuildText={buildSpaceExportText}
+            />
+            {checkedAll.length > 0 && (
+              <div className="inline-flex items-center gap-1.5 rounded-pill border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] text-accent">
+                <Check className="h-3 w-3" />
+                <span>{checkedAll.length} done</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void handleUncheckAll()}
+                  title="Uncheck all items in this Space"
+                  className="h-4 gap-0.5 px-1 text-[10px] text-accent hover:bg-accent/15 hover:text-accent"
+                >
+                  <RotateCcw className="h-2.5 w-2.5" />
+                  <span>Reset</span>
+                </Button>
+              </div>
+            )}
             {starredAll.length > 0 && (
               <div className="flex items-center gap-1.5 text-accent">
                 <Star className="h-3 w-3 fill-accent" />
@@ -344,29 +416,40 @@ export function DetailsView({
                 </span>
               </div>
             )}
-            {unpricedCount > 0 && (
+            {unpricedCount > 0 && showPriceColumn && (
               <span className="text-[10px] text-fg-muted/85">
                 + {unpricedCount} unpriced
               </span>
             )}
           </div>
 
-          <div className="col-span-2 flex items-center justify-end gap-2.5 whitespace-nowrap">
-            <span className="text-[10px] uppercase tracking-wider text-fg-muted">
-              Space Total
-            </span>
-            <strong className="font-semibold text-fg tabular-nums">
-              <RollingCurrency
-                value={spaceTotalText}
-                motionMode={motionMode}
-                enabled={fxAmbientWaves}
-              />
-            </strong>
-          </div>
+          {showPriceColumn && spaceTotalText && (
+            <div className="col-span-2 flex items-center justify-end gap-2 whitespace-nowrap">
+              <span className="text-[10px] uppercase tracking-wider text-fg-muted">
+                {checkedAll.length > 0 ? 'Remaining' : 'Space Total'}
+              </span>
+              <strong className="font-semibold text-fg tabular-nums">
+                <RollingCurrency
+                  value={
+                    checkedAll.length > 0
+                      ? remainingTotalText || formatPrice(0, defaultCurrency)
+                      : spaceTotalText
+                  }
+                  motionMode={motionMode}
+                  enabled={fxAmbientWaves}
+                />
+              </strong>
+              {checkedAll.length > 0 && (
+                <span className="hidden text-[10px] text-fg-muted sm:inline">
+                  / {spaceTotalText}
+                </span>
+              )}
+            </div>
+          )}
 
           <span aria-hidden="true" />
         </footer>
-      )}
+      ) : null}
     </div>
   );
 }

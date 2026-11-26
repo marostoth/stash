@@ -43,6 +43,12 @@ function parseProductMeta(raw: unknown): ProductMeta | undefined {
     obj.price >= 0
       ? Math.round(obj.price * 100) / 100
       : undefined;
+  const previousPrice =
+    typeof obj.previousPrice === 'number' &&
+    Number.isFinite(obj.previousPrice) &&
+    obj.previousPrice >= 0
+      ? Math.round(obj.previousPrice * 100) / 100
+      : undefined;
   const currency =
     typeof obj.currency === 'string' &&
     /^[a-zA-Z]{3}$/.test(obj.currency.trim())
@@ -76,6 +82,7 @@ function parseProductMeta(raw: unknown): ProductMeta | undefined {
   return {
     ...(store !== undefined ? { store } : {}),
     ...(price !== undefined ? { price } : {}),
+    ...(previousPrice !== undefined ? { previousPrice } : {}),
     ...(currency !== undefined ? { currency } : {}),
     ...(priceIsEstimate ? { priceIsEstimate: true } : {}),
     ...(spec !== undefined ? { spec } : {}),
@@ -112,6 +119,7 @@ export function parseSpace(raw: unknown, fallbackOrder: number): Space | null {
     densityOverride: parseDensity(obj.densityOverride),
     ...(viewMode ? { viewMode } : {}),
     ...(groupBy ? { groupBy } : {}),
+    ...(obj.hideChecked === true ? { hideChecked: true } : {}),
     createdAt: typeof obj.createdAt === 'string' ? obj.createdAt : now,
     updatedAt: typeof obj.updatedAt === 'string' ? obj.updatedAt : now,
   };
@@ -194,6 +202,7 @@ export function parseLink(
     tags: normalizeTags(rawTags),
     tagsLocked: obj.tagsLocked === true ? true : undefined,
     starred: obj.starred === true ? true : undefined,
+    checked: obj.checked === true ? true : undefined,
     product: parseProductMeta(obj.product),
     faviconUrl:
       typeof obj.faviconUrl === 'string' && obj.faviconUrl.trim()

@@ -1,4 +1,4 @@
-import { Pencil, Star, Trash2 } from 'lucide-react';
+import { Check, Pencil, Star, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 import { isTactileMotion } from '@/lib/motion/presets';
@@ -8,7 +8,9 @@ import { cn } from '@/lib/utils/cn';
 interface CardActionDrawerProps {
   linkTitle: string;
   starred: boolean;
+  checked: boolean;
   motionMode: MotionMode;
+  onToggleChecked: () => void;
   onToggleStar: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -30,7 +32,9 @@ const DRAWER_SPRING = {
 export function CardActionDrawer({
   linkTitle,
   starred,
+  checked,
   motionMode,
+  onToggleChecked,
   onToggleStar,
   onEdit,
   onDelete,
@@ -52,6 +56,33 @@ export function CardActionDrawer({
     >
       <div className="flex flex-col overflow-hidden rounded-control border border-border/80 bg-panel/95 shadow-md">
         <div className="flex items-center">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onToggleChecked();
+            }}
+            aria-pressed={checked}
+            aria-label={
+              checked
+                ? `Uncheck ${linkTitle}`
+                : `Mark ${linkTitle} as done / bought`
+            }
+            title={checked ? 'Unmark done / bought' : 'Mark as done / bought'}
+            className={cn(
+              'inline-flex h-7 w-7 items-center justify-center border-r border-border/70 transition-colors hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 cursor-pointer',
+              checked ? 'text-accent' : 'text-fg-muted hover:text-accent',
+            )}
+          >
+            <Check
+              className={cn(
+                'h-3.5 w-3.5',
+                checked && 'stroke-[2.8] text-accent',
+              )}
+            />
+          </button>
+
           <button
             type="button"
             onClick={(event) => {

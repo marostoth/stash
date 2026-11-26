@@ -132,6 +132,9 @@ export async function updateSpaceInStorage(
         : {}),
       ...(patch.viewMode !== undefined ? { viewMode: patch.viewMode } : {}),
       ...(patch.groupBy !== undefined ? { groupBy: patch.groupBy } : {}),
+      ...(patch.hideChecked !== undefined
+        ? { hideChecked: patch.hideChecked ? true : undefined }
+        : {}),
       updatedAt: nowIso(),
     };
     return updated;

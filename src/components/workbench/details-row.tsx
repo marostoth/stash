@@ -1,16 +1,26 @@
 import { useDraggable } from '@dnd-kit/react';
 import { useSortable } from '@dnd-kit/react/sortable';
-import { GripVertical, Minus, Pencil, Plus, Star, Trash2 } from 'lucide-react';
+import {
+  Check,
+  GripVertical,
+  Minus,
+  Pencil,
+  Plus,
+  Star,
+  Trash2,
+} from 'lucide-react';
+import { motion } from 'motion/react';
 import { memo, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { LinkFavicon } from '@/components/LinkFavicon';
 import {
+  buildPriceTooltip,
   InlinePriceCell,
   InlineSpecCell,
 } from '@/components/workbench/details-inline-cells';
 import { DropSparks } from '@/components/workbench/drop-sparks';
 import { playDelete, playDrop, playTagPop } from '@/lib/audio/foley';
-import { isArcadeMotion } from '@/lib/motion/presets';
+import { isArcadeMotion, isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import type {
   DropEffectStyle,
@@ -23,7 +33,7 @@ import {
   createDebouncedWriter,
   type DebouncedWriter,
 } from '@/lib/utils/coalesce';
-import { formatPrice, normalizeCurrencyCode } from '@/lib/utils/price-math';
+import { normalizeCurrencyCode } from '@/lib/utils/price-math';
 import { normalizeStoreName } from '@/lib/utils/product-url';
 import { useUiStore } from '@/store/ui-store';
 
@@ -44,17 +54,6 @@ interface DetailsRowProps {
   soundEffects: boolean;
   hoverPreviews: boolean;
   gridTemplateClass: string;
-}
-
-function formatCapturedDate(iso?: string): string {
-  if (!iso) return '';
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return '';
-  return parsed.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
 }
 
 interface DetailsRowViewProps extends DetailsRowProps {
@@ -90,8 +89,10 @@ function DetailsRowView({
   );
   const isSettling = useUiStore((s) => s.settledLinkId === link.id);
   const arcade = isArcadeMotion(motionMode);
+  const tactile = isTactileMotion(motionMode);
 
   const isStarred = link.starred === true;
+  const isChecked = link.checked === true;
   const product = link.product;
   const hasPrice =
     typeof product?.price === 'number' && Number.isFinite(product.price);
@@ -131,34 +132,31 @@ function DetailsRowView({
   const resolvedContext = contextLabel ?? storeName;
   const specOrNote = product?.spec || link.note || '';
   const visibleTags = link.tags.slice(0, 2);
-  const capturedLabel = formatCapturedDate(product?.capturedAt);
   const resolvedCurrency = normalizeCurrencyCode(
     product?.currency,
     defaultCurrency,
   );
   const unitPrice =
     hasPrice && product?.price !== undefined ? product.price : undefined;
-
-  const sourceLabel =
-    product?.source === 'manual'
-      ? capturedLabel
-        ? `Manual entry · ${capturedLabel}`
-        : 'Manual entry'
-      : capturedLabel
-        ? `Captured ${capturedLabel}`
-        : product?.source === 'ai'
-          ? 'AI-extracted price'
-          : 'Auto-extracted price';
-
-  const priceTooltip =
-    unitPrice !== undefined && displayQty > 1
-      ? `${formatPrice(unitPrice, resolvedCurrency, product?.priceIsEstimate)} × ${displayQty} · ${sourceLabel}`
-      : sourceLabel;
+  const priceTooltip = buildPriceTooltip(
+    product,
+    unitPrice,
+    displayQty,
+    resolvedCurrency,
+  );
 
   const handleToggleStar = async () => {
     const nextStarred = !isStarred;
     const res = await stashRepo.updateLink(link.id, { starred: nextStarred });
     if (res.ok && nextStarred) {
+      playTagPop(soundEffects, motionMode);
+    }
+  };
+
+  const handleToggleChecked = async () => {
+    const nextChecked = !isChecked;
+    const res = await stashRepo.updateLink(link.id, { checked: nextChecked });
+    if (res.ok && nextChecked) {
       playTagPop(soundEffects, motionMode);
     }
   };
@@ -229,15 +227,16 @@ function DetailsRowView({
       ref={rowRef}
       data-link-id={link.id}
       className={cn(
-        'group relative grid min-h-[38px] items-center gap-3.5 border-b border-border/60 px-3 py-1 text-xs transition-colors last:border-b-0 hover:bg-card-hover/80',
+        'group relative grid min-h-[38px] items-center gap-3.5 border-b border-border/60 px-3 py-1 text-xs transition-all last:border-b-0 hover:bg-card-hover/80',
         gridTemplateClass,
-        isStarred && 'bg-accent/[0.06]',
+        isStarred && !isChecked && 'bg-accent/[0.06]',
+        isChecked && 'opacity-60 hover:opacity-90',
         isDragging && 'opacity-40',
         isDropTarget && 'bg-accent/12 ring-1 ring-inset ring-accent/65',
         isKeyboardFocused && 'bg-accent/10 ring-1 ring-inset ring-accent/70',
       )}
     >
-      {isStarred && (
+      {isStarred && !isChecked && (
         <span
           aria-hidden="true"
           className="pointer-events-none absolute inset-y-0 left-0 w-[2px] bg-accent"
@@ -249,7 +248,7 @@ function DetailsRowView({
         compact
       />
 
-      {/* 1. Left Drag Handle + Star toggle */}
+      {/* 1. Left Drag Handle + Checked + Star toggle */}
       <div className="flex items-center gap-0.5">
         {dragMode !== 'none' ? (
           <button
@@ -270,11 +269,38 @@ function DetailsRowView({
         )}
         <button
           type="button"
+          onClick={() => void handleToggleChecked()}
+          aria-pressed={isChecked}
+          aria-label={
+            isChecked
+              ? `Uncheck ${link.title}`
+              : `Mark ${link.title} as bought / done`
+          }
+          title={isChecked ? 'Unmark done / bought' : 'Mark as bought / done'}
+          className={cn(
+            'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors cursor-pointer',
+            isChecked
+              ? 'border-accent bg-accent text-accent-fg'
+              : 'border-border/80 bg-canvas/70 text-transparent hover:border-accent/65',
+          )}
+        >
+          <motion.span
+            key={isChecked ? 'chk' : 'unchk'}
+            initial={tactile && isChecked ? { scale: 0.35 } : false}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 600, damping: 20 }}
+            className="inline-flex items-center justify-center"
+          >
+            <Check className="h-3 w-3 stroke-[2.8]" />
+          </motion.span>
+        </button>
+        <button
+          type="button"
           onClick={() => void handleToggleStar()}
           aria-pressed={isStarred}
           aria-label={isStarred ? `Unstar ${link.title}` : `Star ${link.title}`}
           className={cn(
-            'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded transition-colors cursor-pointer',
+            'inline-flex h-6 w-5 shrink-0 items-center justify-center rounded transition-colors cursor-pointer',
             isStarred ? 'text-accent' : 'text-fg-muted/50 hover:text-accent',
           )}
         >
@@ -307,7 +333,14 @@ function DetailsRowView({
         <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded border border-border/80 bg-panel">
           <LinkFavicon url={link.url} faviconUrl={link.faviconUrl} size="sm" />
         </div>
-        <span className="truncate font-medium text-fg group-hover:text-accent transition-colors">
+        <span
+          className={cn(
+            'truncate font-medium transition-colors',
+            isChecked
+              ? 'text-fg-muted line-through decoration-fg-muted/70'
+              : 'text-fg group-hover:text-accent',
+          )}
+        >
           {link.title}
         </span>
       </a>

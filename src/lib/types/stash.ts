@@ -48,6 +48,7 @@ export interface Space {
   densityOverride?: CardDensity;
   viewMode?: SpaceViewMode;
   groupBy?: SpaceGroupBy;
+  hideChecked?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -55,6 +56,7 @@ export interface Space {
 export interface ProductMeta {
   store?: string;
   price?: number;
+  previousPrice?: number;
   currency?: string;
   priceIsEstimate?: boolean;
   spec?: string;
@@ -102,6 +104,7 @@ export interface LinkItem {
   tags: string[];
   tagsLocked?: boolean;
   starred?: boolean;
+  checked?: boolean;
   product?: ProductMeta;
   faviconUrl?: string;
   order: number;

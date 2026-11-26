@@ -131,6 +131,7 @@ export const LinkCard = memo(function LinkCard({
   const domain = extractDomain(link.url);
 
   const isStarred = Boolean(link.starred);
+  const isChecked = Boolean(link.checked);
   const isMicro = density === 'micro';
   const isCompact = density === 'compact';
   const showNote = density === 'comfortable' && Boolean(link.note);
@@ -187,6 +188,16 @@ export const LinkCard = memo(function LinkCard({
       if (tactile && fxAmbientWaves) {
         triggerStarFlash(link.id);
       }
+    }
+  };
+
+  const handleToggleChecked = async () => {
+    const nextChecked = !isChecked;
+    const result = await stashRepo.updateLink(link.id, {
+      checked: nextChecked,
+    });
+    if (result.ok && nextChecked) {
+      playTagPop(soundEffects, motionMode);
     }
   };
 
@@ -308,8 +319,9 @@ export const LinkCard = memo(function LinkCard({
             onPointerMove={foil.handlePointerMove}
             onPointerLeave={foil.handlePointerLeave}
             className={cn(
-              'group relative z-[1] h-full rounded-card border border-border bg-card transition-colors hover:border-accent/45 hover:bg-card-hover',
-              isStarred && 'stash-card-starred',
+              'group relative z-[1] h-full rounded-card border border-border bg-card transition-all hover:border-accent/45 hover:bg-card-hover',
+              isStarred && !isChecked && 'stash-card-starred',
+              isChecked && 'opacity-65 hover:opacity-95',
               !dragDisabled && 'cursor-grab active:cursor-grabbing',
               isDropTarget && 'border-accent ring-2 ring-accent/40',
               isKeyboardFocused &&
@@ -403,7 +415,10 @@ export const LinkCard = memo(function LinkCard({
                   <div className="min-w-0 flex-1">
                     <div
                       className={cn(
-                        'font-medium leading-snug text-fg',
+                        'font-medium leading-snug',
+                        isChecked
+                          ? 'text-fg-muted line-through decoration-fg-muted/70'
+                          : 'text-fg',
                         isMicro
                           ? 'truncate text-[13px]'
                           : 'line-clamp-2 text-sm',
@@ -466,8 +481,10 @@ export const LinkCard = memo(function LinkCard({
             <CardActionDrawer
               linkTitle={link.title}
               starred={isStarred}
+              checked={isChecked}
               motionMode={motionMode}
               onEnterDrawer={dismissPreview}
+              onToggleChecked={() => void handleToggleChecked()}
               onToggleStar={() => void handleToggleStar()}
               onEdit={() => openEditLink(link)}
               onDelete={() => void handleQuickDelete()}

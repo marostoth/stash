@@ -1,10 +1,50 @@
-import { PenLine } from 'lucide-react';
+import { Check, Copy, PenLine } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import { stashRepo } from '@/lib/storage/repo';
-import type { LinkItem } from '@/lib/types/stash';
+import type { LinkItem, ProductMeta } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
-import { formatPrice, normalizeCurrencyCode } from '@/lib/utils/price-math';
+import {
+  computePriceDelta,
+  formatPrice,
+  normalizeCurrencyCode,
+} from '@/lib/utils/price-math';
 import { normalizeStoreName } from '@/lib/utils/product-url';
+
+export function buildPriceTooltip(
+  product: ProductMeta | undefined,
+  unitPrice: number | undefined,
+  displayQty: number,
+  resolvedCurrency: string,
+): string {
+  const capturedLabel = product?.capturedAt
+    ? (() => {
+        const parsed = new Date(product.capturedAt);
+        return Number.isNaN(parsed.getTime())
+          ? ''
+          : parsed.toLocaleDateString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            });
+      })()
+    : '';
+  const sourceLabel =
+    product?.source === 'manual'
+      ? capturedLabel
+        ? `Manual entry · ${capturedLabel}`
+        : 'Manual entry'
+      : capturedLabel
+        ? `Captured ${capturedLabel}`
+        : product?.source === 'ai'
+          ? 'AI-extracted price'
+          : 'Auto-extracted price';
+
+  return unitPrice !== undefined && displayQty > 1
+    ? `${formatPrice(unitPrice, resolvedCurrency, product?.priceIsEstimate)} × ${displayQty} · ${sourceLabel}`
+    : sourceLabel;
+}
 
 interface InlineSpecCellProps {
   link: LinkItem;
@@ -151,6 +191,7 @@ export function InlinePriceCell({
     unitPrice !== undefined
       ? Math.round(unitPrice * displayQty * 100) / 100
       : undefined;
+  const priceDelta = computePriceDelta(unitPrice, product?.previousPrice);
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(
@@ -270,6 +311,24 @@ export function InlinePriceCell({
       >
         {linePrice !== undefined && product ? (
           <>
+            {priceDelta && product.previousPrice !== undefined && (
+              <span
+                title={
+                  priceDelta.direction === 'down'
+                    ? `Price dropped ${formatPrice(priceDelta.amount, resolvedCurrency)} (was ${formatPrice(product.previousPrice, resolvedCurrency)})`
+                    : `Price up ${formatPrice(priceDelta.amount, resolvedCurrency)} (was ${formatPrice(product.previousPrice, resolvedCurrency)})`
+                }
+                className={cn(
+                  'hidden shrink-0 items-center rounded px-1 py-0.25 font-mono text-[9px] font-semibold leading-none sm:inline-flex',
+                  priceDelta.direction === 'down'
+                    ? 'border border-emerald-500/35 bg-emerald-500/15 text-emerald-400'
+                    : 'border border-danger/35 bg-danger/15 text-danger',
+                )}
+              >
+                {priceDelta.direction === 'down' ? '↓' : '↑'}
+                {formatPrice(priceDelta.amount, resolvedCurrency)}
+              </span>
+            )}
             {product.source === 'manual' && (
               <PenLine
                 className="h-3 w-3 shrink-0 text-fg-muted/70"
@@ -291,5 +350,62 @@ export function InlinePriceCell({
         )}
       </button>
     </div>
+  );
+}
+
+interface CopyListButtonProps {
+  label?: string;
+  title?: string;
+  onBuildText: () => string;
+}
+
+/**
+ * 1-click Copy Shopping List button with instant Check morph feedback.
+ */
+export function CopyListButton({
+  label = 'Copy List',
+  title = 'Copy formatted list to clipboard',
+  onBuildText,
+}: CopyListButtonProps) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const handleCopy = async () => {
+    const text = onBuildText();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success('Copied list to clipboard');
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        setCopied(false);
+        timerRef.current = null;
+      }, 1500);
+    } catch {
+      toast.error('Could not access clipboard');
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => void handleCopy()}
+      title={title}
+      className="h-7 gap-1 px-2 text-[11px] text-fg-muted hover:text-fg"
+    >
+      {copied ? (
+        <Check className="h-3 w-3 text-accent" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+      <span className="hidden sm:inline">{copied ? 'Copied' : label}</span>
+    </Button>
   );
 }

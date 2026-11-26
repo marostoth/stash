@@ -26,6 +26,7 @@ import {
   findDuplicateLinkInList,
   markLinkOpenedInStorage,
   moveOrReorderLinkInStorage,
+  setLinksCheckedInStorage,
   setLinksStarredInStorage,
   updateLinkInStorage,
 } from '@/lib/storage/links-ops';
@@ -308,6 +309,11 @@ export const stashRepo = {
     ids: readonly string[],
     starred: boolean,
   ): Promise<string[]> => setLinksStarredInStorage(ids, starred),
+
+  setLinksChecked: (
+    ids: readonly string[],
+    checked: boolean,
+  ): Promise<string[]> => setLinksCheckedInStorage(ids, checked),
 
   deleteLink: (id: string): Promise<boolean> => deleteLinkInStorage(id),
   deleteLinks: (ids: readonly string[]): Promise<LinkItem[]> =>

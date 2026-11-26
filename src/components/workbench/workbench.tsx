@@ -184,12 +184,25 @@ export function Workbench() {
   );
 
   const isFiltering = searchQuery.trim().length > 0 || starredOnly;
+  const hideCheckedInSpace = activeSpace?.hideChecked === true && !isFiltering;
+  const checkedCountInSpace = useMemo(
+    () =>
+      links.filter(
+        (link) =>
+          link.checked === true &&
+          activeSpaceCollectionIds.has(link.collectionId),
+      ).length,
+    [links, activeSpaceCollectionIds],
+  );
   const visibleLinks = useMemo(
     () =>
-      groups.flatMap((group) =>
-        !group.collection.collapsed || isFiltering ? group.links : [],
-      ),
-    [groups, isFiltering],
+      groups.flatMap((group) => {
+        if (group.collection.collapsed && !isFiltering) return [];
+        return hideCheckedInSpace
+          ? group.links.filter((l) => l.checked !== true)
+          : group.links;
+      }),
+    [groups, isFiltering, hideCheckedInSpace],
   );
 
   useWorkbenchShortcuts({
@@ -242,6 +255,7 @@ export function Workbench() {
               spaces={spaces}
               collections={collections}
               activeSpaceId={resolvedSpaceId}
+              checkedCountInSpace={checkedCountInSpace}
               wideBoard={wideBoard}
               motionMode={settings.motionMode}
               fxAmbientWaves={fxAmbientWaves}
@@ -334,6 +348,7 @@ export function Workbench() {
                       groups={groups}
                       spaces={spaces}
                       isFiltering={isFiltering}
+                      hideChecked={hideCheckedInSpace}
                       searchAllSpaces={searchAllSpaces}
                       openInNewTab={settings.openLinkInNewTab}
                       defaultCurrency={defaultCurrency}
@@ -356,12 +371,15 @@ export function Workbench() {
                             colSpaceId !== resolvedSpaceId
                               ? spaceById.get(colSpaceId)
                               : undefined;
+                          const displayedLinks = hideCheckedInSpace
+                            ? collectionLinks.filter((l) => l.checked !== true)
+                            : collectionLinks;
                           return (
                             <CollectionSection
                               key={collection.id}
                               collection={collection}
                               index={colIndex}
-                              links={collectionLinks}
+                              links={displayedLinks}
                               spaces={spaces}
                               spaceBadge={outsideActiveSpace}
                               onSwitchSpace={handleSelectSpace}
