@@ -108,11 +108,12 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* 1. Motion Feel */}
       <SettingsSectionCard
         icon={<Zap className="h-4 w-4" />}
         title="Motion Feel"
+        subtitle="Choose how much physical weight, bounce, and celebratory FX Stash uses across the board."
         badge={{
           label:
             MOTION_OPTIONS.find((m) => m.id === settings.motionMode)?.label ??
@@ -120,7 +121,7 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
           tone: arcade ? 'accent' : 'neutral',
         }}
       >
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           {MOTION_OPTIONS.map((opt) => {
             const active = settings.motionMode === opt.id;
             return (
@@ -132,16 +133,16 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
                   void stashRepo.updateSettings({ motionMode: opt.id })
                 }
                 className={cn(
-                  'rounded-control border p-2.5 text-left transition-colors cursor-pointer',
+                  'rounded-control border p-3.5 text-left transition-colors cursor-pointer',
                   active
                     ? 'border-accent/70 bg-accent/12'
-                    : 'border-border bg-panel/60 hover:border-border/80 hover:bg-card',
+                    : 'border-border/80 bg-panel/60 hover:border-border hover:bg-card',
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span
                     className={cn(
-                      'text-xs font-semibold',
+                      'text-[13px] font-semibold',
                       active ? 'text-accent' : 'text-fg',
                     )}
                   >
@@ -153,7 +154,7 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-1 text-[11px] leading-snug text-fg-muted">
+                <p className="mt-1 text-xs leading-relaxed text-fg-muted">
                   {opt.description}
                 </p>
               </button>
@@ -166,12 +167,13 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
       <SettingsSectionCard
         icon={<Flame className="h-4 w-4" />}
         title="Drop Impact Shockwave"
+        subtitle="Customize the shockwave and edge-dust burst that fires when cards land on the board."
         badge={{
           label: arcade ? 'Active (Arcade)' : 'Arcade Only',
           tone: arcade ? 'accent' : 'neutral',
         }}
       >
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           {DROP_STYLE_OPTIONS.map((opt) => {
             const active = dropStyle === opt.id;
             return (
@@ -184,21 +186,21 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
                   if (arcade) triggerTestSlam(opt.id);
                 }}
                 className={cn(
-                  'rounded-control border p-2.5 text-left transition-colors cursor-pointer',
+                  'rounded-control border p-3.5 text-left transition-colors cursor-pointer',
                   active
                     ? 'border-accent/70 bg-accent/12'
-                    : 'border-border bg-panel/60 hover:border-border/80 hover:bg-card',
+                    : 'border-border/80 bg-panel/60 hover:border-border hover:bg-card',
                 )}
               >
                 <div
                   className={cn(
-                    'text-xs font-semibold',
+                    'text-[13px] font-semibold',
                     active ? 'text-accent' : 'text-fg',
                   )}
                 >
                   {opt.label}
                 </div>
-                <p className="mt-1 text-[11px] leading-snug text-fg-muted">
+                <p className="mt-1 text-xs leading-relaxed text-fg-muted">
                   {opt.description}
                 </p>
               </button>
@@ -207,7 +209,7 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
         </div>
 
         {/* Interactive Mini Slam Preview Stage */}
-        <div className="mt-3 flex flex-col items-center justify-between gap-3 rounded-card border border-border bg-canvas/85 px-4 py-6 sm:flex-row">
+        <div className="flex flex-col items-center justify-between gap-4 rounded-card border border-border/80 bg-panel/45 px-5 py-7 sm:flex-row">
           <div className="flex items-center gap-3">
             <div className="relative w-48 sm:w-52">
               <DropSparks

@@ -18,9 +18,8 @@ export default defineConfig({
       'tabGroups',
       'sidePanel',
       'contextMenus',
-      'scripting',
     ],
-    optional_permissions: ['bookmarks'],
+    optional_permissions: ['bookmarks', 'scripting'],
     optional_host_permissions: ['https://*/*', 'http://*/*'],
     omnibox: {
       keyword: 's',

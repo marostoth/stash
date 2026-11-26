@@ -1,6 +1,8 @@
 import { useDroppable } from '@dnd-kit/react';
 import {
   Check,
+  ChevronsDownUp,
+  ChevronsUpDown,
   EyeOff,
   Layers,
   LayoutGrid,
@@ -242,18 +244,16 @@ export function SpaceBar({
   const hideChecked = activeSpace?.hideChecked === true;
 
   const handleSetViewMode = (mode: SpaceViewMode) => {
-    if (!activeSpace || activeViewMode === mode) return;
-    void stashRepo.updateSpace(activeSpace.id, { viewMode: mode });
+    if (activeSpace && activeViewMode !== mode)
+      void stashRepo.updateSpace(activeSpace.id, { viewMode: mode });
   };
-
   const handleSetGroupBy = (groupBy: SpaceGroupBy) => {
-    if (!activeSpace || activeGroupBy === groupBy) return;
-    void stashRepo.updateSpace(activeSpace.id, { groupBy });
+    if (activeSpace && activeGroupBy !== groupBy)
+      void stashRepo.updateSpace(activeSpace.id, { groupBy });
   };
-
   const handleToggleHideChecked = () => {
-    if (!activeSpace) return;
-    void stashRepo.updateSpace(activeSpace.id, { hideChecked: !hideChecked });
+    if (activeSpace)
+      void stashRepo.updateSpace(activeSpace.id, { hideChecked: !hideChecked });
   };
 
   const handleCreateSpace = async (name: string, icon: string) => {
@@ -266,15 +266,33 @@ export function SpaceBar({
     toast.success(`Created Space "${created.name}"`);
   };
 
+  const activeSpaceCollections = collections.filter(
+    (col) => (col.spaceId ?? DEFAULT_SPACE_ID) === activeSpaceId,
+  );
+  const allSpaceCollectionsCollapsed =
+    activeSpaceCollections.length > 0 &&
+    activeSpaceCollections.every((col) => col.collapsed);
+  const handleToggleAllCollapsed = () => {
+    if (activeSpaceCollections.length === 0) return;
+    void stashRepo.setCollectionsCollapsed(
+      activeSpaceCollections.map((c) => c.id),
+      !allSpaceCollectionsCollapsed,
+    );
+  };
+
+  const collapseActionLabel = allSpaceCollectionsCollapsed
+    ? 'Expand all'
+    : 'Collapse all';
+
   return (
     <div
       ref={popoverRef}
-      className="relative z-20 border-b border-border/80 bg-panel/75 backdrop-blur-xs"
+      className="relative z-20 border-b border-border/70 bg-panel/75 backdrop-blur-xs"
     >
-      <div className="px-4 sm:px-6">
+      <div className="px-5 sm:px-7">
         <div
           className={cn(
-            'mx-auto flex items-center justify-between gap-2 py-1.5',
+            'mx-auto flex items-center justify-between gap-2 py-2',
             wideBoard ? 'max-w-[1720px]' : 'max-w-[1320px]',
           )}
         >
@@ -318,6 +336,23 @@ export function SpaceBar({
 
           {/* Per-Space View & Group Controls */}
           <div className="flex shrink-0 items-center gap-1.5">
+            {activeSpaceCollections.length >= 2 && (
+              <button
+                type="button"
+                onClick={handleToggleAllCollapsed}
+                title={`${collapseActionLabel} collections in this Space`}
+                aria-label={`${collapseActionLabel} collections`}
+                className="inline-flex h-6 items-center gap-1 rounded-control border border-border bg-canvas/80 px-2 font-mono text-[10px] font-medium text-fg-muted transition-colors hover:border-accent/45 hover:text-fg cursor-pointer"
+              >
+                {allSpaceCollectionsCollapsed ? (
+                  <ChevronsUpDown className="h-3 w-3 text-accent" />
+                ) : (
+                  <ChevronsDownUp className="h-3 w-3" />
+                )}
+                <span className="hidden md:inline">{collapseActionLabel}</span>
+              </button>
+            )}
+
             {checkedCountInSpace > 0 && (
               <button
                 type="button"

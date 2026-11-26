@@ -184,6 +184,7 @@ function DetailsRowView({
     playDelete(soundEffects);
     toast('Link removed', {
       duration: 5000,
+      className: 'stash-undo-toast',
       action: {
         label: 'Undo',
         onClick: () => {
@@ -227,7 +228,7 @@ function DetailsRowView({
       ref={rowRef}
       data-link-id={link.id}
       className={cn(
-        'group relative grid min-h-[38px] items-center gap-3.5 border-b border-border/60 px-3 py-1 text-xs transition-all last:border-b-0 hover:bg-card-hover/80',
+        'group relative grid min-h-[42px] items-center gap-3.5 border-b border-border/60 px-3.5 py-1.5 text-xs transition-all last:border-b-0 hover:bg-card-hover/80',
         gridTemplateClass,
         isStarred && !isChecked && 'bg-accent/[0.06]',
         isSelected && 'bg-accent/[0.14] ring-1 ring-inset ring-accent/75',

@@ -25,10 +25,10 @@ export function resolveCollectionGridClass(
         : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4';
   const gap =
     density === 'micro'
-      ? 'gap-2'
+      ? 'gap-2.5'
       : density === 'compact'
-        ? 'gap-2.5'
-        : 'gap-3.5';
+        ? 'gap-3.5'
+        : 'gap-4';
   return cn(cols, gap);
 }
 

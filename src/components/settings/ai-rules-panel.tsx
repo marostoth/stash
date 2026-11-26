@@ -50,17 +50,18 @@ export function AiRulesPanel({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <SettingsSectionCard
         icon={<Cpu className="h-4 w-4" />}
         title="On-Device AI (Chrome Gemini Nano)"
         subtitle="Runs locally inside Chrome when no Tier 1 rule matches to suggest collections, up to 3 tags, and short summary notes. Never sends your bookmarks to external servers."
         badge={{ label: nanoStatus, tone: badgeTone }}
       >
-        <div className="space-y-1">
+        <div className="divide-y divide-border/55">
           <SettingsToggleRow
             id="settings-enable-ai"
             label="Use On-Device AI fallback when available"
+            hint="Automatically classify new links during Auto-Categorize when no custom rule matches."
             checked={settings.enableOnDeviceAi}
             onCheckedChange={(checked) =>
               void stashRepo.updateSettings({ enableOnDeviceAi: checked })
@@ -70,6 +71,7 @@ export function AiRulesPanel({
           <SettingsToggleRow
             id="settings-auto-tag-on-save"
             label="Auto-tag manually added links"
+            hint="Quietly suggest up to 3 concise tags right after you stash or create a link."
             checked={settings.autoTagOnSave}
             onCheckedChange={(checked) =>
               void stashRepo.updateSettings({ autoTagOnSave: checked })

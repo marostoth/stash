@@ -48,21 +48,34 @@ interface SettingsModalProps {
 
 interface NavItemSpec {
   id: SettingsTab;
+  group: 'Preferences' | 'Look & Feel' | 'Library & Data';
   label: string;
   description: string;
   Icon: ComponentType<{ className?: string }>;
 }
 
+const NAV_GROUPS = ['Preferences', 'Look & Feel', 'Library & Data'] as const;
+
 const NAV_ITEMS: readonly NavItemSpec[] = [
   {
     id: 'general',
+    group: 'Preferences',
     label: 'General',
     description:
-      'Workspace behavior, board width, sessions, and hover previews.',
+      'Board layout, link opening behavior, sessions, and hover previews.',
     Icon: SlidersHorizontal,
   },
   {
+    id: 'shortcuts',
+    group: 'Preferences',
+    label: 'Shortcuts',
+    description:
+      'Live Chrome global bindings, board navigation, and quick-capture tricks.',
+    Icon: Keyboard,
+  },
+  {
     id: 'appearance',
+    group: 'Look & Feel',
     label: 'Appearance',
     description:
       'Built-in skins, Theme Studio, canvas backdrops, and wallpaper.',
@@ -70,6 +83,7 @@ const NAV_ITEMS: readonly NavItemSpec[] = [
   },
   {
     id: 'effects',
+    group: 'Look & Feel',
     label: 'Effects',
     description:
       'Motion feel, perimeter drop shockwaves, hover sheen, and action waves.',
@@ -77,6 +91,7 @@ const NAV_ITEMS: readonly NavItemSpec[] = [
   },
   {
     id: 'sounds',
+    group: 'Look & Feel',
     label: 'Sounds',
     description:
       'Synthesized sound packs, volume, audition board, and custom audio clips.',
@@ -84,28 +99,25 @@ const NAV_ITEMS: readonly NavItemSpec[] = [
   },
   {
     id: 'ai-rules',
+    group: 'Library & Data',
     label: 'AI & Rules',
     description: 'Chrome Gemini Nano on-device AI and priority-ordered rules.',
     Icon: Sparkles,
   },
   {
     id: 'library-tools',
+    group: 'Library & Data',
     label: 'Library Tools',
     description:
-      'Health Check, Smart Reorganize, batch Auto-Icon, and Auto-Tag.',
+      'Health Check, duplicates, AI maintenance sweeps, and 7-day Trash.',
     Icon: Wrench,
   },
   {
-    id: 'shortcuts',
-    label: 'Shortcuts',
-    description:
-      'Live Chrome global bindings, board navigation, and quick-capture tricks.',
-    Icon: Keyboard,
-  },
-  {
     id: 'backup',
+    group: 'Library & Data',
     label: 'Backup & Import',
-    description: 'Portable JSON backups and Chrome or Netscape HTML imports.',
+    description:
+      'Portable JSON backups, Netscape HTML export, and bookmark importers.',
     Icon: FolderSync,
   },
 ] as const;
@@ -119,7 +131,7 @@ function readExtensionVersion(): string {
   } catch {
     // Fallback outside extension runtime
   }
-  return 'v1.16.1';
+  return 'v1.26.0';
 }
 
 export function SettingsModal({
@@ -189,9 +201,9 @@ export function SettingsModal({
     >
       <DialogContent className="flex h-[min(88vh,820px)] w-[min(94vw,1120px)] flex-col overflow-hidden p-0 md:flex-row">
         {/* Left Navigation Rail (collapses to horizontal strip on < md) */}
-        <aside className="flex shrink-0 flex-col border-b border-border bg-canvas/60 md:w-[220px] md:border-b-0 md:border-r">
-          <div className="flex h-[60px] shrink-0 items-center border-b border-border/80 px-4 pr-12 md:pr-4">
-            <DialogTitle className="text-sm font-semibold tracking-tight text-fg">
+        <aside className="flex shrink-0 flex-col border-b border-border bg-canvas/60 md:w-[232px] md:border-b-0 md:border-r">
+          <div className="flex h-[68px] shrink-0 items-center border-b border-border/80 px-5 pr-12 md:pr-5">
+            <DialogTitle className="text-[15px] font-semibold tracking-tight text-fg">
               Stash Settings
             </DialogTitle>
             <DialogDescription className="sr-only">
@@ -202,48 +214,63 @@ export function SettingsModal({
 
           <nav
             aria-label="Settings sections"
-            className="flex gap-1 overflow-x-auto px-2.5 py-2.5 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:px-2.5 md:py-3"
+            className="flex gap-1 overflow-x-auto px-3 py-2.5 md:flex-1 md:flex-col md:gap-4 md:overflow-x-visible md:overflow-y-auto md:px-3 md:py-4"
           >
-            {NAV_ITEMS.map(({ id, label, Icon }) => {
-              const active = activeTab === id;
-              const badgeCount =
-                id === 'ai-rules' && rules.length > 0 ? rules.length : null;
+            {NAV_GROUPS.map((group) => {
+              const items = NAV_ITEMS.filter((item) => item.group === group);
               return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setActiveTab(id)}
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    'flex shrink-0 items-center justify-between gap-2 rounded-control px-2.5 py-2 text-left text-xs font-medium transition-colors cursor-pointer md:w-full',
-                    active
-                      ? 'bg-accent text-accent-fg'
-                      : 'text-fg-muted hover:bg-card hover:text-fg',
-                  )}
+                <div
+                  key={group}
+                  className="flex shrink-0 items-center gap-1 md:flex-col md:items-stretch md:gap-0.5"
                 >
-                  <span className="flex items-center gap-2">
-                    <Icon className="h-3.5 w-3.5 shrink-0" />
-                    <span className="whitespace-nowrap">{label}</span>
-                  </span>
-                  {badgeCount !== null ? (
-                    <span
-                      className={cn(
-                        'rounded-pill px-1.5 py-0.25 font-mono text-[10px]',
-                        active
-                          ? 'bg-black/20 text-accent-fg'
-                          : 'border border-border bg-panel text-fg-muted',
-                      )}
-                    >
-                      {badgeCount}
-                    </span>
-                  ) : null}
-                </button>
+                  <div className="hidden px-2.5 pb-1 font-mono text-[10px] font-medium uppercase tracking-widest text-fg-muted/75 md:block">
+                    {group}
+                  </div>
+                  {items.map(({ id, label, Icon }) => {
+                    const active = activeTab === id;
+                    const badgeCount =
+                      id === 'ai-rules' && rules.length > 0
+                        ? rules.length
+                        : null;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setActiveTab(id)}
+                        aria-current={active ? 'page' : undefined}
+                        className={cn(
+                          'flex shrink-0 items-center justify-between gap-2 rounded-control px-2.5 py-2 text-left text-[13px] font-medium transition-colors cursor-pointer md:w-full',
+                          active
+                            ? 'bg-accent text-accent-fg'
+                            : 'text-fg-muted hover:bg-card hover:text-fg',
+                        )}
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span className="whitespace-nowrap">{label}</span>
+                        </span>
+                        {badgeCount !== null ? (
+                          <span
+                            className={cn(
+                              'rounded-pill px-1.5 py-0.25 font-mono text-[10px]',
+                              active
+                                ? 'bg-black/20 text-accent-fg'
+                                : 'border border-border bg-panel text-fg-muted',
+                            )}
+                          >
+                            {badgeCount}
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
               );
             })}
           </nav>
 
           {/* Anchored Left-Rail Footer (desktop) */}
-          <div className="hidden items-center justify-between gap-2 border-t border-border px-3.5 py-2.5 md:flex">
+          <div className="hidden items-center justify-between gap-2 border-t border-border/80 px-4 py-3 md:flex">
             <span className="font-mono text-[10px] text-fg-muted">
               {versionLabel}
             </span>
@@ -266,14 +293,14 @@ export function SettingsModal({
         {/* Right Content Column: Docked Header + Scroll-Faded Body */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {currentNav ? (
-            <header className="flex h-[60px] shrink-0 items-center gap-3 border-b border-border bg-panel/95 px-6 pr-14">
+            <header className="flex h-[68px] shrink-0 items-center gap-3.5 border-b border-border/80 bg-panel/95 px-7 pr-14 sm:px-8 sm:pr-14">
               {CurrentNavIcon ? (
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control border border-border bg-canvas/80 text-accent">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border border-border/80 bg-canvas/85 text-accent">
                   <CurrentNavIcon className="h-4 w-4" aria-hidden="true" />
                 </div>
               ) : null}
               <div className="min-w-0">
-                <h2 className="truncate text-sm font-semibold tracking-tight text-fg">
+                <h2 className="truncate text-[15px] font-semibold tracking-tight text-fg">
                   {currentNav.label}
                 </h2>
                 <p className="truncate text-xs text-fg-muted">
@@ -294,7 +321,7 @@ export function SettingsModal({
               className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-6 bg-gradient-to-t from-panel to-transparent"
             />
 
-            <div className="h-full overflow-y-auto px-6 py-5">
+            <div className="h-full overflow-y-auto px-7 py-6 sm:px-8 sm:py-7">
               {activeTab === 'general' ? (
                 <GeneralPanel settings={settings} settingsOpen={open} />
               ) : activeTab === 'appearance' ? (

@@ -12,7 +12,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { type CSSProperties, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   HealthGroupSection,
@@ -179,6 +179,8 @@ export function HealthCheckModal({
       const count = removed.length;
       toast(`Removed ${count} link${count === 1 ? '' : 's'}`, {
         duration: 8000,
+        className: 'stash-undo-toast',
+        style: { '--stash-toast-duration': '8000ms' } as CSSProperties,
         action: {
           label: 'Undo',
           onClick: () => {

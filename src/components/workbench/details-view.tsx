@@ -243,6 +243,7 @@ export function DetailsView({
       `Unchecked ${changed.length} item${changed.length === 1 ? '' : 's'}`,
       {
         duration: 5000,
+        className: 'stash-undo-toast',
         action: {
           label: 'Undo',
           onClick: () => {

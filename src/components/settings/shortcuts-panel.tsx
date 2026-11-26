@@ -23,7 +23,7 @@ const GROUP_ICON: Record<ShortcutGroup['id'], ReactNode> = {
 
 function Keycap({ children }: { children: string }) {
   return (
-    <kbd className="inline-flex min-w-[22px] items-center justify-center rounded border border-border bg-canvas/80 px-1.5 py-0.5 font-mono text-[11px] leading-tight text-fg shadow-[inset_0_-1px_0_rgba(0,0,0,0.35)]">
+    <kbd className="inline-flex min-w-[24px] items-center justify-center rounded border border-border/90 bg-panel px-2 py-0.5 font-mono text-[11px] leading-tight text-fg shadow-[inset_0_-1px_0_rgba(0,0,0,0.35)]">
       {children}
     </kbd>
   );
@@ -115,7 +115,7 @@ export function ShortcutsPanel({ settingsOpen }: ShortcutsPanelProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Live Global Chrome Commands */}
       <SettingsSectionCard
         icon={<Command className="h-4 w-4" />}
@@ -133,7 +133,7 @@ export function ShortcutsPanel({ settingsOpen }: ShortcutsPanelProps) {
           </Button>
         }
       >
-        <div className="divide-y divide-border/70">
+        <div className="divide-y divide-border/55">
           {!loaded ? (
             <div className="py-2 font-mono text-[11px] text-fg-muted">
               Loading Chrome shortcuts...
@@ -144,10 +144,10 @@ export function ShortcutsPanel({ settingsOpen }: ShortcutsPanelProps) {
               return (
                 <div
                   key={cmd.name}
-                  className="flex items-center justify-between gap-3 py-2 first:pt-0.5 last:pb-0.5"
+                  className="flex items-center justify-between gap-4 py-2.5 first:pt-0.5 last:pb-0.5"
                 >
                   <div className="min-w-0">
-                    <div className="text-xs font-medium text-fg">
+                    <div className="text-[13px] font-medium text-fg">
                       {cmd.description}
                     </div>
                   </div>
@@ -175,13 +175,13 @@ export function ShortcutsPanel({ settingsOpen }: ShortcutsPanelProps) {
           title={group.title}
           subtitle={group.subtitle}
         >
-          <div className="divide-y divide-border/70">
+          <div className="divide-y divide-border/55">
             {group.items.map((item) => (
               <div
                 key={item.id}
-                className="flex flex-wrap items-center justify-between gap-3 py-2 first:pt-0.5 last:pb-0.5"
+                className="flex flex-wrap items-center justify-between gap-4 py-2.5 first:pt-0.5 last:pb-0.5"
               >
-                <span className="text-xs text-fg">{item.label}</span>
+                <span className="text-[13px] text-fg">{item.label}</span>
                 <span className="inline-flex shrink-0 items-center gap-1.5">
                   <KeyChord tokens={item.keys} joiner={item.joiner ?? '+'} />
                   {item.qualifier ? (

@@ -106,11 +106,26 @@ export function useWorkbenchDnd({
     (event: DragEndEvent) => {
       if (event.canceled) return;
       const { source, target } = event.operation;
-      if (!source || !target) return;
+      if (!source) return;
 
       const sourceData = source.data;
-      const targetData = target.data;
-      if (!isDragItemData(sourceData) || !isDropTargetData(targetData)) return;
+      if (!isDragItemData(sourceData)) return;
+
+      const playSamePlaceLanding = (linkId: string, collectionId: string) => {
+        playDrop(soundEffects, motionMode);
+        requestAnimationFrame(() => {
+          settleLink(linkId);
+          triggerSettledImpact(linkId, collectionId);
+        });
+      };
+
+      const targetData = target?.data;
+      if (!target || !isDropTargetData(targetData)) {
+        if (sourceData.kind === 'link') {
+          playSamePlaceLanding(sourceData.link.id, sourceData.collectionId);
+        }
+        return;
+      }
 
       // 0. Drop link, open tab, or collection directly onto a Space pill
       if (targetData.kind === 'space-drop') {
@@ -264,6 +279,8 @@ export function useWorkbenchDnd({
           const sameCollection = sourceData.collectionId === destCollectionId;
           if (!sameCollection || destIndex !== sourceData.index) {
             void moveLink(destCollectionId, destIndex);
+          } else {
+            playSamePlaceLanding(sourceData.link.id, sourceData.collectionId);
           }
           return;
         }
@@ -273,6 +290,8 @@ export function useWorkbenchDnd({
             void moveLink(targetData.collectionId);
           } else if (isSortable(source) && source.index !== sourceData.index) {
             void moveLink(sourceData.collectionId, source.index);
+          } else {
+            playSamePlaceLanding(sourceData.link.id, sourceData.collectionId);
           }
         }
       }

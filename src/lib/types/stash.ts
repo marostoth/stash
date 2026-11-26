@@ -250,6 +250,22 @@ export interface StashExportBundle {
   customThemes: ThemeDefinition[];
 }
 
+export type TrashEntry =
+  | {
+      id: string;
+      kind: 'link';
+      deletedAt: string;
+      collectionName?: string;
+      link: LinkItem;
+    }
+  | {
+      id: string;
+      kind: 'collection';
+      deletedAt: string;
+      collection: Collection;
+      links: LinkItem[];
+    };
+
 export const DEFAULT_SETTINGS: StashSettings = {
   activeThemeId: 'oscilloscope',
   backdropOverride: 'theme',

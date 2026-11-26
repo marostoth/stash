@@ -117,6 +117,7 @@ export function SidePanelCollectionList({
     playDelete(soundEffects);
     toast('Link removed', {
       duration: 5000,
+      className: 'stash-undo-toast',
       action: {
         label: 'Undo',
         onClick: () => {
@@ -154,7 +155,7 @@ export function SidePanelCollectionList({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {groups.map(({ collection, links: colLinks }) => {
         const expanded = isCollectionOpen(collection.id, collection.collapsed);
         const CuratedIcon = getCuratedCollectionIcon(collection.icon);

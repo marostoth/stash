@@ -111,8 +111,8 @@ export function TopBar({
   };
 
   return (
-    <header className="sticky top-0 z-30 h-12 border-b border-border bg-panel/95 backdrop-blur-sm">
-      <div className="flex h-full items-center justify-between gap-3 px-4 sm:px-6">
+    <header className="sticky top-0 z-30 h-14 border-b border-border/75 bg-panel/95 backdrop-blur-sm">
+      <div className="flex h-full items-center justify-between gap-3 px-5 sm:px-7">
         {/* Brand */}
         <div className="flex shrink-0 items-center gap-2.5">
           <div

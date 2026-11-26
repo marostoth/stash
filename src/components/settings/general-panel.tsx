@@ -1,6 +1,7 @@
-import { SlidersHorizontal } from 'lucide-react';
+import { AppWindow, LayoutGrid } from 'lucide-react';
 import { PreviewsSettingsCard } from '@/components/settings/previews-settings-card';
 import {
+  SettingsControlRow,
   SettingsSectionCard,
   SettingsToggleRow,
 } from '@/components/settings/settings-section-card';
@@ -21,25 +22,61 @@ interface GeneralPanelProps {
 
 export function GeneralPanel({ settings, settingsOpen }: GeneralPanelProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* 1. Board & Layout */}
       <SettingsSectionCard
-        icon={<SlidersHorizontal className="h-4 w-4" />}
-        title="Workspace Behavior"
+        icon={<LayoutGrid className="h-4 w-4" />}
+        title="Board & Layout"
+        subtitle="Control card spacing, canvas width, and optional floating strips above your collections."
       >
-        <div className="space-y-1">
-          <SettingsToggleRow
-            id="settings-open-new-tab"
-            label="Open saved links in a new tab"
-            checked={settings.openLinkInNewTab}
-            onCheckedChange={(checked) =>
-              void stashRepo.updateSettings({ openLinkInNewTab: checked })
+        <div className="divide-y divide-border/55">
+          <SettingsControlRow
+            htmlFor="settings-card-density"
+            label="Card density"
+            hint="Choose how much metadata and breathing room each link card shows."
+            control={
+              <Select
+                id="settings-card-density"
+                value={settings.density}
+                onChange={(e) =>
+                  void stashRepo.updateSettings({
+                    density: e.target.value as CardDensity,
+                  })
+                }
+                className="h-8 w-40 text-xs"
+              >
+                <option value="micro">Micro</option>
+                <option value="compact">Compact</option>
+                <option value="comfortable">Comfortable</option>
+              </Select>
+            }
+          />
+
+          <SettingsControlRow
+            htmlFor="settings-board-width"
+            label="Board width"
+            hint="Standard keeps a focused reading measure; Ultrawide expands for large monitors."
+            control={
+              <Select
+                id="settings-board-width"
+                value={settings.boardWidth}
+                onChange={(e) =>
+                  void stashRepo.updateSettings({
+                    boardWidth: e.target.value as BoardWidthMode,
+                  })
+                }
+                className="h-8 w-40 text-xs"
+              >
+                <option value="standard">Standard</option>
+                <option value="wide">Ultrawide</option>
+              </Select>
             }
           />
 
           <SettingsToggleRow
             id="settings-quick-launch-bar"
             label="Show Quick Links strip"
-            hint="Compact 1-click Quick Launch bar beneath Spaces showing pinned or starred links."
+            hint="Compact 1-click Quick Launch row at the top of the board for pinned or starred sites."
             checked={settings.quickLaunchVisible !== false}
             onCheckedChange={(checked) =>
               void stashRepo.updateSettings({ quickLaunchVisible: checked })
@@ -49,7 +86,7 @@ export function GeneralPanel({ settings, settingsOpen }: GeneralPanelProps) {
           <SettingsToggleRow
             id="settings-tag-filter-bar"
             label="Show Quick Tag filter bar"
-            hint="Clickable #tag chips beneath Quick Links (and in the Side Panel) for 1-click filtering."
+            hint="Clickable #tag chips above your collections (and in the Side Panel) for 1-click slicing."
             checked={settings.tagBarVisible !== false}
             onCheckedChange={(checked) => {
               if (!checked) {
@@ -58,80 +95,30 @@ export function GeneralPanel({ settings, settingsOpen }: GeneralPanelProps) {
               void stashRepo.updateSettings({ tagBarVisible: checked });
             }}
           />
+        </div>
+      </SettingsSectionCard>
 
-          <div className="flex items-center justify-between gap-3 py-1">
-            <label
-              htmlFor="settings-card-density"
-              className="text-xs text-fg select-none"
-            >
-              Card density
-            </label>
-            <Select
-              id="settings-card-density"
-              value={settings.density}
-              onChange={(e) =>
-                void stashRepo.updateSettings({
-                  density: e.target.value as CardDensity,
-                })
-              }
-              className="h-8 w-36 text-xs"
-            >
-              <option value="micro">Micro</option>
-              <option value="compact">Compact</option>
-              <option value="comfortable">Comfortable</option>
-            </Select>
-          </div>
-
-          <div className="flex items-center justify-between gap-3 py-1">
-            <label
-              htmlFor="settings-board-width"
-              className="text-xs text-fg select-none"
-            >
-              Board width
-            </label>
-            <Select
-              id="settings-board-width"
-              value={settings.boardWidth}
-              onChange={(e) =>
-                void stashRepo.updateSettings({
-                  boardWidth: e.target.value as BoardWidthMode,
-                })
-              }
-              className="h-8 w-36 text-xs"
-            >
-              <option value="standard">Standard</option>
-              <option value="wide">Ultrawide</option>
-            </Select>
-          </div>
-
-          <div className="flex items-center justify-between gap-3 py-1">
-            <label
-              htmlFor="settings-default-currency"
-              className="text-xs text-fg select-none"
-            >
-              Default currency
-            </label>
-            <Select
-              id="settings-default-currency"
-              value={settings.defaultCurrency ?? 'GBP'}
-              onChange={(e) =>
-                void stashRepo.updateSettings({
-                  defaultCurrency: e.target.value,
-                })
-              }
-              className="h-8 w-36 text-xs"
-            >
-              {COMMON_CURRENCIES.map((currency) => (
-                <option key={currency.code} value={currency.code}>
-                  {currency.label}
-                </option>
-              ))}
-            </Select>
-          </div>
+      {/* 2. Links, Tabs & Shopping */}
+      <SettingsSectionCard
+        icon={<AppWindow className="h-4 w-4" />}
+        title="Links, Tabs & Shopping"
+        subtitle="How links launch, how open browser sessions are saved, and your default Shopping List currency."
+      >
+        <div className="divide-y divide-border/55">
+          <SettingsToggleRow
+            id="settings-open-new-tab"
+            label="Open saved links in a new tab"
+            hint="Keep your Stash board open in the background when launching a link."
+            checked={settings.openLinkInNewTab}
+            onCheckedChange={(checked) =>
+              void stashRepo.updateSettings({ openLinkInNewTab: checked })
+            }
+          />
 
           <SettingsToggleRow
             id="settings-include-pinned"
             label="Include pinned tabs when saving sessions"
+            hint="By default, Save Session skips Chrome pinned tabs so your daily anchors stay put."
             checked={settings.includePinnedInSessions}
             onCheckedChange={(checked) =>
               void stashRepo.updateSettings({
@@ -143,6 +130,7 @@ export function GeneralPanel({ settings, settingsOpen }: GeneralPanelProps) {
           <SettingsToggleRow
             id="settings-close-on-quick-stash"
             label="Close tab after Side Panel quick-stash"
+            hint="Automatically close the current browser tab once it is saved from the Side Panel."
             checked={settings.closeTabOnQuickStash}
             onCheckedChange={(checked) =>
               void stashRepo.updateSettings({
@@ -150,9 +138,34 @@ export function GeneralPanel({ settings, settingsOpen }: GeneralPanelProps) {
               })
             }
           />
+
+          <SettingsControlRow
+            htmlFor="settings-default-currency"
+            label="Default currency"
+            hint="Used for new price entries and Shopping List totals."
+            control={
+              <Select
+                id="settings-default-currency"
+                value={settings.defaultCurrency ?? 'GBP'}
+                onChange={(e) =>
+                  void stashRepo.updateSettings({
+                    defaultCurrency: e.target.value,
+                  })
+                }
+                className="h-8 w-40 text-xs"
+              >
+                {COMMON_CURRENCIES.map((currency) => (
+                  <option key={currency.code} value={currency.code}>
+                    {currency.label}
+                  </option>
+                ))}
+              </Select>
+            }
+          />
         </div>
       </SettingsSectionCard>
 
+      {/* 3. Previews */}
       <PreviewsSettingsCard settings={settings} settingsOpen={settingsOpen} />
     </div>
   );

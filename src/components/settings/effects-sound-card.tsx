@@ -111,11 +111,11 @@ export function EffectsSoundCard({
         tone: settings.soundEffects && volumeDraft > 0 ? 'accent' : 'neutral',
       }}
     >
-      <div className="space-y-3">
+      <div className="space-y-5">
         <SettingsToggleRow
           id="settings-sound-fx"
           label="Synthesized sound effects"
-          hint="Generated live with Web Audio (zero audio files)."
+          hint="Generated live with Web Audio (zero external audio files)."
           checked={settings.soundEffects}
           onCheckedChange={(checked) => {
             void stashRepo.updateSettings({ soundEffects: checked });
@@ -128,14 +128,14 @@ export function EffectsSoundCard({
         {/* Sound Pack Selector */}
         <div
           className={cn(
-            'space-y-1.5',
+            'space-y-2 border-t border-border/60 pt-4',
             !settings.soundEffects && 'pointer-events-none opacity-50',
           )}
         >
-          <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
+          <div className="font-mono text-[10px] font-medium uppercase tracking-widest text-fg-muted">
             Sound Pack
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2.5 sm:grid-cols-2">
             {SOUND_PACK_OPTIONS.map((pack) => {
               const active = activePack === pack.id;
               return (
@@ -145,17 +145,17 @@ export function EffectsSoundCard({
                   aria-pressed={active}
                   onClick={() => handleSelectPack(pack.id)}
                   className={cn(
-                    'rounded-control border p-2 text-left transition-colors cursor-pointer',
+                    'rounded-control border p-3 text-left transition-colors cursor-pointer',
                     pack.id === 'arpg-heavy' && 'sm:col-span-2',
                     active
                       ? 'border-accent/70 bg-accent/12'
-                      : 'border-border bg-panel/60 hover:border-border/80 hover:bg-card',
+                      : 'border-border/80 bg-panel/60 hover:border-border hover:bg-card',
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span
                       className={cn(
-                        'text-xs font-semibold',
+                        'text-[13px] font-semibold',
                         active ? 'text-accent' : 'text-fg',
                       )}
                     >
@@ -167,7 +167,7 @@ export function EffectsSoundCard({
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-0.5 text-[11px] leading-snug text-fg-muted">
+                  <p className="mt-1 text-xs leading-relaxed text-fg-muted">
                     {pack.description}
                   </p>
                 </button>
@@ -179,13 +179,15 @@ export function EffectsSoundCard({
         {/* Volume Slider */}
         <label
           className={cn(
-            'block space-y-1.5 text-xs',
+            'block space-y-2 border-t border-border/60 pt-4 text-xs',
             !settings.soundEffects && 'opacity-50',
           )}
         >
-          <div className="flex items-center justify-between text-fg-muted">
-            <span>Effect volume</span>
-            <span className="font-mono text-[11px] font-medium text-fg tabular-nums">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-medium text-fg">
+              Effect volume
+            </span>
+            <span className="font-mono text-xs font-medium text-fg tabular-nums">
               {volumeDraft}%
             </span>
           </div>
@@ -212,11 +214,11 @@ export function EffectsSoundCard({
         </label>
 
         {/* Foley Soundboard */}
-        <div className="border-t border-border/70 pt-2.5">
-          <div className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-fg-muted">
+        <div className="border-t border-border/60 pt-4">
+          <div className="mb-2.5 font-mono text-[10px] font-medium uppercase tracking-widest text-fg-muted">
             Audition Active Pack
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
               size="sm"

@@ -149,8 +149,8 @@ export const LinkCard = memo(function LinkCard({
   const cardPadding = isMicro
     ? 'gap-1 px-2.5 py-2'
     : isCompact
-      ? 'gap-1.5 px-2.5 py-2'
-      : 'gap-2 p-3.5';
+      ? 'gap-1.5 px-3 py-2.5'
+      : 'gap-2.5 p-4';
 
   const handleContextMenu = (event: React.MouseEvent) => {
     event.preventDefault();
@@ -235,6 +235,7 @@ export const LinkCard = memo(function LinkCard({
 
     toast('Link removed', {
       duration: 5000,
+      className: 'stash-undo-toast',
       action: {
         label: 'Undo',
         onClick: () => {
@@ -267,12 +268,7 @@ export const LinkCard = memo(function LinkCard({
 
   return (
     /* Outer wrapper strictly owns @dnd-kit/react ref & transforms — never apply Motion transforms here */
-    <div
-      ref={ref}
-      data-link-id={link.id}
-      style={hoverTiltActive ? { perspective: FOIL_PERSPECTIVE_PX } : undefined}
-      className="relative h-full"
-    >
+    <div ref={ref} data-link-id={link.id} className="relative h-full">
       {isDragging ? (
         <LinkCardDragPlaceholder
           title={link.title}
@@ -328,7 +324,11 @@ export const LinkCard = memo(function LinkCard({
             transition={cardTransition}
             style={
               hoverTiltActive
-                ? { rotateX: foil.rotateX, rotateY: foil.rotateY }
+                ? {
+                    transformPerspective: FOIL_PERSPECTIVE_PX,
+                    rotateX: foil.rotateX,
+                    rotateY: foil.rotateY,
+                  }
                 : undefined
             }
             onPointerEnter={foil.handlePointerEnter}
@@ -341,7 +341,7 @@ export const LinkCard = memo(function LinkCard({
               drawerHover.handleCardPointerLeave();
             }}
             className={cn(
-              'group relative z-[1] h-full rounded-card border border-border bg-card transition-all hover:border-accent/45 hover:bg-card-hover',
+              'group relative z-[1] h-full rounded-card border border-border bg-card transition-[background-color,border-color,opacity,box-shadow] hover:border-accent/45 hover:bg-card-hover',
               isStarred && !isChecked && 'stash-card-starred',
               isSelected &&
                 'border-accent bg-accent/[0.11] ring-2 ring-accent/70',

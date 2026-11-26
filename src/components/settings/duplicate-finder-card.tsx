@@ -1,5 +1,5 @@
 import { Copy, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { type CSSProperties, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { SettingsSectionCard } from '@/components/settings/settings-section-card';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,8 @@ export function DuplicateFinderCard({
       `Removed ${removed.length} duplicate${removed.length === 1 ? '' : 's'}`,
       {
         duration: 6000,
+        className: 'stash-undo-toast',
+        style: { '--stash-toast-duration': '6000ms' } as CSSProperties,
         action: {
           label: 'Undo',
           onClick: () => {

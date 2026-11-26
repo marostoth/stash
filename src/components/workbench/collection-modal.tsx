@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input, Select } from '@/components/ui/input';
+import { deleteCollectionWithUndo } from '@/components/workbench/delete-collection-toast';
 import { autoAssignCollectionIconIfEmpty } from '@/lib/icons/auto-assign-icon';
 import { stashRepo } from '@/lib/storage/repo';
 import {
@@ -93,9 +94,9 @@ export function CollectionModal({
       setConfirmDelete(true);
       return;
     }
-    await stashRepo.deleteCollection(modal.collection.id);
-    toast.success(`Deleted "${modal.collection.name}"`);
+    const { id, name: collectionName } = modal.collection;
     closeCollectionModal();
+    await deleteCollectionWithUndo(id, collectionName);
   };
 
   return (

@@ -77,7 +77,7 @@ export function useQuickStashProduct({
     }
     let active = true;
     void browser.permissions
-      .contains({ origins: [originPattern] })
+      .contains({ permissions: ['scripting'], origins: [originPattern] })
       .then((granted) => {
         if (active) setHasHostPermission(Boolean(granted));
       })
@@ -139,14 +139,14 @@ export function useQuickStashProduct({
       return;
     }
 
-    // CRITICAL: request host permission synchronously before any await
+    // CRITICAL: request optional scripting + host permission synchronously before any await
     if (
       !hasHostPermission &&
       typeof browser !== 'undefined' &&
       browser.permissions?.request
     ) {
       void browser.permissions
-        .request({ origins: [originPattern] })
+        .request({ permissions: ['scripting'], origins: [originPattern] })
         .then((granted) => {
           setHasHostPermission(Boolean(granted));
           return runExtraction(Boolean(granted));

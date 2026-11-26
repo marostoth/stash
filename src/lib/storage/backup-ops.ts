@@ -18,6 +18,11 @@ import type {
 } from '@/lib/storage/repo-types';
 import { pruneEmptyAutoInboxesInStorage } from '@/lib/storage/spaces-ops';
 import {
+  recordDeletedCollectionInTrash,
+  recordDeletedLinksInTrash,
+  removeRestoredLinksFromTrash,
+} from '@/lib/storage/trash-ops';
+import {
   formatSessionName,
   type OpenTabInfo,
   selectEligibleTabsForClose,
@@ -254,13 +259,15 @@ export async function deleteCollectionInStorage(id: string): Promise<boolean> {
     collectionsStorage.getValue(),
     linksStorage.getValue(),
   ]);
-  const remaining = existingCollections.filter((item) => item.id !== id);
-  if (remaining.length === existingCollections.length) return false;
+  const targetCollection = existingCollections.find((item) => item.id === id);
+  if (!targetCollection) return false;
 
+  const remaining = existingCollections.filter((item) => item.id !== id);
   const reindexed = sortByOrder(remaining).map((item, index) => ({
     ...item,
     order: index,
   }));
+  const removedLinks = existingLinks.filter((link) => link.collectionId === id);
   const remainingLinks = existingLinks.filter(
     (link) => link.collectionId !== id,
   );
@@ -268,12 +275,16 @@ export async function deleteCollectionInStorage(id: string): Promise<boolean> {
   await Promise.all([
     collectionsStorage.setValue(reindexed),
     linksStorage.setValue(remainingLinks),
+    recordDeletedCollectionInTrash(targetCollection, removedLinks),
   ]);
   return true;
 }
 
 export async function deleteLinkInStorage(id: string): Promise<boolean> {
-  const existing = await linksStorage.getValue();
+  const [collections, existing] = await Promise.all([
+    collectionsStorage.getValue(),
+    linksStorage.getValue(),
+  ]);
   const target = existing.find((item) => item.id === id);
   if (!target) return false;
 
@@ -286,8 +297,12 @@ export async function deleteLinkInStorage(id: string): Promise<boolean> {
     const nextOrder = orderById.get(item.id);
     return nextOrder !== undefined ? { ...item, order: nextOrder } : item;
   });
+  const colNames = new Map(collections.map((c) => [c.id, c.name]));
 
-  await linksStorage.setValue(finalLinks);
+  await Promise.all([
+    linksStorage.setValue(finalLinks),
+    recordDeletedLinksInTrash([target], colNames),
+  ]);
   await pruneEmptyAutoInboxesInStorage([target.collectionId], finalLinks);
   return true;
 }
@@ -318,7 +333,10 @@ export async function restoreLinkInStorage(
   if (duplicate) return null;
 
   const nextLinks = insertLinkAtIndexInList(existingLinks, link, link.order);
-  await linksStorage.setValue(nextLinks);
+  await Promise.all([
+    linksStorage.setValue(nextLinks),
+    removeRestoredLinksFromTrash([link.id]),
+  ]);
   return nextLinks.find((item) => item.id === link.id) ?? link;
 }
 
@@ -331,7 +349,10 @@ export async function deleteLinksInStorage(
 ): Promise<LinkItem[]> {
   if (ids.length === 0) return [];
   const idSet = new Set(ids);
-  const existing = await linksStorage.getValue();
+  const [collections, existing] = await Promise.all([
+    collectionsStorage.getValue(),
+    linksStorage.getValue(),
+  ]);
 
   const removed: LinkItem[] = [];
   const remaining: LinkItem[] = [];
@@ -363,8 +384,12 @@ export async function deleteLinksInStorage(
     const nextOrder = orderById.get(item.id);
     return nextOrder !== undefined ? { ...item, order: nextOrder } : item;
   });
+  const colNames = new Map(collections.map((c) => [c.id, c.name]));
 
-  await linksStorage.setValue(finalLinks);
+  await Promise.all([
+    linksStorage.setValue(finalLinks),
+    recordDeletedLinksInTrash(sortByOrder(removed), colNames),
+  ]);
   await pruneEmptyAutoInboxesInStorage(
     Array.from(affectedCollections),
     finalLinks,
@@ -412,6 +437,9 @@ export async function restoreLinksInStorage(
 
   if (restoredIds.size === 0) return [];
 
-  await linksStorage.setValue(working);
+  await Promise.all([
+    linksStorage.setValue(working),
+    removeRestoredLinksFromTrash(Array.from(restoredIds)),
+  ]);
   return working.filter((item) => restoredIds.has(item.id));
 }

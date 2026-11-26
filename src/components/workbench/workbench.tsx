@@ -285,129 +285,142 @@ export function Workbench() {
               onSelectSpace={handleSelectSpace}
             />
 
-            {settings.quickLaunchVisible !== false && (
-              <QuickLaunchBar
-                links={links}
-                activeSpaceCollectionIds={activeSpaceCollectionIds}
-                openInNewTab={settings.openLinkInNewTab}
-                wideBoard={wideBoard}
-              />
-            )}
-
-            {settings.tagBarVisible !== false && (
-              <TagFilterBar
-                links={links}
-                activeSpaceCollectionIds={activeSpaceCollectionIds}
-                searchAllSpaces={searchAllSpaces}
-                wideBoard={wideBoard}
-              />
-            )}
-
             <div className="flex min-h-0 flex-1 overflow-hidden">
               <main
                 onScroll={dismissPreview}
-                className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6"
+                className="min-w-0 flex-1 overflow-y-auto px-5 py-7 sm:px-8 sm:py-8"
               >
-                <motion.div
-                  key={resolvedSpaceId}
-                  initial={
-                    spaceSlideActive
-                      ? { x: spaceSlideDirection * 42, opacity: 0.45 }
-                      : false
-                  }
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ duration: 0.36, ease: [0.22, 0.88, 0.32, 1] }}
+                <div
                   className={
                     wideBoard
                       ? 'mx-auto max-w-[1720px]'
                       : 'mx-auto max-w-[1320px]'
                   }
                 >
-                  {loading ? (
-                    <div className="py-20 text-center font-mono text-xs text-fg-muted">
-                      Loading workspace...
-                    </div>
-                  ) : collections.length === 0 ? (
-                    <EmptyState />
-                  ) : !isFiltering && activeSpaceCollections.length === 0 ? (
-                    <EmptySpaceNotice
-                      spaceName={activeSpace?.name ?? 'this Space'}
-                      onCreateCollection={openCreateCollection}
-                    />
-                  ) : groups.length === 0 ? (
-                    <NoFilterMatchesNotice
-                      starredOnly={starredOnly}
-                      searchQuery={searchQuery}
-                      searchAllSpaces={searchAllSpaces}
-                      spacesCount={spaces.length}
-                      onClear={() => {
-                        setSearchQuery('');
-                        setStarredOnly(false);
-                        setSmartFilter('all');
-                        clearSelectedTags();
-                      }}
-                    />
-                  ) : activeViewMode === 'details' ? (
-                    <DetailsView
-                      activeSpace={activeSpace}
-                      groups={groups}
-                      spaces={spaces}
-                      isFiltering={isFiltering}
-                      hideChecked={hideCheckedInSpace}
-                      searchAllSpaces={searchAllSpaces}
-                      openInNewTab={settings.openLinkInNewTab}
-                      defaultCurrency={defaultCurrency}
-                      motionMode={settings.motionMode}
-                      dropEffectStyle={settings.dropEffectStyle}
-                      fxAmbientWaves={fxAmbientWaves}
-                      soundEffects={settings.soundEffects}
-                      hoverPreviews={settings.hoverPreviews}
-                      onSwitchSpace={handleSelectSpace}
-                    />
-                  ) : (
-                    <div className="space-y-8">
-                      {groups.map(
-                        ({ collection, links: collectionLinks }, colIndex) => {
-                          const colSpaceId =
-                            collection.spaceId ?? DEFAULT_SPACE_ID;
-                          const outsideActiveSpace =
-                            isFiltering &&
-                            searchAllSpaces &&
-                            colSpaceId !== resolvedSpaceId
-                              ? spaceById.get(colSpaceId)
-                              : undefined;
-                          const displayedLinks = hideCheckedInSpace
-                            ? collectionLinks.filter((l) => l.checked !== true)
-                            : collectionLinks;
-                          return (
-                            <CollectionSection
-                              key={collection.id}
-                              collection={collection}
-                              index={colIndex}
-                              links={displayedLinks}
-                              spaces={spaces}
-                              spaceBadge={outsideActiveSpace}
-                              onSwitchSpace={handleSelectSpace}
-                              openInNewTab={settings.openLinkInNewTab}
-                              defaultCurrency={defaultCurrency}
-                              density={effectiveDensity}
-                              wideBoard={wideBoard}
-                              forceExpanded={isFiltering}
-                              dragDisabled={isFiltering}
-                              motionMode={settings.motionMode}
-                              dropEffectStyle={settings.dropEffectStyle}
-                              fxDeskJolt={fxDeskJolt}
-                              fxHoverSheen={fxHoverSheen}
-                              fxAmbientWaves={fxAmbientWaves}
-                              soundEffects={settings.soundEffects}
-                              hoverPreviews={settings.hoverPreviews}
-                            />
-                          );
-                        },
+                  {(settings.quickLaunchVisible !== false ||
+                    settings.tagBarVisible !== false) && (
+                    <div className="mb-7 space-y-2.5 empty:mb-0">
+                      {settings.quickLaunchVisible !== false && (
+                        <QuickLaunchBar
+                          links={links}
+                          activeSpaceCollectionIds={activeSpaceCollectionIds}
+                          openInNewTab={settings.openLinkInNewTab}
+                          wideBoard={wideBoard}
+                        />
+                      )}
+
+                      {settings.tagBarVisible !== false && (
+                        <TagFilterBar
+                          links={links}
+                          activeSpaceCollectionIds={activeSpaceCollectionIds}
+                          searchAllSpaces={searchAllSpaces}
+                          wideBoard={wideBoard}
+                        />
                       )}
                     </div>
                   )}
-                </motion.div>
+
+                  <motion.div
+                    key={resolvedSpaceId}
+                    initial={
+                      spaceSlideActive
+                        ? { x: spaceSlideDirection * 42, opacity: 0.45 }
+                        : false
+                    }
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ duration: 0.36, ease: [0.22, 0.88, 0.32, 1] }}
+                  >
+                    {loading ? (
+                      <div className="py-20 text-center font-mono text-xs text-fg-muted">
+                        Loading workspace...
+                      </div>
+                    ) : collections.length === 0 ? (
+                      <EmptyState />
+                    ) : !isFiltering && activeSpaceCollections.length === 0 ? (
+                      <EmptySpaceNotice
+                        spaceName={activeSpace?.name ?? 'this Space'}
+                        onCreateCollection={openCreateCollection}
+                      />
+                    ) : groups.length === 0 ? (
+                      <NoFilterMatchesNotice
+                        starredOnly={starredOnly}
+                        searchQuery={searchQuery}
+                        searchAllSpaces={searchAllSpaces}
+                        spacesCount={spaces.length}
+                        onClear={() => {
+                          setSearchQuery('');
+                          setStarredOnly(false);
+                          setSmartFilter('all');
+                          clearSelectedTags();
+                        }}
+                      />
+                    ) : activeViewMode === 'details' ? (
+                      <DetailsView
+                        activeSpace={activeSpace}
+                        groups={groups}
+                        spaces={spaces}
+                        isFiltering={isFiltering}
+                        hideChecked={hideCheckedInSpace}
+                        searchAllSpaces={searchAllSpaces}
+                        openInNewTab={settings.openLinkInNewTab}
+                        defaultCurrency={defaultCurrency}
+                        motionMode={settings.motionMode}
+                        dropEffectStyle={settings.dropEffectStyle}
+                        fxAmbientWaves={fxAmbientWaves}
+                        soundEffects={settings.soundEffects}
+                        hoverPreviews={settings.hoverPreviews}
+                        onSwitchSpace={handleSelectSpace}
+                      />
+                    ) : (
+                      <div className="space-y-10">
+                        {groups.map(
+                          (
+                            { collection, links: collectionLinks },
+                            colIndex,
+                          ) => {
+                            const colSpaceId =
+                              collection.spaceId ?? DEFAULT_SPACE_ID;
+                            const outsideActiveSpace =
+                              isFiltering &&
+                              searchAllSpaces &&
+                              colSpaceId !== resolvedSpaceId
+                                ? spaceById.get(colSpaceId)
+                                : undefined;
+                            const displayedLinks = hideCheckedInSpace
+                              ? collectionLinks.filter(
+                                  (l) => l.checked !== true,
+                                )
+                              : collectionLinks;
+                            return (
+                              <CollectionSection
+                                key={collection.id}
+                                collection={collection}
+                                index={colIndex}
+                                links={displayedLinks}
+                                spaces={spaces}
+                                spaceBadge={outsideActiveSpace}
+                                onSwitchSpace={handleSelectSpace}
+                                openInNewTab={settings.openLinkInNewTab}
+                                defaultCurrency={defaultCurrency}
+                                density={effectiveDensity}
+                                wideBoard={wideBoard}
+                                forceExpanded={isFiltering}
+                                dragDisabled={isFiltering}
+                                motionMode={settings.motionMode}
+                                dropEffectStyle={settings.dropEffectStyle}
+                                fxDeskJolt={fxDeskJolt}
+                                fxHoverSheen={fxHoverSheen}
+                                fxAmbientWaves={fxAmbientWaves}
+                                soundEffects={settings.soundEffects}
+                                hoverPreviews={settings.hoverPreviews}
+                              />
+                            );
+                          },
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
+                </div>
               </main>
 
               {settings.openTabsSidebarVisible && (

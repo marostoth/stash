@@ -184,7 +184,7 @@ export function SidePanelApp() {
     >
       <div className="stash-backdrop flex h-screen flex-col overflow-hidden text-fg">
         {/* Compact Header */}
-        <header className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-border bg-panel px-3">
+        <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border/75 bg-panel px-3.5">
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs font-semibold tracking-[0.14em] text-fg">
               STASH

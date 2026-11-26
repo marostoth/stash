@@ -13,7 +13,7 @@ export function SoundsPanel({ settings }: SoundsPanelProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <EffectsSoundCard
         settings={settings}
         onTriggerTestSlam={triggerDropPreview}

@@ -128,6 +128,7 @@ function StoreClearStarredButton({
     if (changedIds.length === 0) return;
     toast(`Cleared ${changedIds.length} starred in ${storeName}`, {
       duration: 5000,
+      className: 'stash-undo-toast',
       action: {
         label: 'Undo',
         onClick: () => {

@@ -73,6 +73,14 @@ import {
   updateSpaceInStorage,
   watchSpacesInStorage,
 } from '@/lib/storage/spaces-ops';
+import {
+  deleteTrashEntryInStorage,
+  emptyTrashInStorage,
+  getTrashEntriesInStorage,
+  restoreTrashEntryInStorage,
+  type TrashRestoreResult,
+  watchTrashEntriesInStorage,
+} from '@/lib/storage/trash-ops';
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
 import {
   type CategorizationRule,
@@ -84,6 +92,7 @@ import {
   type StashExportBundle,
   type StashSettings,
   type ThemeDefinition,
+  type TrashEntry,
 } from '@/lib/types/stash';
 import { reorderCollectionsList, sortByOrder } from '@/lib/utils/ordering';
 
@@ -252,6 +261,26 @@ export const stashRepo = {
     const target = existing.find((item) => item.id === id);
     if (!target) return null;
     return this.updateCollection(id, { collapsed: !target.collapsed });
+  },
+
+  async setCollectionsCollapsed(
+    ids: readonly string[],
+    collapsed: boolean,
+  ): Promise<number> {
+    if (ids.length === 0) return 0;
+    const idSet = new Set(ids);
+    const existing = await collectionsStorage.getValue();
+    const timestamp = nowIso();
+    let changed = 0;
+    const next = existing.map((item) => {
+      if (!idSet.has(item.id) || item.collapsed === collapsed) return item;
+      changed += 1;
+      return { ...item, collapsed, updatedAt: timestamp };
+    });
+    if (changed > 0) {
+      await collectionsStorage.setValue(next);
+    }
+    return changed;
   },
 
   deleteCollection: (id: string): Promise<boolean> =>
@@ -444,4 +473,12 @@ export const stashRepo = {
   ): Promise<LibraryBoardState> => applyReorganizationInStorage(nextState),
   restoreLibrarySnapshot: (snapshot: LibraryBoardState): Promise<void> =>
     restoreLibrarySnapshotInStorage(snapshot),
+  getTrash: (): Promise<TrashEntry[]> => getTrashEntriesInStorage(),
+  watchTrash: (cb: (entries: TrashEntry[]) => void): (() => void) =>
+    watchTrashEntriesInStorage(cb),
+  restoreTrashEntry: (entryId: string): Promise<TrashRestoreResult | null> =>
+    restoreTrashEntryInStorage(entryId),
+  deleteTrashEntry: (entryId: string): Promise<boolean> =>
+    deleteTrashEntryInStorage(entryId),
+  emptyTrash: (): Promise<void> => emptyTrashInStorage(),
 };

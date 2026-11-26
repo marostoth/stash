@@ -25,12 +25,13 @@ export function EffectsTogglesCard({ settings }: EffectsTogglesCardProps) {
     <SettingsSectionCard
       icon={<Sliders className="h-4 w-4" />}
       title="Fine-Tune Physics & Waves"
+      subtitle="Toggle individual tactile layers while keeping your selected Motion Feel."
       badge={{
         label: tactile ? `${enabledCount} / 4 on` : 'Paused',
         tone: tactile && enabledCount > 0 ? 'accent' : 'neutral',
       }}
     >
-      <div className="space-y-3">
+      <div className="divide-y divide-border/55">
         <SettingsToggleRow
           id="fx-desk-jolt"
           label="Neighbor ripple / desk jolt"

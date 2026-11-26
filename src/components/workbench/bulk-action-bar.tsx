@@ -8,7 +8,7 @@ import {
   X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
@@ -159,6 +159,8 @@ export function BulkActionBar({
     clearSelection();
     toast(`Deleted ${removed.length} link${removed.length === 1 ? '' : 's'}`, {
       duration: 6000,
+      className: 'stash-undo-toast',
+      style: { '--stash-toast-duration': '6000ms' } as CSSProperties,
       action: {
         label: 'Undo',
         onClick: () => {

@@ -42,8 +42,8 @@ function readAttr(attrs: string, name: string): string | undefined {
 }
 
 /**
- * Parses standard Netscape Bookmark HTML files (Chrome, Edge, Firefox, Toby)
- * without using DOM innerHTML/DOMParser, keeping CSP clean and Node-testable.
+ * Parses standard Netscape Bookmark HTML files (Chrome, Edge, Firefox, and
+ * other bookmark managers) without DOM innerHTML/DOMParser, keeping CSP clean.
  */
 export function parseNetscapeBookmarksHtml(
   html: string,

@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { toast } from 'sonner';
 import { playSessionFreeze } from '@/lib/audio/foley';
 import { checkNanoAvailability } from '@/lib/categorizer/nano-engine';
@@ -429,6 +435,8 @@ export function useReorganizeWorkflow(
         `Reorganized ${movedLinks} link${movedLinks === 1 ? '' : 's'} into ${targetCollectionsCount} collection${targetCollectionsCount === 1 ? '' : 's'}`,
         {
           duration: 10_000,
+          className: 'stash-undo-toast',
+          style: { '--stash-toast-duration': '10000ms' } as CSSProperties,
           action: {
             label: 'Undo',
             onClick: () => {

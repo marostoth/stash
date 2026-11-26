@@ -14,7 +14,7 @@ export function AppearancePanel({
   settings,
 }: AppearancePanelProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <ThemesPanel
         allThemes={allThemes}
         activeTheme={activeTheme}

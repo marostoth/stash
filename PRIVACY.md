@@ -17,8 +17,8 @@ The only direct network requests Stash makes are straight from your browser to w
 
 All data you create or import is stored strictly on your device using `chrome.storage.local` and browser IndexedDB:
 
-- **Collections, Spaces & Links:** Titles, URLs, notes, tags, starred/done/pinned status, and optional product metadata (store name, price, previous price history, spec, quantity).
-- **Preferences & Rules:** Themes, layout/effect settings, categorization rules, custom local wallpapers, and optional locally uploaded custom audio clips (`local:stash_custom_sfx`).
+- **Collections, Spaces & Links:** Titles, URLs, notes, tags, sort preferences, starred/done/pinned status, and optional product metadata (store name, price, previous price history, spec, quantity).
+- **Preferences, Rules & Safety Bin:** Themes, layout/effect settings, categorization rules, custom local wallpapers, optional locally uploaded custom audio clips (`local:stash_custom_sfx`), and a 7-day local Recently Deleted safety bin (`local:stash_trash`) that auto-purges expired entries.
 - **Optional Visual Previews:** Cached page thumbnails captured locally in IndexedDB only when you explicitly enable Visual Previews.
 
 ## 3. On-Device AI (Gemini Nano)
@@ -31,12 +31,12 @@ When you enable On-Device AI, Stash uses Chrome's built-in local `LanguageModel`
 - **`tabs` & `tabGroups`:** Powers the Open Tabs sidebar, Save Session / Save & Close, drag-to-stash, and opening collections or store items into Chrome Tab Groups.
 - **`sidePanel`:** Provides the docked Side Panel for one-click stashing from any webpage.
 - **`contextMenus`, `omnibox`, `commands`:** Enables right-click "Stash this link", address-bar search (`s <query>`), and global keyboard shortcuts.
-- **`scripting` & Optional Host Permissions (`https://*/*`, `http://*/*`):** Requested strictly on user interaction when you choose to extract product price/spec metadata from an active tab, enable Visual Previews, or run a Library Health Check.
+- **Optional `scripting` & Optional Host Permissions (`https://*/*`, `http://*/*`):** Requested strictly on user interaction when you choose to extract product price/spec metadata from an active tab, enable Visual Previews, or run a Library Health Check.
 - **Optional `bookmarks`:** Requested only if you choose to import existing Chrome bookmarks.
 
 ## 5. Data Control & Deletion
 
-You can export your entire library as a portable JSON file at any time, or permanently delete all local data by removing the extension from Chrome.
+You can export your entire library as a portable JSON backup or standard Netscape HTML bookmarks file at any time, empty Recently Deleted immediately, or permanently delete all local data by removing the extension from Chrome.
 
 ## 6. Contact
 

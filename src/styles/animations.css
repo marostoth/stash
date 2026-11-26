@@ -158,6 +158,39 @@
   animation: stash-match-pop 280ms ease-out both;
 }
 
+@keyframes stash-toast-drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.stash-undo-toast {
+  position: relative;
+  overflow: hidden;
+}
+
+.stash-undo-toast::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.5px;
+  background: var(--stash-accent);
+  opacity: 0.85;
+  transform-origin: left center;
+  animation: stash-toast-drain var(--stash-toast-duration, 5000ms) linear
+    forwards;
+  pointer-events: none;
+}
+
+.stash-undo-toast:hover::after {
+  animation-play-state: paused;
+}
+
 /* Temporary silky color cross-fade armed only during active theme switches */
 html[data-theme-transition="true"] *,
 html[data-theme-transition="true"] *::before,

@@ -8,6 +8,7 @@ import {
   type Space,
   type StashSettings,
   type ThemeDefinition,
+  type TrashEntry,
 } from '@/lib/types/stash';
 
 export const spacesStorage = storage.defineItem<Space[]>('local:stash_spaces', {
@@ -57,6 +58,14 @@ export const settingsStorage = storage.defineItem<StashSettings>(
 
 export const customThemesStorage = storage.defineItem<ThemeDefinition[]>(
   'local:stash_custom_themes',
+  {
+    version: 1,
+    fallback: [],
+  },
+);
+
+export const trashStorage = storage.defineItem<TrashEntry[]>(
+  'local:stash_trash',
   {
     version: 1,
     fallback: [],

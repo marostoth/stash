@@ -11,7 +11,7 @@ import {
   Sparkles,
   Tag,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { motion } from 'motion/react';
 import type { CSSProperties } from 'react';
 import { toast } from 'sonner';
 import { CollectionAppearancePopover } from '@/components/CollectionAppearancePopover';
@@ -23,9 +23,11 @@ import {
   resolveCollectionGridClass,
 } from '@/components/workbench/collection-header-badges';
 import { CollectionSortMenu } from '@/components/workbench/collection-sort-menu';
+import { deleteCollectionWithUndo } from '@/components/workbench/delete-collection-toast';
 import { LinkCard } from '@/components/workbench/link-card';
+import { SmoothCollapse } from '@/components/workbench/smooth-collapse';
 import { useAutoTagSweep } from '@/hooks/use-auto-tag-sweep';
-import { COLLAPSE_SPRING, isTactileMotion } from '@/lib/motion/presets';
+import { isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import {
   wakeUpCollectionInNewWindow,
@@ -159,8 +161,7 @@ export function CollectionSection({
   };
 
   const handleDeleteCollection = async () => {
-    await stashRepo.deleteCollection(collection.id);
-    toast.success(`Deleted "${collection.name}"`);
+    await deleteCollectionWithUndo(collection.id, collection.name);
   };
 
   const handleMoveToSpace = async (targetSpace: Space) => {
@@ -236,10 +237,8 @@ export function CollectionSection({
         }
         transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
         className={cn(
-          'space-y-3 rounded-card transition-colors',
-          collection.tintColor
-            ? 'stash-collection-tinted p-3.5'
-            : 'p-1.5 -m-1.5',
+          'space-y-4 rounded-card transition-colors',
+          collection.tintColor ? 'stash-collection-tinted p-4' : 'p-1.5 -m-1.5',
           isDropTarget &&
             cn(
               'bg-panel/60 ring-2 ring-accent/55',
@@ -250,7 +249,7 @@ export function CollectionSection({
         {/* Collection Header */}
         <div
           className={cn(
-            'flex items-center justify-between gap-2 border-b border-border pb-2 transition-transform duration-150',
+            'flex items-center justify-between gap-2 border-b border-border/70 pb-2.5 transition-transform duration-150',
             isDropTarget && tactile && '-translate-y-0.5',
           )}
         >
@@ -425,72 +424,58 @@ export function CollectionSection({
           </div>
         </div>
 
-        {/* Links Grid (smooth spring expand/collapse) */}
-        <AnimatePresence initial={false}>
-          {!isCollapsed && (
-            <motion.div
-              key="collection-body"
-              initial={{ height: 0, opacity: 0, overflow: 'hidden' }}
-              animate={{
-                height: 'auto',
-                opacity: 1,
-                transitionEnd: { overflow: 'visible' },
-              }}
-              exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
-              transition={COLLAPSE_SPRING}
-            >
-              <div className="px-0.5 py-1">
-                {links.length > 0 ? (
-                  <div
-                    className={resolveCollectionGridClass(
-                      density,
-                      viewMode,
-                      wideBoard,
-                    )}
-                  >
-                    {links.map((link, cardIndex) => (
-                      <LinkCard
-                        key={link.id}
-                        link={link}
-                        index={cardIndex}
-                        openInNewTab={openInNewTab}
-                        density={density}
-                        dragDisabled={dragDisabled || isAutoSorted}
-                        motionMode={motionMode}
-                        dropEffectStyle={dropEffectStyle}
-                        fxDeskJolt={fxDeskJolt}
-                        fxHoverSheen={fxHoverSheen}
-                        fxAmbientWaves={fxAmbientWaves}
-                        soundEffects={soundEffects}
-                        cascadeActive={isCascading}
-                        wakeWaveActive={isWaking}
-                        hoverPreviews={hoverPreviews}
-                        viewMode={viewMode}
-                        collectionTint={collection.tintColor}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => openCreateLink(collection.id)}
-                    className={cn(
-                      'flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-border bg-panel/40 px-4 py-5 text-xs text-fg-muted transition-colors hover:border-accent/50 hover:bg-panel hover:text-fg cursor-pointer',
-                      isDropTarget && 'border-accent bg-accent/10 text-accent',
-                    )}
-                  >
-                    <Plus className="h-3.5 w-3.5 text-accent" />
-                    <span>
-                      {isDropTarget
-                        ? `Drop to stash into ${collection.name}`
-                        : `Drop an open tab here or add your first link to ${collection.name}`}
-                    </span>
-                  </button>
+        {/* Links Grid (native CSS grid-rows smooth expand/collapse) */}
+        <SmoothCollapse open={!isCollapsed} animated={tactile}>
+          <div className="px-0.5 py-1">
+            {links.length > 0 ? (
+              <div
+                className={resolveCollectionGridClass(
+                  density,
+                  viewMode,
+                  wideBoard,
                 )}
+              >
+                {links.map((link, cardIndex) => (
+                  <LinkCard
+                    key={link.id}
+                    link={link}
+                    index={cardIndex}
+                    openInNewTab={openInNewTab}
+                    density={density}
+                    dragDisabled={dragDisabled || isAutoSorted}
+                    motionMode={motionMode}
+                    dropEffectStyle={dropEffectStyle}
+                    fxDeskJolt={fxDeskJolt}
+                    fxHoverSheen={fxHoverSheen}
+                    fxAmbientWaves={fxAmbientWaves}
+                    soundEffects={soundEffects}
+                    cascadeActive={isCascading}
+                    wakeWaveActive={isWaking}
+                    hoverPreviews={hoverPreviews}
+                    viewMode={viewMode}
+                    collectionTint={collection.tintColor}
+                  />
+                ))}
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openCreateLink(collection.id)}
+                className={cn(
+                  'flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-border bg-panel/40 px-4 py-5 text-xs text-fg-muted transition-colors hover:border-accent/50 hover:bg-panel hover:text-fg cursor-pointer',
+                  isDropTarget && 'border-accent bg-accent/10 text-accent',
+                )}
+              >
+                <Plus className="h-3.5 w-3.5 text-accent" />
+                <span>
+                  {isDropTarget
+                    ? `Drop to stash into ${collection.name}`
+                    : `Drop an open tab here or add your first link to ${collection.name}`}
+                </span>
+              </button>
+            )}
+          </div>
+        </SmoothCollapse>
       </motion.div>
     </section>
   );

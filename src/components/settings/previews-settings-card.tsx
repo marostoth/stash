@@ -116,17 +116,18 @@ export function PreviewsSettingsCard({
   return (
     <SettingsSectionCard
       icon={<Eye className="h-4 w-4" />}
-      title="Previews"
+      title="Hover & Visual Previews"
+      subtitle="Inspect full titles, notes, and optional local page snapshots before opening a link."
       badge={{
         label: effectiveVisualEnabled ? 'Visual On' : 'Text Only',
         tone: effectiveVisualEnabled ? 'accent' : 'neutral',
       }}
     >
-      <div className="space-y-1">
+      <div className="divide-y divide-border/55">
         <SettingsToggleRow
           id="settings-hover-previews"
           label="Hover previews"
-          hint="500ms pause or press Space while hovering a card"
+          hint="Pause 500ms or press Space while hovering a card to peek at its full details."
           checked={settings.hoverPreviews}
           onCheckedChange={(checked) =>
             void stashRepo.updateSettings({ hoverPreviews: checked })
@@ -136,7 +137,7 @@ export function PreviewsSettingsCard({
         <SettingsToggleRow
           id="settings-visual-previews"
           label="Visual Previews (Screenshots & Site Cards)"
-          hint="Local-only IndexedDB cache; skips incognito, login, and checkout pages"
+          hint="Local-only IndexedDB cache; skips incognito, login, and checkout pages."
           checked={effectiveVisualEnabled}
           disabled={busy}
           onCheckedChange={handleToggleVisualPreviews}
@@ -144,12 +145,17 @@ export function PreviewsSettingsCard({
       </div>
 
       {lastError ? (
-        <p className="rounded-control border border-danger/40 bg-danger/10 px-2.5 py-1.5 font-mono text-[11px] text-danger">
+        <p className="rounded-control border border-danger/40 bg-danger/10 px-3 py-2 font-mono text-[11px] text-danger">
           Chrome error: {lastError}
         </p>
       ) : null}
 
-      <div className="pt-0.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
+        <span className="text-xs text-fg-muted">
+          {cacheCount === 0
+            ? 'No cached page snapshots stored locally.'
+            : `${cacheCount} cached snapshot${cacheCount === 1 ? '' : 's'} stored in local IndexedDB.`}
+        </span>
         <Button
           variant="secondary"
           size="sm"
@@ -158,7 +164,7 @@ export function PreviewsSettingsCard({
           className="gap-1.5"
         >
           <Trash2 className="h-3.5 w-3.5 text-fg-muted" />
-          Clear Preview Cache ({cacheCount})
+          Clear Cache ({cacheCount})
         </Button>
       </div>
     </SettingsSectionCard>

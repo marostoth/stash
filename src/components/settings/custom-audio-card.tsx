@@ -190,7 +190,7 @@ export function CustomAudioCard({
 
         <div
           className={cn(
-            'divide-y divide-border/70 rounded-control border border-border bg-canvas/65',
+            'divide-y divide-border/60 rounded-control border border-border/80 bg-panel/45',
             (!settings.soundEffects || !overridesEnabled) &&
               uploadedCount > 0 &&
               'opacity-65',
@@ -201,19 +201,21 @@ export function CustomAudioCard({
             return (
               <div
                 key={slot.id}
-                className="flex items-center justify-between gap-2 px-2.5 py-2 text-xs"
+                className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-medium text-fg">{slot.label}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px] font-medium text-fg">
+                      {slot.label}
+                    </span>
                     {clip && (
-                      <span className="truncate rounded-pill border border-accent/40 bg-accent/10 px-1.5 py-0.25 font-mono text-[9px] text-accent">
+                      <span className="truncate rounded-pill border border-accent/40 bg-accent/10 px-2 py-0.25 font-mono text-[10px] text-accent">
                         {clip.name} ·{' '}
                         {Math.max(1, Math.round(clip.sizeBytes / 1024))} KB
                       </span>
                     )}
                   </div>
-                  <div className="truncate text-[10px] text-fg-muted">
+                  <div className="mt-0.5 truncate text-[11px] text-fg-muted">
                     {slot.hint}
                   </div>
                 </div>
