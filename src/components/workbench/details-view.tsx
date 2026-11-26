@@ -1,17 +1,7 @@
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpRight,
-  ChevronDown,
-  ChevronRight,
-  Layers,
-  Plus,
-  Star,
-} from 'lucide-react';
+import { ArrowDown, ArrowUp, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { DetailsRow } from '@/components/workbench/details-row';
+import { DetailsCollectionSection } from '@/components/workbench/details-collection-section';
 import {
   type DetailsSortColumn,
   type DetailsSortState,
@@ -19,19 +9,16 @@ import {
   type StoreGroupSummary,
   sortDetailsLinks,
 } from '@/components/workbench/details-store-section';
-import { stashRepo } from '@/lib/storage/repo';
 import {
   openLinksInNamedTabGroup,
   wakeUpCollectionInTabGroup,
 } from '@/lib/tabs/tab-actions';
-import { getCuratedCollectionIcon } from '@/lib/themes/collection-icons';
 import {
   type Collection,
   DEFAULT_SPACE_ID,
   type LinkItem,
   type MotionMode,
   type Space,
-  TAB_GROUP_COLOR_SWATCH,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 import {
@@ -77,6 +64,7 @@ export function DetailsView({
 
   const groupBy = activeSpace?.groupBy ?? 'collection';
   const activeSpaceId = activeSpace?.id ?? DEFAULT_SPACE_ID;
+  const activeSpaceName = activeSpace?.name ?? 'Main';
   const spaceById = useMemo(
     () => new Map(spaces.map((s) => [s.id, s])),
     [spaces],
@@ -99,9 +87,10 @@ export function DetailsView({
     [allLinks],
   );
 
+  // Column 1 is 44px to house the left drag handle (16px) + star toggle (24px) cleanly
   const gridTemplateClass = showPriceColumn
-    ? 'grid-cols-[26px_minmax(180px,2.2fr)_minmax(100px,1.2fr)_minmax(96px,0.9fr)_minmax(88px,1fr)_76px_96px_56px] max-lg:grid-cols-[26px_minmax(160px,2fr)_minmax(96px,1.1fr)_minmax(88px,0.9fr)_72px_92px_56px] max-md:grid-cols-[26px_minmax(130px,1.8fr)_minmax(76px,0.8fr)_70px_86px_52px]'
-    : 'grid-cols-[26px_minmax(180px,2.2fr)_minmax(110px,1.4fr)_minmax(96px,0.95fr)_minmax(90px,1.1fr)_56px] max-lg:grid-cols-[26px_minmax(160px,2fr)_minmax(100px,1.3fr)_minmax(90px,0.95fr)_56px] max-md:grid-cols-[26px_minmax(140px,1.8fr)_90px_52px]';
+    ? 'grid-cols-[44px_minmax(180px,2.2fr)_minmax(100px,1.2fr)_minmax(96px,0.9fr)_minmax(88px,1fr)_76px_96px_56px] max-lg:grid-cols-[44px_minmax(160px,2fr)_minmax(96px,1.1fr)_minmax(88px,0.9fr)_72px_92px_56px] max-md:grid-cols-[44px_minmax(130px,1.8fr)_minmax(76px,0.8fr)_70px_86px_52px]'
+    : 'grid-cols-[44px_minmax(180px,2.2fr)_minmax(110px,1.4fr)_minmax(96px,0.95fr)_minmax(90px,1.1fr)_56px] max-lg:grid-cols-[44px_minmax(160px,2fr)_minmax(100px,1.3fr)_minmax(90px,0.95fr)_56px] max-md:grid-cols-[44px_minmax(140px,1.8fr)_90px_52px]';
 
   const cycleSort = (column: DetailsSortColumn) => {
     setSort((prev) => {
@@ -127,14 +116,16 @@ export function DetailsView({
         gridTemplateClass,
       )}
     >
-      <button
-        type="button"
-        onClick={() => cycleSort('starred')}
-        title="Sort by Starred"
-        className="inline-flex items-center justify-center gap-0.5 hover:text-fg cursor-pointer"
-      >
-        <Star className="h-3 w-3" />
-      </button>
+      <div className="flex items-center justify-end pr-1">
+        <button
+          type="button"
+          onClick={() => cycleSort('starred')}
+          title="Sort by Starred"
+          className="inline-flex items-center justify-center gap-0.5 hover:text-fg cursor-pointer"
+        >
+          <Star className="h-3 w-3" />
+        </button>
+      </div>
       <button
         type="button"
         onClick={() => cycleSort('title')}
@@ -249,7 +240,10 @@ export function DetailsView({
               <DetailsStoreSection
                 key={group.storeName}
                 group={group}
+                activeSpaceId={activeSpaceId}
+                activeSpaceName={activeSpaceName}
                 collectionNameById={collectionNameById}
+                dragDisabled={isFiltering}
                 collapsed={collapsed}
                 onToggleCollapse={() =>
                   setCollapsedStores((prev) => ({
@@ -274,21 +268,11 @@ export function DetailsView({
               />
             );
           })
-        : groups.map(({ collection, links: colLinks }) => {
+        : groups.map(({ collection, links: colLinks }, colIndex) => {
             const isCollapsed = collection.collapsed && !isFiltering;
             const sortedLinks = sortDetailsLinks(colLinks, sort, {
               contextMode: 'store',
             });
-            const CuratedIcon = getCuratedCollectionIcon(collection.icon);
-            const colorHex =
-              collection.tintColor ?? TAB_GROUP_COLOR_SWATCH[collection.color];
-            const totalText = formatCurrencySummaries(
-              summarizePrices(colLinks, defaultCurrency),
-            );
-            const colStarred = colLinks.filter((l) => l.starred === true);
-            const starredText = formatCurrencySummaries(
-              summarizePrices(colStarred, defaultCurrency),
-            );
             const colSpaceId = collection.spaceId ?? DEFAULT_SPACE_ID;
             const outsideSpace =
               isFiltering && searchAllSpaces && colSpaceId !== activeSpaceId
@@ -296,144 +280,29 @@ export function DetailsView({
                 : undefined;
 
             return (
-              <section
+              <DetailsCollectionSection
                 key={collection.id}
-                className="overflow-hidden rounded-card border border-border bg-card"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-panel/70 px-3 py-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void stashRepo.toggleCollectionCollapsed(collection.id)
-                      }
-                      className="flex min-w-0 items-center gap-2 text-left cursor-pointer"
-                    >
-                      {isCollapsed ? (
-                        <ChevronRight className="h-4 w-4 text-fg-muted" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-fg-muted" />
-                      )}
-                      {CuratedIcon ? (
-                        <CuratedIcon
-                          className="h-3.5 w-3.5 shrink-0"
-                          style={{ color: colorHex }}
-                        />
-                      ) : (
-                        <span
-                          className="h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: colorHex }}
-                        />
-                      )}
-                      <span className="truncate text-xs font-semibold text-fg">
-                        {collection.name}
-                      </span>
-                      <span className="font-mono text-[10px] text-fg-muted">
-                        ({colLinks.length})
-                      </span>
-                    </button>
-
-                    {isCollapsed && totalText && (
-                      <span className="rounded-pill border border-border bg-canvas px-2 py-0.25 font-mono text-[10px] text-fg">
-                        Total {totalText}
-                      </span>
-                    )}
-                    {totalText && colStarred.length > 0 && (
-                      <span className="inline-flex items-center gap-1 rounded-pill border border-accent/45 bg-accent/12 px-2 py-0.25 font-mono text-[10px] text-accent">
-                        <Star className="h-2.5 w-2.5 fill-accent" />
-                        {colStarred.length}
-                        {starredText ? ` · ${starredText}` : ''}
-                      </span>
-                    )}
-                    {outsideSpace && (
-                      <button
-                        type="button"
-                        onClick={() => onSwitchSpace(outsideSpace.id)}
-                        className="inline-flex items-center gap-1 rounded-pill border border-border bg-canvas px-2 py-0.25 font-mono text-[10px] text-fg-muted hover:border-accent/50 hover:text-accent cursor-pointer"
-                      >
-                        <Layers className="h-2.5 w-2.5" />
-                        {outsideSpace.name}
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-1">
-                    {colLinks.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          void handleWakeCollection(collection, colLinks)
-                        }
-                        className="h-7 gap-1 px-2 text-[11px]"
-                      >
-                        <span>Wake Up</span>
-                        <ArrowUpRight className="h-3 w-3 text-accent" />
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openCreateLink(collection.id)}
-                      className="h-7 gap-1 px-2 text-[11px]"
-                    >
-                      <Plus className="h-3 w-3" />
-                      <span>Add</span>
-                    </Button>
-                  </div>
-                </div>
-
-                {!isCollapsed && (
-                  <div>
-                    {sortedLinks.length > 0 ? (
-                      <>
-                        {renderTableHeader()}
-                        <div>
-                          {sortedLinks.map((link) => (
-                            <DetailsRow
-                              key={link.id}
-                              link={link}
-                              showPriceColumn={showPriceColumn}
-                              defaultCurrency={defaultCurrency}
-                              openInNewTab={openInNewTab}
-                              motionMode={motionMode}
-                              soundEffects={soundEffects}
-                              hoverPreviews={hoverPreviews}
-                              gridTemplateClass={gridTemplateClass}
-                            />
-                          ))}
-                        </div>
-                        {showPriceColumn && totalText && (
-                          <div
-                            className={cn(
-                              'grid items-center gap-3.5 border-t border-border/80 bg-panel/45 px-3 py-1.5 font-mono text-[11px]',
-                              gridTemplateClass,
-                            )}
-                          >
-                            <span
-                              aria-hidden="true"
-                              className="col-span-5 max-lg:col-span-4 max-md:col-span-3"
-                            />
-                            <div className="col-span-2 flex items-center justify-end gap-2.5 whitespace-nowrap">
-                              <span className="text-[10px] uppercase tracking-wider text-fg-muted">
-                                Subtotal
-                              </span>
-                              <strong className="font-semibold text-fg tabular-nums">
-                                {totalText}
-                              </strong>
-                            </div>
-                            <span aria-hidden="true" />
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="px-3 py-4 text-center text-xs text-fg-muted">
-                        No links in this collection yet.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </section>
+                collection={collection}
+                colIndex={colIndex}
+                sortedLinks={sortedLinks}
+                isCollapsed={isCollapsed}
+                outsideSpace={outsideSpace}
+                dragDisabled={isFiltering}
+                sortActive={sort !== null}
+                showPriceColumn={showPriceColumn}
+                defaultCurrency={defaultCurrency}
+                openInNewTab={openInNewTab}
+                motionMode={motionMode}
+                soundEffects={soundEffects}
+                hoverPreviews={hoverPreviews}
+                gridTemplateClass={gridTemplateClass}
+                renderTableHeader={renderTableHeader}
+                onSwitchSpace={onSwitchSpace}
+                onWakeCollection={(col, items) =>
+                  void handleWakeCollection(col, items)
+                }
+                onAddLink={openCreateLink}
+              />
             );
           })}
 

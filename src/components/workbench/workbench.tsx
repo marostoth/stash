@@ -79,12 +79,16 @@ export function Workbench() {
   const trayHeightPx = useBackgroundJobsStore((s) => s.trayHeightPx);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  const { handleQuickStashTab, handleDragStart, handleDragEnd } =
-    useWorkbenchDnd({
-      soundEffects: settings.soundEffects,
-      motionMode: settings.motionMode,
-      onSwitchSpace: setActiveSpaceId,
-    });
+  const {
+    handleQuickStashTab,
+    handleDragStart,
+    handleDragOver,
+    handleDragEnd,
+  } = useWorkbenchDnd({
+    soundEffects: settings.soundEffects,
+    motionMode: settings.motionMode,
+    onSwitchSpace: setActiveSpaceId,
+  });
 
   // Hydrate initial search query when opened from Chrome's `s <query>` omnibox
   useEffect(() => {
@@ -186,6 +190,7 @@ export function Workbench() {
       <DragDropProvider
         sensors={WORKBENCH_SENSORS}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
         <div className="stash-backdrop relative flex h-screen flex-col overflow-hidden text-fg">

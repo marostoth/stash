@@ -4,6 +4,7 @@ node_modules/
 # WXT build outputs & generated types
 .output/
 .wxt/
+store-assets/
 
 # Local / OS / IDE
 .DS_Store

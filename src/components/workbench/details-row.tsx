@@ -1,7 +1,13 @@
-import { Minus, Pencil, PenLine, Plus, Star, Trash2 } from 'lucide-react';
+import { useDraggable } from '@dnd-kit/react';
+import { useSortable } from '@dnd-kit/react/sortable';
+import { GripVertical, Minus, Pencil, Plus, Star, Trash2 } from 'lucide-react';
 import { memo, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { LinkFavicon } from '@/components/LinkFavicon';
+import {
+  InlinePriceCell,
+  InlineSpecCell,
+} from '@/components/workbench/details-inline-cells';
 import { playDelete, playDrop, playTagPop } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
 import type { LinkItem, MotionMode, ProductMeta } from '@/lib/types/stash';
@@ -16,8 +22,12 @@ import { useUiStore } from '@/store/ui-store';
 
 const QTY_SAVE_DEBOUNCE_MS = 250;
 
+export type DetailsRowDragMode = 'collection' | 'cross-only' | 'none';
+
 interface DetailsRowProps {
   link: LinkItem;
+  index: number;
+  dragMode: DetailsRowDragMode;
   contextLabel?: string;
   showPriceColumn: boolean;
   defaultCurrency: string;
@@ -39,8 +49,16 @@ function formatCapturedDate(iso?: string): string {
   });
 }
 
-export const DetailsRow = memo(function DetailsRow({
+interface DetailsRowViewProps extends DetailsRowProps {
+  rowRef?: (element: Element | null) => void;
+  handleRef?: (element: Element | null) => void;
+  isDragging: boolean;
+  isDropTarget: boolean;
+}
+
+function DetailsRowView({
   link,
+  dragMode,
   contextLabel,
   showPriceColumn,
   defaultCurrency,
@@ -49,7 +67,11 @@ export const DetailsRow = memo(function DetailsRow({
   soundEffects,
   hoverPreviews,
   gridTemplateClass,
-}: DetailsRowProps) {
+  rowRef,
+  handleRef,
+  isDragging,
+  isDropTarget,
+}: DetailsRowViewProps) {
   const openEditLink = useUiStore((s) => s.openEditLink);
   const schedulePreview = useUiStore((s) => s.schedulePreview);
   const dismissPreview = useUiStore((s) => s.dismissPreview);
@@ -105,10 +127,6 @@ export const DetailsRow = memo(function DetailsRow({
   );
   const unitPrice =
     hasPrice && product?.price !== undefined ? product.price : undefined;
-  const linePrice =
-    unitPrice !== undefined
-      ? Math.round(unitPrice * displayQty * 100) / 100
-      : undefined;
 
   const sourceLabel =
     product?.source === 'manual'
@@ -197,11 +215,14 @@ export const DetailsRow = memo(function DetailsRow({
 
   return (
     <div
+      ref={rowRef}
       data-link-id={link.id}
       className={cn(
         'group relative grid min-h-[38px] items-center gap-3.5 border-b border-border/60 px-3 py-1 text-xs transition-colors last:border-b-0 hover:bg-card-hover/80',
         gridTemplateClass,
         isStarred && 'bg-accent/[0.06]',
+        isDragging && 'opacity-40',
+        isDropTarget && 'bg-accent/12 ring-1 ring-inset ring-accent/65',
         isKeyboardFocused && 'bg-accent/10 ring-1 ring-inset ring-accent/70',
       )}
     >
@@ -212,21 +233,43 @@ export const DetailsRow = memo(function DetailsRow({
         />
       )}
 
-      {/* 1. Star toggle */}
-      <button
-        type="button"
-        onClick={() => void handleToggleStar()}
-        aria-pressed={isStarred}
-        aria-label={isStarred ? `Unstar ${link.title}` : `Star ${link.title}`}
-        className={cn(
-          'inline-flex h-6 w-6 items-center justify-center rounded transition-colors cursor-pointer',
-          isStarred ? 'text-accent' : 'text-fg-muted/50 hover:text-accent',
+      {/* 1. Left Drag Handle + Star toggle */}
+      <div className="flex items-center gap-0.5">
+        {dragMode !== 'none' ? (
+          <button
+            ref={handleRef}
+            type="button"
+            aria-label={`Drag ${link.title}`}
+            title={
+              dragMode === 'collection'
+                ? 'Drag to reorder or move to another collection / Space'
+                : 'Drag to move to another collection or Space'
+            }
+            className="inline-flex h-5 w-4 shrink-0 items-center justify-center rounded text-fg-muted/45 transition-colors hover:bg-panel hover:text-fg group-hover:text-fg-muted cursor-grab active:cursor-grabbing"
+          >
+            <GripVertical className="h-3 w-3" />
+          </button>
+        ) : (
+          <span aria-hidden="true" className="w-4 shrink-0" />
         )}
-      >
-        <Star
-          className={cn('h-3.5 w-3.5', isStarred && 'fill-accent text-accent')}
-        />
-      </button>
+        <button
+          type="button"
+          onClick={() => void handleToggleStar()}
+          aria-pressed={isStarred}
+          aria-label={isStarred ? `Unstar ${link.title}` : `Star ${link.title}`}
+          className={cn(
+            'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded transition-colors cursor-pointer',
+            isStarred ? 'text-accent' : 'text-fg-muted/50 hover:text-accent',
+          )}
+        >
+          <Star
+            className={cn(
+              'h-3.5 w-3.5',
+              isStarred && 'fill-accent text-accent',
+            )}
+          />
+        </button>
+      </div>
 
       {/* 2. Item (Favicon + Title) */}
       <a
@@ -253,13 +296,8 @@ export const DetailsRow = memo(function DetailsRow({
         </span>
       </a>
 
-      {/* 3. Spec / Note */}
-      <span
-        title={specOrNote || undefined}
-        className="hidden truncate text-[11px] text-fg-muted md:block"
-      >
-        {specOrNote || '—'}
-      </span>
+      {/* 3. Spec / Note (click to edit inline) */}
+      <InlineSpecCell link={link} specOrNote={specOrNote} />
 
       {/* 4. Context (Store when grouped by Collection, Collection when grouped by Store) */}
       <span
@@ -316,44 +354,15 @@ export const DetailsRow = memo(function DetailsRow({
         </div>
       )}
 
-      {/* 7. Price (unitPrice × qty; click '—' to add a price in Quick Edit) */}
+      {/* 7. Price (unitPrice × qty; click to edit unit price inline) */}
       {showPriceColumn && (
-        <div
-          title={hasPrice ? priceTooltip : undefined}
-          className="flex items-center justify-end gap-1 font-mono text-[11px] tabular-nums"
-        >
-          {linePrice !== undefined && product ? (
-            <>
-              {product.source === 'manual' && (
-                <PenLine
-                  className="h-3 w-3 shrink-0 text-fg-muted/70"
-                  aria-label="Manual price entry"
-                />
-              )}
-              <span
-                className={cn(
-                  isStarred ? 'font-semibold text-fg' : 'text-fg/95',
-                )}
-              >
-                {formatPrice(
-                  linePrice,
-                  resolvedCurrency,
-                  product.priceIsEstimate,
-                )}
-              </span>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => openEditLink(link, { expandProduct: true })}
-              title="Click to add price"
-              aria-label={`Add price for ${link.title}`}
-              className="rounded px-1.5 py-0.5 text-fg-muted/50 transition-colors hover:bg-panel hover:text-accent cursor-pointer"
-            >
-              —
-            </button>
-          )}
-        </div>
+        <InlinePriceCell
+          link={link}
+          defaultCurrency={defaultCurrency}
+          displayQty={displayQty}
+          isStarred={isStarred}
+          priceTooltip={priceTooltip}
+        />
       )}
 
       {/* 8. Hover Actions */}
@@ -379,4 +388,63 @@ export const DetailsRow = memo(function DetailsRow({
       </div>
     </div>
   );
+}
+
+function SortableDetailsRow(props: DetailsRowProps) {
+  const { ref, handleRef, isDragging, isDropTarget } = useSortable({
+    id: `link:${props.link.id}`,
+    group: props.link.collectionId,
+    type: 'link',
+    accept: ['link', 'open-tab'],
+    index: props.index,
+    data: {
+      kind: 'link' as const,
+      link: props.link,
+      collectionId: props.link.collectionId,
+      index: props.index,
+    },
+  });
+
+  return (
+    <DetailsRowView
+      {...props}
+      rowRef={ref}
+      handleRef={handleRef}
+      isDragging={isDragging}
+      isDropTarget={isDropTarget}
+    />
+  );
+}
+
+function DraggableDetailsRow(props: DetailsRowProps) {
+  const { ref, handleRef, isDragging } = useDraggable({
+    id: `link:${props.link.id}`,
+    type: 'link',
+    data: {
+      kind: 'link' as const,
+      link: props.link,
+      collectionId: props.link.collectionId,
+      index: props.index,
+    },
+  });
+
+  return (
+    <DetailsRowView
+      {...props}
+      rowRef={ref}
+      handleRef={handleRef}
+      isDragging={isDragging}
+      isDropTarget={false}
+    />
+  );
+}
+
+export const DetailsRow = memo(function DetailsRow(props: DetailsRowProps) {
+  if (props.dragMode === 'collection') {
+    return <SortableDetailsRow {...props} />;
+  }
+  if (props.dragMode === 'cross-only') {
+    return <DraggableDetailsRow {...props} />;
+  }
+  return <DetailsRowView {...props} isDragging={false} isDropTarget={false} />;
 });

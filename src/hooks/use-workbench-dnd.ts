@@ -1,4 +1,4 @@
-import type { DragEndEvent } from '@dnd-kit/react';
+import type { DragEndEvent, DragOverEvent } from '@dnd-kit/react';
 import { isSortable } from '@dnd-kit/react/sortable';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
@@ -76,6 +76,21 @@ export function useWorkbenchDnd({
     dismissPreview();
     playPickup(soundEffects);
   }, [dismissPreview, soundEffects]);
+
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const { source, target } = event.operation;
+    if (!source || !target) return;
+    if (
+      isSortable(source) &&
+      isSortable(target) &&
+      source.group !== target.group
+    ) {
+      // Prevent @dnd-kit OptimisticSortingPlugin from physically reparenting
+      // React-owned DOM nodes across different collection containers, which
+      // causes React reconciliation to throw NotFoundError on removeChild.
+      event.preventDefault();
+    }
+  }, []);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -258,5 +273,10 @@ export function useWorkbenchDnd({
     ],
   );
 
-  return { handleQuickStashTab, handleDragStart, handleDragEnd };
+  return {
+    handleQuickStashTab,
+    handleDragStart,
+    handleDragOver,
+    handleDragEnd,
+  };
 }

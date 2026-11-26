@@ -1,3 +1,4 @@
+import { useDroppable } from '@dnd-kit/react';
 import {
   ArrowUpRight,
   ChevronDown,
@@ -154,7 +155,10 @@ export interface StoreGroupSummary {
 
 interface DetailsStoreSectionProps {
   group: StoreGroupSummary;
+  activeSpaceId: string;
+  activeSpaceName: string;
   collectionNameById: ReadonlyMap<string, string>;
+  dragDisabled: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onOpenStoreStarred: () => void;
@@ -170,7 +174,10 @@ interface DetailsStoreSectionProps {
 
 export function DetailsStoreSection({
   group,
+  activeSpaceId,
+  activeSpaceName,
   collectionNameById,
+  dragDisabled,
   collapsed,
   onToggleCollapse,
   onOpenStoreStarred,
@@ -183,8 +190,37 @@ export function DetailsStoreSection({
   hoverPreviews,
   gridTemplateClass,
 }: DetailsStoreSectionProps) {
+  // Only accept open browser tabs (never cross-store link reassignments)
+  const uniqueColIds = Array.from(
+    new Set(group.items.map((item) => item.collectionId)),
+  );
+  const singleCollectionId =
+    uniqueColIds.length === 1 ? uniqueColIds[0] : undefined;
+
+  const { ref: dropRef, isDropTarget } = useDroppable({
+    id: `store-drop:${group.storeName}`,
+    accept: 'open-tab',
+    collisionPriority: 1,
+    data: singleCollectionId
+      ? {
+          kind: 'collection-drop',
+          collectionId: singleCollectionId,
+        }
+      : {
+          kind: 'space-drop',
+          spaceId: activeSpaceId,
+          spaceName: activeSpaceName,
+        },
+  });
+
   return (
-    <section className="overflow-hidden rounded-card border border-border bg-card">
+    <section
+      ref={dropRef}
+      className={cn(
+        'overflow-hidden rounded-card border border-border bg-card transition-colors',
+        isDropTarget && 'border-accent ring-2 ring-accent/55',
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-panel/70 px-3 py-2">
         <button
           type="button"
@@ -240,10 +276,12 @@ export function DetailsStoreSection({
         <div>
           {renderTableHeader()}
           <div>
-            {group.items.map((link) => (
+            {group.items.map((link, idx) => (
               <DetailsRow
                 key={link.id}
                 link={link}
+                index={idx}
+                dragMode={dragDisabled ? 'none' : 'cross-only'}
                 contextLabel={collectionNameById.get(link.collectionId) ?? '—'}
                 showPriceColumn={showPriceColumn}
                 defaultCurrency={defaultCurrency}
