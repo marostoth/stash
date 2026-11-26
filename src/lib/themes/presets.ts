@@ -257,6 +257,98 @@ export const WARM_PAPER_THEME: ThemeDefinition = buildThemeFromCoreTokens({
   backdropStyle: 'flat',
 });
 
+export const NORDIC_FROST_THEME: ThemeDefinition = buildThemeFromCoreTokens({
+  id: 'nordic-frost',
+  name: 'Nordic Frost',
+  isBuiltIn: true,
+  core: {
+    canvas: '#1B212C',
+    surface: '#242B38',
+    accent: '#88C0D0',
+    text: '#ECEFF4',
+    border: '#354054',
+  },
+  cardRadius: 'standard',
+  backdropStyle: 'vignette',
+});
+
+export const CATPPUCCIN_MOCHA_THEME: ThemeDefinition = buildThemeFromCoreTokens(
+  {
+    id: 'catppuccin-mocha',
+    name: 'Catppuccin Mocha',
+    isBuiltIn: true,
+    core: {
+      canvas: '#181825',
+      surface: '#242437',
+      accent: '#CBA6F7',
+      text: '#CDD6F4',
+      border: '#3B3D57',
+    },
+    cardRadius: 'rounded',
+    backdropStyle: 'mesh-glow',
+  },
+);
+
+export const ROSE_PINE_THEME: ThemeDefinition = buildThemeFromCoreTokens({
+  id: 'rose-pine',
+  name: 'Rose Pine',
+  isBuiltIn: true,
+  core: {
+    canvas: '#191724',
+    surface: '#232034',
+    accent: '#EBBCBA',
+    text: '#E0DEF4',
+    border: '#3A3554',
+  },
+  cardRadius: 'rounded',
+  backdropStyle: 'ambient-glow',
+});
+
+export const TOKYO_NIGHT_THEME: ThemeDefinition = buildThemeFromCoreTokens({
+  id: 'tokyo-night',
+  name: 'Tokyo Night',
+  isBuiltIn: true,
+  core: {
+    canvas: '#16161E',
+    surface: '#1F2335',
+    accent: '#7AA2F7',
+    text: '#C8D3F5',
+    border: '#2E344D',
+  },
+  cardRadius: 'standard',
+  backdropStyle: 'dot-matrix',
+});
+
+export const GRUVBOX_WARM_THEME: ThemeDefinition = buildThemeFromCoreTokens({
+  id: 'gruvbox-warm',
+  name: 'Gruvbox Warm',
+  isBuiltIn: true,
+  core: {
+    canvas: '#1D2021',
+    surface: '#282828',
+    accent: '#FE8019',
+    text: '#EBDBB2',
+    border: '#3C3836',
+  },
+  cardRadius: 'sharp',
+  backdropStyle: 'noise-grain',
+});
+
+export const SAGE_EDITORIAL_THEME: ThemeDefinition = buildThemeFromCoreTokens({
+  id: 'sage-editorial',
+  name: 'Sage Editorial',
+  isBuiltIn: true,
+  core: {
+    canvas: '#F2F4F0',
+    surface: '#FBFDF9',
+    accent: '#3B7A57',
+    text: '#1D261F',
+    border: '#D5DDD2',
+  },
+  cardRadius: 'standard',
+  backdropStyle: 'flat',
+});
+
 export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
   OSCILLOSCOPE_THEME,
   CLEAN_DARK_THEME,
@@ -264,6 +356,12 @@ export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
   AMBER_PHOSPHOR_THEME,
   MIDNIGHT_INDIGO_THEME,
   WARM_PAPER_THEME,
+  NORDIC_FROST_THEME,
+  CATPPUCCIN_MOCHA_THEME,
+  ROSE_PINE_THEME,
+  TOKYO_NIGHT_THEME,
+  GRUVBOX_WARM_THEME,
+  SAGE_EDITORIAL_THEME,
 ] as const;
 
 export const DEFAULT_THEME_ID = OSCILLOSCOPE_THEME.id;

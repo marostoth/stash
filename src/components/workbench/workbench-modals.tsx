@@ -13,28 +13,76 @@ import type {
 } from '@/lib/types/stash';
 import { useUiStore } from '@/store/ui-store';
 
+const CHUNK_RELOAD_KEY = 'stash_chunk_reload_at';
+const CHUNK_RELOAD_COOLDOWN_MS = 15_000;
+
+function isStaleChunkError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  return (
+    msg.includes('failed to fetch dynamically imported module') ||
+    msg.includes('importing a module script failed') ||
+    msg.includes('loading chunk')
+  );
+}
+
+/**
+ * Wraps `React.lazy` so an already-open New Tab recovers cleanly after a
+ * Chrome extension reload or Store auto-update invalidates old chunk hashes.
+ */
+function importWithChunkReload<T>(factory: () => Promise<T>): Promise<T> {
+  return factory().catch((err: unknown) => {
+    if (isStaleChunkError(err) && typeof window !== 'undefined') {
+      try {
+        const lastReload = Number(
+          window.sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? '0',
+        );
+        if (
+          !Number.isFinite(lastReload) ||
+          Date.now() - lastReload > CHUNK_RELOAD_COOLDOWN_MS
+        ) {
+          window.sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+          window.location.reload();
+          return new Promise<T>(() => undefined);
+        }
+      } catch {
+        // Fall through to ErrorBoundary if sessionStorage is unavailable
+      }
+    }
+    throw err;
+  });
+}
+
 const SettingsModal = lazy(() =>
-  import('@/components/settings/settings-modal').then((m) => ({
-    default: m.SettingsModal,
-  })),
+  importWithChunkReload(() =>
+    import('@/components/settings/settings-modal').then((m) => ({
+      default: m.SettingsModal,
+    })),
+  ),
 );
 
 const HealthCheckModal = lazy(() =>
-  import('@/components/HealthCheckModal').then((m) => ({
-    default: m.HealthCheckModal,
-  })),
+  importWithChunkReload(() =>
+    import('@/components/HealthCheckModal').then((m) => ({
+      default: m.HealthCheckModal,
+    })),
+  ),
 );
 
 const ReorganizeModal = lazy(() =>
-  import('@/components/reorganize/ReorganizeModal').then((m) => ({
-    default: m.ReorganizeModal,
-  })),
+  importWithChunkReload(() =>
+    import('@/components/reorganize/ReorganizeModal').then((m) => ({
+      default: m.ReorganizeModal,
+    })),
+  ),
 );
 
 const TriageModal = lazy(() =>
-  import('@/components/workbench/triage-modal').then((m) => ({
-    default: m.TriageModal,
-  })),
+  importWithChunkReload(() =>
+    import('@/components/workbench/triage-modal').then((m) => ({
+      default: m.TriageModal,
+    })),
+  ),
 );
 
 interface WorkbenchModalsProps {

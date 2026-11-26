@@ -12,6 +12,7 @@ import type {
   StashSettings,
 } from '@/lib/types/stash';
 import { COMMON_CURRENCIES } from '@/lib/utils/price-math';
+import { useUiStore } from '@/store/ui-store';
 
 interface GeneralPanelProps {
   settings: StashSettings;
@@ -37,12 +38,25 @@ export function GeneralPanel({ settings, settingsOpen }: GeneralPanelProps) {
 
           <SettingsToggleRow
             id="settings-quick-launch-bar"
-            label="Show Quick Launch favorites strip"
-            hint="Compact 1-click bar beneath Spaces showing pinned or starred links."
+            label="Show Quick Links strip"
+            hint="Compact 1-click Quick Launch bar beneath Spaces showing pinned or starred links."
             checked={settings.quickLaunchVisible !== false}
             onCheckedChange={(checked) =>
               void stashRepo.updateSettings({ quickLaunchVisible: checked })
             }
+          />
+
+          <SettingsToggleRow
+            id="settings-tag-filter-bar"
+            label="Show Quick Tag filter bar"
+            hint="Clickable #tag chips beneath Quick Links (and in the Side Panel) for 1-click filtering."
+            checked={settings.tagBarVisible !== false}
+            onCheckedChange={(checked) => {
+              if (!checked) {
+                useUiStore.getState().clearSelectedTags();
+              }
+              void stashRepo.updateSettings({ tagBarVisible: checked });
+            }}
           />
 
           <div className="flex items-center justify-between gap-3 py-1">

@@ -325,6 +325,10 @@ export function parseSettings(raw: unknown): StashSettings {
       typeof obj.quickLaunchVisible === 'boolean'
         ? obj.quickLaunchVisible
         : DEFAULT_SETTINGS.quickLaunchVisible,
+    tagBarVisible:
+      typeof obj.tagBarVisible === 'boolean'
+        ? obj.tagBarVisible
+        : DEFAULT_SETTINGS.tagBarVisible,
     enableOnDeviceAi:
       typeof obj.enableOnDeviceAi === 'boolean'
         ? obj.enableOnDeviceAi

@@ -182,7 +182,7 @@ export function SidePanelApp() {
     <MotionConfig
       reducedMotion={resolveReducedMotionPolicy(settings.motionMode)}
     >
-      <div className="flex h-screen flex-col overflow-hidden bg-canvas text-fg">
+      <div className="stash-backdrop flex h-screen flex-col overflow-hidden text-fg">
         {/* Compact Header */}
         <header className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-border bg-panel px-3">
           <div className="flex items-center gap-2">
@@ -322,7 +322,7 @@ export function SidePanelApp() {
             </button>
           </div>
 
-          {topTags.length > 0 && (
+          {settings.tagBarVisible !== false && topTags.length > 0 && (
             <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
               {topTags.map(({ tag }) => {
                 const active = selectedTag === tag;

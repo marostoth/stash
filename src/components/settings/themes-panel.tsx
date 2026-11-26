@@ -9,7 +9,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { SettingsSectionCard } from '@/components/settings/settings-section-card';
 import { ThemeStudio } from '@/components/themes/ThemeStudio';
@@ -25,9 +25,12 @@ import {
   encodeThemeShareCode,
   parseAndValidateThemeShareInput,
 } from '@/lib/themes/share';
+import { applyThemeToDocument } from '@/lib/themes/theme-engine';
 import { serializeThemeForExport } from '@/lib/themes/theme-validator';
 import type { StashSettings, ThemeDefinition } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+
+type ThemeModeFilter = 'all' | 'dark' | 'light';
 
 interface ThemesPanelProps {
   allThemes: readonly ThemeDefinition[];
@@ -42,6 +45,8 @@ export function ThemesPanel({
 }: ThemesPanelProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
+  const [modeFilter, setModeFilter] = useState<ThemeModeFilter>('all');
+  const [previewThemeId, setPreviewThemeId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importInput, setImportInput] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
@@ -51,7 +56,44 @@ export function ThemesPanel({
       ? (allThemes.find((t) => t.id === editingThemeId && !t.isBuiltIn) ?? null)
       : null;
 
+  // Live hover preview: temporarily apply hovered theme, revert cleanly on leave/unmount
+  useEffect(() => {
+    if (editingTheme) return;
+    const target =
+      previewThemeId !== null
+        ? (allThemes.find((t) => t.id === previewThemeId) ?? activeTheme)
+        : activeTheme;
+    applyThemeToDocument(
+      target,
+      document.documentElement,
+      settings.backdropOverride,
+    );
+    return () => {
+      if (previewThemeId !== null) {
+        applyThemeToDocument(
+          activeTheme,
+          document.documentElement,
+          settings.backdropOverride,
+        );
+      }
+    };
+  }, [
+    activeTheme,
+    allThemes,
+    editingTheme,
+    previewThemeId,
+    settings.backdropOverride,
+  ]);
+
+  const darkCount = allThemes.filter((t) => t.mode === 'dark').length;
+  const lightCount = allThemes.filter((t) => t.mode === 'light').length;
+  const filteredThemes =
+    modeFilter === 'all'
+      ? allThemes
+      : allThemes.filter((t) => t.mode === modeFilter);
+
   const handleApply = (themeId: string) => {
+    setPreviewThemeId(null);
     void stashRepo.updateSettings({ activeThemeId: themeId });
   };
 
@@ -234,10 +276,55 @@ export function ThemesPanel({
         />
       ) : null}
 
+      {/* Filter Pills + Live Hover Hint */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div
+          role="tablist"
+          aria-label="Filter themes by mode"
+          className="inline-flex rounded-control border border-border bg-panel p-0.5"
+        >
+          {(
+            [
+              { id: 'all', label: `All (${allThemes.length})` },
+              { id: 'dark', label: `Dark (${darkCount})` },
+              { id: 'light', label: `Light (${lightCount})` },
+            ] as const
+          ).map((tab) => {
+            const selected = modeFilter === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setModeFilter(tab.id)}
+                className={cn(
+                  'rounded-[calc(var(--stash-radius-control)-2px)] px-2.5 py-1 font-mono text-[11px] font-medium transition-colors cursor-pointer',
+                  selected
+                    ? 'bg-accent text-accent-fg'
+                    : 'text-fg-muted hover:text-fg',
+                )}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+        {!editingTheme && (
+          <span className="font-mono text-[10px] text-fg-muted">
+            Hover any theme for live preview
+          </span>
+        )}
+      </div>
+
       {/* Swatch Grid */}
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        {allThemes.map((theme) => {
+      <div
+        onPointerLeave={() => setPreviewThemeId(null)}
+        className="grid grid-cols-1 gap-2.5 sm:grid-cols-2"
+      >
+        {filteredThemes.map((theme) => {
           const isActive = theme.id === activeTheme.id;
+          const isPreviewing = !isActive && previewThemeId === theme.id;
           const isEditing = editingTheme?.id === theme.id;
           const core = extractCoreThemeColors(theme);
           const backdropLabel = theme.backdropStyle ?? 'flat';
@@ -245,9 +332,16 @@ export function ThemesPanel({
           return (
             <div
               key={theme.id}
+              onPointerEnter={() => {
+                if (!editingTheme) setPreviewThemeId(theme.id);
+              }}
               className={cn(
                 'flex flex-col justify-between gap-2.5 rounded-card border bg-canvas p-3 transition-colors',
-                isActive ? 'border-accent/70' : 'border-border',
+                isActive
+                  ? 'border-accent/70'
+                  : isPreviewing
+                    ? 'border-accent/45'
+                    : 'border-border',
                 isEditing && 'ring-1 ring-accent/50',
               )}
             >

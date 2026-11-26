@@ -1,10 +1,13 @@
 import { create } from 'zustand';
 
+export type ImpactWaveMode = 'push' | 'vacuum';
+
 export interface SettledImpact {
   linkId: string;
   collectionId: string;
   cx: number;
   cy: number;
+  mode: ImpactWaveMode;
   seq: number;
 }
 
@@ -23,6 +26,7 @@ interface FxStoreState {
   spaceSlideDirection: -1 | 0 | 1;
   starFlashLinkId: string | null;
   triggerSettledImpact: (linkId: string, collectionId: string) => void;
+  triggerVacuumImplosion: (linkId: string, collectionId: string) => void;
   triggerWakeWave: (collectionId: string) => void;
   triggerCollectionSlam: (collectionId: string) => void;
   setSessionSweeping: (sweeping: boolean) => void;
@@ -66,6 +70,7 @@ export const useFxStore = create<FxStoreState>((set) => ({
           collectionId,
           cx: rect.left + rect.width / 2,
           cy: rect.top + rect.height / 2,
+          mode: 'push',
           seq,
         },
       });
@@ -76,6 +81,35 @@ export const useFxStore = create<FxStoreState>((set) => ({
         impactTimer = null;
       }, 640);
     });
+  },
+
+  triggerVacuumImplosion: (linkId, collectionId) => {
+    if (impactTimer) clearTimeout(impactTimer);
+    if (typeof document === 'undefined') return;
+    const el = document.querySelector<HTMLElement>(
+      `[data-link-id="${CSS.escape(linkId)}"]`,
+    );
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    impactSeq += 1;
+    const seq = impactSeq;
+    set({
+      settledImpact: {
+        linkId,
+        collectionId,
+        cx: rect.left + rect.width / 2,
+        cy: rect.top + rect.height / 2,
+        mode: 'vacuum',
+        seq,
+      },
+    });
+    impactTimer = setTimeout(() => {
+      set((state) =>
+        state.settledImpact?.seq === seq ? { settledImpact: null } : state,
+      );
+      impactTimer = null;
+    }, 680);
   },
 
   triggerWakeWave: (collectionId) => {

@@ -294,12 +294,14 @@ export function Workbench() {
               />
             )}
 
-            <TagFilterBar
-              links={links}
-              activeSpaceCollectionIds={activeSpaceCollectionIds}
-              searchAllSpaces={searchAllSpaces}
-              wideBoard={wideBoard}
-            />
+            {settings.tagBarVisible !== false && (
+              <TagFilterBar
+                links={links}
+                activeSpaceCollectionIds={activeSpaceCollectionIds}
+                searchAllSpaces={searchAllSpaces}
+                wideBoard={wideBoard}
+              />
+            )}
 
             <div className="flex min-h-0 flex-1 overflow-hidden">
               <main

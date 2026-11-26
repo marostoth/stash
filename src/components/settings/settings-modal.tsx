@@ -158,6 +158,7 @@ export function SettingsModal({
 
   const currentNav =
     NAV_ITEMS.find((item) => item.id === activeTab) ?? NAV_ITEMS[0];
+  const CurrentNavIcon = currentNav?.Icon;
   const versionLabel = readExtensionVersion();
 
   const nanoPill =
@@ -186,10 +187,10 @@ export function SettingsModal({
         if (!nextOpen) closeSettings();
       }}
     >
-      <DialogContent className="flex h-[min(86vh,640px)] w-[min(94vw,860px)] flex-col overflow-hidden p-0 md:flex-row">
+      <DialogContent className="flex h-[min(88vh,820px)] w-[min(94vw,1120px)] flex-col overflow-hidden p-0 md:flex-row">
         {/* Left Navigation Rail (collapses to horizontal strip on < md) */}
-        <aside className="flex shrink-0 flex-col border-b border-border bg-canvas/60 md:w-[200px] md:border-b-0 md:border-r">
-          <div className="px-4 pt-4 pb-2.5 pr-12 md:pr-4">
+        <aside className="flex shrink-0 flex-col border-b border-border bg-canvas/60 md:w-[220px] md:border-b-0 md:border-r">
+          <div className="flex h-[60px] shrink-0 items-center border-b border-border/80 px-4 pr-12 md:pr-4">
             <DialogTitle className="text-sm font-semibold tracking-tight text-fg">
               Stash Settings
             </DialogTitle>
@@ -201,7 +202,7 @@ export function SettingsModal({
 
           <nav
             aria-label="Settings sections"
-            className="flex gap-1 overflow-x-auto px-2.5 pb-2.5 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:px-2.5 md:py-1"
+            className="flex gap-1 overflow-x-auto px-2.5 py-2.5 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:px-2.5 md:py-3"
           >
             {NAV_ITEMS.map(({ id, label, Icon }) => {
               const active = activeTab === id;
@@ -262,58 +263,79 @@ export function SettingsModal({
           </div>
         </aside>
 
-        {/* Scrollable Right Content Pane */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {/* Right Content Column: Docked Header + Scroll-Faded Body */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {currentNav ? (
-            <div className="mb-4 pr-8">
-              <h2 className="text-sm font-semibold tracking-tight text-fg">
-                {currentNav.label}
-              </h2>
-              <p className="mt-0.5 text-xs text-fg-muted">
-                {currentNav.description}
-              </p>
-            </div>
+            <header className="flex h-[60px] shrink-0 items-center gap-3 border-b border-border bg-panel/95 px-6 pr-14">
+              {CurrentNavIcon ? (
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control border border-border bg-canvas/80 text-accent">
+                  <CurrentNavIcon className="h-4 w-4" aria-hidden="true" />
+                </div>
+              ) : null}
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-semibold tracking-tight text-fg">
+                  {currentNav.label}
+                </h2>
+                <p className="truncate text-xs text-fg-muted">
+                  {currentNav.description}
+                </p>
+              </div>
+            </header>
           ) : null}
 
-          {activeTab === 'general' ? (
-            <GeneralPanel settings={settings} settingsOpen={open} />
-          ) : activeTab === 'appearance' ? (
-            <AppearancePanel
-              allThemes={allThemes}
-              activeTheme={activeTheme}
-              settings={settings}
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            {/* Soft top & bottom edge fades so scrolled cards glide cleanly under header */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-5 bg-gradient-to-b from-panel to-transparent"
             />
-          ) : activeTab === 'effects' ? (
-            <EffectsPanel settings={settings} />
-          ) : activeTab === 'sounds' ? (
-            <SoundsPanel settings={settings} />
-          ) : activeTab === 'ai-rules' ? (
-            <AiRulesPanel
-              collections={collections}
-              rules={rules}
-              settings={settings}
-              nanoStatus={nanoStatus}
-              onNanoStatusChange={setNanoStatus}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-6 bg-gradient-to-t from-panel to-transparent"
             />
-          ) : activeTab === 'library-tools' ? (
-            <LibraryToolsPanel
-              spaces={spaces}
-              collections={collections}
-              links={links}
-              nanoStatus={nanoStatus}
-              onOpenHealthCheck={openHealthCheck}
-              onOpenReorganize={openReorganize}
-            />
-          ) : activeTab === 'shortcuts' ? (
-            <ShortcutsPanel settingsOpen={open} />
-          ) : (
-            <BackupImportPanel
-              settings={settings}
-              spaces={spaces}
-              linkCount={links.length}
-              collectionCount={collections.length}
-            />
-          )}
+
+            <div className="h-full overflow-y-auto px-6 py-5">
+              {activeTab === 'general' ? (
+                <GeneralPanel settings={settings} settingsOpen={open} />
+              ) : activeTab === 'appearance' ? (
+                <AppearancePanel
+                  allThemes={allThemes}
+                  activeTheme={activeTheme}
+                  settings={settings}
+                />
+              ) : activeTab === 'effects' ? (
+                <EffectsPanel settings={settings} />
+              ) : activeTab === 'sounds' ? (
+                <SoundsPanel settings={settings} />
+              ) : activeTab === 'ai-rules' ? (
+                <AiRulesPanel
+                  collections={collections}
+                  rules={rules}
+                  settings={settings}
+                  nanoStatus={nanoStatus}
+                  onNanoStatusChange={setNanoStatus}
+                />
+              ) : activeTab === 'library-tools' ? (
+                <LibraryToolsPanel
+                  spaces={spaces}
+                  collections={collections}
+                  links={links}
+                  nanoStatus={nanoStatus}
+                  onOpenHealthCheck={openHealthCheck}
+                  onOpenReorganize={openReorganize}
+                />
+              ) : activeTab === 'shortcuts' ? (
+                <ShortcutsPanel settingsOpen={open} />
+              ) : (
+                <BackupImportPanel
+                  settings={settings}
+                  spaces={spaces}
+                  linkCount={links.length}
+                  collectionCount={collections.length}
+                />
+              )}
+            </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

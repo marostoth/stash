@@ -28,6 +28,19 @@ export function resolveTheme(
   return all.find((theme) => theme.id === themeId) ?? OSCILLOSCOPE_THEME;
 }
 
+const THEME_TRANSITION_MS = 320;
+let themeTransitionTimer: ReturnType<typeof setTimeout> | null = null;
+
+function pulseThemeTransition(root: HTMLElement): void {
+  if (typeof window === 'undefined' || root.dataset.motion === 'off') return;
+  root.dataset.themeTransition = 'true';
+  if (themeTransitionTimer) clearTimeout(themeTransitionTimer);
+  themeTransitionTimer = setTimeout(() => {
+    delete root.dataset.themeTransition;
+    themeTransitionTimer = null;
+  }, THEME_TRANSITION_MS);
+}
+
 export function applyThemeToDocument(
   theme: ThemeDefinition,
   root: HTMLElement = document.documentElement,
@@ -40,6 +53,15 @@ export function applyThemeToDocument(
   const radiusSpec = theme.cardRadius
     ? CARD_RADIUS_PRESETS[theme.cardRadius]
     : null;
+
+  const prevTheme = root.dataset.theme;
+  const prevBackdrop = root.dataset.backdrop;
+  if (
+    prevTheme &&
+    (prevTheme !== theme.id || (prevBackdrop && prevBackdrop !== backdrop))
+  ) {
+    pulseThemeTransition(root);
+  }
 
   root.dataset.theme = theme.id;
   root.dataset.themeMode = theme.mode;

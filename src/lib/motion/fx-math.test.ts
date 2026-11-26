@@ -23,6 +23,18 @@ describe('computeNeighborJolt', () => {
     const below = computeNeighborJolt({ x: 100, y: 100 }, { x: 100, y: 240 });
     expect(below?.dx).toBe(0);
     expect(below?.dy).toBeGreaterThan(0);
+
+    // Vacuum implosion (direction = -1) pulls neighbors INWARD toward vanished card
+    const vacuumRight = computeNeighborJolt(
+      { x: 100, y: 100 },
+      { x: 260, y: 100 },
+      12,
+      640,
+      -1,
+    );
+    expect(vacuumRight).not.toBeNull();
+    expect(vacuumRight?.dx).toBeLessThan(0);
+    expect(vacuumRight?.dy).toBe(0);
   });
 
   it('returns null for the impact card itself or cards outside shockwave radius', () => {

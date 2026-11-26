@@ -71,13 +71,21 @@ export function resolveLinkCardMotion(params: {
   } = params;
 
   const animate = vaporizing
-    ? {
-        opacity: 0,
-        scale: arcade ? 0.82 : 0.92,
-        rotate: arcade ? -2.5 : 0,
-        y: arcade ? 4 : 0,
-        x: 0,
-      }
+    ? arcade
+      ? {
+          opacity: [1, 0.92, 0],
+          scale: [1, 1.03, 0.24],
+          rotate: 0,
+          y: 0,
+          x: 0,
+        }
+      : {
+          opacity: 0,
+          scale: 0.88,
+          rotate: 0,
+          y: 0,
+          x: 0,
+        }
     : isHighlighted && arcade
       ? {
           ...ARCADE_HEADSHAKE_KEYFRAMES,
@@ -111,7 +119,13 @@ export function resolveLinkCardMotion(params: {
             : { opacity: 1, x: 0, y: 0, rotate: 0, scale: 1 };
 
   const transition = vaporizing
-    ? { duration: arcade ? 0.29 : 0.16, ease: 'easeIn' as const }
+    ? arcade
+      ? {
+          duration: 0.27,
+          times: [0, 0.24, 1],
+          ease: [0.55, 0, 1, 0.45] as const,
+        }
+      : { duration: 0.16, ease: 'easeIn' as const }
     : isHighlighted && arcade
       ? ARCADE_HEADSHAKE_TRANSITION
       : isSettling && arcade
@@ -164,9 +178,13 @@ export function useNeighborJolt(
     const rect = el.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
 
+    const isVacuum = settledImpact.mode === 'vacuum';
     const vec = computeNeighborJolt(
       { x: settledImpact.cx, y: settledImpact.cy },
       { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
+      isVacuum ? 12 : 9,
+      isVacuum ? 640 : 580,
+      isVacuum ? -1 : 1,
     );
     if (!vec) {
       setJolt(null);
@@ -257,7 +275,9 @@ const VAPOR_MOTES = [
 ] as const;
 
 /**
- * Brief ash/spark puff when a card vaporizes on quick delete (Arcade).
+ * Vacuum implosion collapse when a card vanishes on quick delete (Arcade):
+ * a radial distortion ring collapses inward while surrounding particles rush
+ * toward the center void.
  */
 export function DeleteVaporPuff({ active }: { active: boolean }) {
   return (
@@ -267,27 +287,50 @@ export function DeleteVaporPuff({ active }: { active: boolean }) {
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center overflow-visible"
         >
+          {/* Inward-collapsing vacuum ring */}
+          <motion.div
+            initial={{ scale: 1.42, opacity: 0 }}
+            animate={{ scale: 0.2, opacity: [0, 0.78, 0] }}
+            transition={{
+              duration: 0.3,
+              opacity: { duration: 0.3, times: [0, 0.35, 1] },
+              ease: [0.5, 0, 0.9, 0.5],
+            }}
+            style={{
+              background:
+                'radial-gradient(ellipse at center, transparent 52%, color-mix(in srgb, var(--stash-accent) 45%, transparent) 66%, color-mix(in srgb, var(--stash-danger) 40%, transparent) 72%, transparent 82%)',
+              filter: 'blur(1.5px)',
+            }}
+            className="absolute -inset-x-6 -inset-y-5 rounded-full will-change-transform"
+          />
+
+          {/* Particles sucked inward into the collapsing void */}
           {VAPOR_MOTES.map((mote, i) => (
             <motion.span
               key={`${mote.x}-${mote.y}`}
-              initial={{ x: 0, y: 0, scale: 0.9, opacity: 0.78 }}
+              initial={{
+                x: mote.x * 1.45,
+                y: mote.y * 1.45,
+                scale: 0.85,
+                opacity: 0.85,
+              }}
               animate={{
-                x: mote.x,
-                y: mote.y,
+                x: 0,
+                y: 0,
                 scale: 0.1,
                 opacity: 0,
               }}
               transition={{
-                duration: 0.44,
-                delay: i * 0.018,
-                ease: 'easeOut',
+                duration: 0.28,
+                delay: i * 0.012,
+                ease: [0.55, 0, 1, 0.45],
               }}
               style={{
                 width: mote.size,
                 height: mote.size,
                 backgroundColor:
                   i % 2 === 0
-                    ? 'var(--stash-danger)'
+                    ? 'var(--stash-accent)'
                     : 'var(--stash-text-muted)',
               }}
               className="absolute rounded-full blur-[1px]"

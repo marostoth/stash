@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import type * as React from 'react';
+import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -24,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { OdometerCounter } from '@/components/ui/odometer-counter';
 import { stashRepo } from '@/lib/storage/repo';
+import { applyThemeToDocument } from '@/lib/themes/theme-engine';
 import type { StashSettings, ThemeDefinition } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 import type { SmartFilter } from '@/lib/utils/search';
@@ -69,9 +71,37 @@ export function TopBar({
   const toggleSearchAllSpaces = useUiStore((s) => s.toggleSearchAllSpaces);
   const openCreateCollection = useUiStore((s) => s.openCreateCollection);
   const openSettings = useUiStore((s) => s.openSettings);
+  const justSelectedThemeRef = useRef<string | null>(null);
+  const previewingRef = useRef(false);
 
-  const handleSelectTheme = (themeId: string) => {
-    void stashRepo.updateSettings({ activeThemeId: themeId });
+  const previewTheme = (theme: ThemeDefinition) => {
+    previewingRef.current = true;
+    applyThemeToDocument(
+      theme,
+      document.documentElement,
+      settings.backdropOverride,
+    );
+  };
+
+  const revertThemePreview = () => {
+    if (!previewingRef.current) return;
+    previewingRef.current = false;
+    applyThemeToDocument(
+      activeTheme,
+      document.documentElement,
+      settings.backdropOverride,
+    );
+  };
+
+  const handleSelectTheme = (theme: ThemeDefinition) => {
+    justSelectedThemeRef.current = theme.id;
+    previewingRef.current = false;
+    applyThemeToDocument(
+      theme,
+      document.documentElement,
+      settings.backdropOverride,
+    );
+    void stashRepo.updateSettings({ activeThemeId: theme.id });
   };
 
   const handleToggleSidebar = () => {
@@ -272,8 +302,18 @@ export function TopBar({
             <span className="hidden sm:inline">Collection</span>
           </Button>
 
-          {/* Theme Quick-Switcher */}
-          <DropdownMenu>
+          {/* Theme Quick-Switcher (with live hover/keyboard preview) */}
+          <DropdownMenu
+            onOpenChange={(open) => {
+              if (!open) {
+                if (justSelectedThemeRef.current) {
+                  justSelectedThemeRef.current = null;
+                } else {
+                  revertThemePreview();
+                }
+              }
+            }}
+          >
             <DropdownMenuTrigger asChild>
               <Button
                 variant="secondary"
@@ -289,14 +329,20 @@ export function TopBar({
                 />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuLabel>Theme</DropdownMenuLabel>
+            <DropdownMenuContent
+              align="end"
+              onPointerLeave={revertThemePreview}
+              className="max-h-[70vh] w-56 overflow-y-auto"
+            >
+              <DropdownMenuLabel>Theme (hover to preview)</DropdownMenuLabel>
               {allThemes.map((theme) => {
                 const isSelected = theme.id === activeTheme.id;
                 return (
                   <DropdownMenuItem
                     key={theme.id}
-                    onSelect={() => handleSelectTheme(theme.id)}
+                    onPointerEnter={() => previewTheme(theme)}
+                    onFocus={() => previewTheme(theme)}
+                    onSelect={() => handleSelectTheme(theme)}
                     className="justify-between"
                   >
                     <span className="flex items-center gap-2">

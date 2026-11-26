@@ -170,6 +170,7 @@ export interface StashSettings {
   closeTabOnQuickStash: boolean;
   openTabsSidebarVisible: boolean;
   quickLaunchVisible: boolean;
+  tagBarVisible: boolean;
   enableOnDeviceAi: boolean;
   autoTagOnSave: boolean;
   motionMode: MotionMode;
@@ -260,6 +261,7 @@ export const DEFAULT_SETTINGS: StashSettings = {
   closeTabOnQuickStash: false,
   openTabsSidebarVisible: true,
   quickLaunchVisible: true,
+  tagBarVisible: true,
   enableOnDeviceAi: true,
   autoTagOnSave: true,
   motionMode: 'tactile',

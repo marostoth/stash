@@ -92,6 +92,7 @@ export const LinkCard = memo(function LinkCard({
   const triggerStarFlash = useFxStore((s) => s.triggerStarFlash);
   const isStarFlashing = useFxStore((s) => s.starFlashLinkId === link.id);
   const triggerSettledImpact = useFxStore((s) => s.triggerSettledImpact);
+  const triggerVacuumImplosion = useFxStore((s) => s.triggerVacuumImplosion);
   const isSelected = useSelectionStore((s) => s.selectedIds.includes(link.id));
   const selectionMode = useSelectionStore((s) => s.selectedIds.length > 0);
   const toggleSelect = useSelectionStore((s) => s.toggleSelect);
@@ -220,7 +221,10 @@ export const LinkCard = memo(function LinkCard({
 
     if (tactile) {
       setVaporizing(true);
-      await new Promise((resolve) => setTimeout(resolve, arcade ? 280 : 155));
+      if (arcade && fxDeskJolt) {
+        triggerVacuumImplosion(link.id, link.collectionId);
+      }
+      await new Promise((resolve) => setTimeout(resolve, arcade ? 275 : 155));
     }
 
     const deleted = await stashRepo.deleteLink(snapshot.id);

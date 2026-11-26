@@ -166,15 +166,16 @@ export interface NeighborJoltVector {
 }
 
 /**
- * Computes a radial desk-jolt impulse pushing a sibling card away from a
- * heavy drop impact center, attenuated by distance. Returns null when the
- * card is outside the shockwave radius or coincides with the impact origin.
+ * Computes a radial desk-jolt impulse pushing (direction = 1) or pulling via
+ * vacuum implosion (direction = -1) a sibling card relative to an origin,
+ * attenuated by distance. Returns null outside the radius or at the origin.
  */
 export function computeNeighborJolt(
   impact: Point2D,
   neighbor: Point2D,
   maxDisplacementPx = 9,
   radiusPx = 580,
+  direction: 1 | -1 = 1,
 ): NeighborJoltVector | null {
   const rawDx = neighbor.x - impact.x;
   const rawDy = neighbor.y - impact.y;
@@ -184,8 +185,8 @@ export function computeNeighborJolt(
   }
   const falloff = (1 - dist / radiusPx) ** 1.35;
   const magnitude = Math.max(1.5, maxDisplacementPx * falloff);
-  const dx = Number(((rawDx / dist) * magnitude).toFixed(2));
-  const dy = Number(((rawDy / dist) * magnitude).toFixed(2));
+  const dx = Number(((rawDx / dist) * magnitude * direction).toFixed(2));
+  const dy = Number(((rawDy / dist) * magnitude * direction).toFixed(2));
   const delaySec = Number(
     Math.min(0.16, 0.025 + (dist / radiusPx) * 0.135).toFixed(3),
   );
