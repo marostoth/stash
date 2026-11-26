@@ -7,29 +7,22 @@ import {
 import { MotionConfig, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Toaster } from 'sonner';
-import { HealthCheckModal } from '@/components/HealthCheckModal';
-import { ReorganizeModal } from '@/components/reorganize/ReorganizeModal';
-import { SettingsModal } from '@/components/settings/settings-modal';
-import { StashErrorBoundary } from '@/components/ui/error-boundary';
 import { BackgroundJobsTray } from '@/components/workbench/background-jobs-tray';
 import { BulkActionBar } from '@/components/workbench/bulk-action-bar';
-import { CollectionModal } from '@/components/workbench/collection-modal';
 import { CollectionSection } from '@/components/workbench/collection-section';
 import { DetailsView } from '@/components/workbench/details-view';
 import { DragGhost } from '@/components/workbench/drag-ghost';
 import { EmptyState } from '@/components/workbench/empty-state';
-import { LinkPreviewPopover } from '@/components/workbench/link-preview-popover';
 import { OpenTabsSidebar } from '@/components/workbench/open-tabs-sidebar';
-import { QuickEditModal } from '@/components/workbench/quick-edit-modal';
 import { QuickLaunchBar } from '@/components/workbench/quick-launch-bar';
 import { SpaceBar } from '@/components/workbench/space-bar';
 import { TopBar } from '@/components/workbench/top-bar';
-import { TriageModal } from '@/components/workbench/triage-modal';
 import { WallpaperLayer } from '@/components/workbench/wallpaper-layer';
 import {
   EmptySpaceNotice,
   NoFilterMatchesNotice,
 } from '@/components/workbench/workbench-empty-states';
+import { WorkbenchModals } from '@/components/workbench/workbench-modals';
 import { useOpenTabs } from '@/hooks/use-open-tabs';
 import { useStashData } from '@/hooks/use-stash-data';
 import { useWorkbenchDnd } from '@/hooks/use-workbench-dnd';
@@ -232,6 +225,7 @@ export function Workbench() {
     visibleLinks,
     spaces,
     openLinkInNewTab: settings.openLinkInNewTab,
+    onSelectSpace: handleSelectSpace,
   });
 
   const effectiveDensity = activeSpace?.densityOverride ?? settings.density;
@@ -301,11 +295,11 @@ export function Workbench() {
                   key={resolvedSpaceId}
                   initial={
                     spaceSlideActive
-                      ? { x: spaceSlideDirection * 30, opacity: 0.45 }
+                      ? { x: spaceSlideDirection * 42, opacity: 0.45 }
                       : false
                   }
                   animate={{ x: 0, opacity: 1 }}
-                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ duration: 0.36, ease: [0.22, 0.88, 0.32, 1] }}
                   className={
                     wideBoard
                       ? 'mx-auto max-w-[1720px]'
@@ -413,45 +407,17 @@ export function Workbench() {
             </div>
           </div>
 
-          <CollectionModal spaces={spaces} activeSpaceId={resolvedSpaceId} />
-          <QuickEditModal
-            collections={collections}
-            spaces={spaces}
-            defaultCurrency={defaultCurrency}
-          />
-          <StashErrorBoundary
-            scope="Settings"
-            compact
-            onReset={() => useUiStore.getState().closeSettings()}
-          >
-            <SettingsModal
-              spaces={spaces}
-              collections={collections}
-              links={links}
-              rules={rules}
-              settings={settings}
-              allThemes={allThemes}
-              activeTheme={activeTheme}
-            />
-          </StashErrorBoundary>
-          <HealthCheckModal collections={collections} links={links} />
-          <ReorganizeModal
-            collections={collections}
-            links={links}
-            settings={settings}
-            activeSpace={activeSpace}
-          />
-          <TriageModal
+          <WorkbenchModals
             spaces={spaces}
             collections={collections}
             links={links}
             rules={rules}
             settings={settings}
-          />
-          <LinkPreviewPopover
-            hoverPreviews={settings.hoverPreviews}
-            visualPreviewsEnabled={settings.visualPreviewsEnabled}
-            motionMode={settings.motionMode}
+            allThemes={allThemes}
+            activeTheme={activeTheme}
+            activeSpace={activeSpace}
+            resolvedSpaceId={resolvedSpaceId}
+            defaultCurrency={defaultCurrency}
           />
 
           <DragOverlay dropAnimation={null}>

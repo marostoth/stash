@@ -17,8 +17,8 @@ The only direct network requests Stash makes are straight from your browser to w
 
 All data you create or import is stored strictly on your device using `chrome.storage.local` and browser IndexedDB:
 
-- **Collections, Spaces & Links:** Titles, URLs, notes, tags, starred status, and optional product metadata (store name, price, spec, quantity).
-- **Preferences & Rules:** Themes, layout settings, categorization rules, and custom local wallpapers.
+- **Collections, Spaces & Links:** Titles, URLs, notes, tags, starred/done/pinned status, and optional product metadata (store name, price, previous price history, spec, quantity).
+- **Preferences & Rules:** Themes, layout/effect settings, categorization rules, custom local wallpapers, and optional locally uploaded custom audio clips (`local:stash_custom_sfx`).
 - **Optional Visual Previews:** Cached page thumbnails captured locally in IndexedDB only when you explicitly enable Visual Previews.
 
 ## 3. On-Device AI (Gemini Nano)

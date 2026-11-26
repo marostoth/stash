@@ -1,4 +1,4 @@
-import { Star, Trash2 } from 'lucide-react';
+import { Check, Pin, Star, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,8 @@ export function QuickEditModal({
   const [tagsTouched, setTagsTouched] = useState(false);
   const [collectionId, setCollectionId] = useState('');
   const [starred, setStarred] = useState(false);
+  const [checked, setChecked] = useState(false);
+  const [pinnedToDock, setPinnedToDock] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
   const [productDraft, setProductDraft] = useState<ProductFormDraft>(() =>
     createProductFormDraft(undefined, defaultCurrency),
@@ -72,6 +74,8 @@ export function QuickEditModal({
       setTagsRaw(modal.link.tags.join(', '));
       setCollectionId(modal.link.collectionId);
       setStarred(Boolean(modal.link.starred));
+      setChecked(Boolean(modal.link.checked));
+      setPinnedToDock(Boolean(modal.link.pinnedToDock));
       setProductDraft(
         createProductFormDraft(modal.link.product, defaultCurrency),
       );
@@ -85,6 +89,8 @@ export function QuickEditModal({
       setTagsRaw('');
       setCollectionId(modal.defaultCollectionId || collections[0]?.id || '');
       setStarred(false);
+      setChecked(false);
+      setPinnedToDock(false);
       setProductDraft(createProductFormDraft(undefined, defaultCurrency));
       setProductOpen(false);
     }
@@ -137,6 +143,8 @@ export function QuickEditModal({
         note,
         tags: parsedTags,
         starred,
+        checked,
+        pinnedToDock,
         product: nextProduct ?? null,
         ...(tagsChanged ? { tagsLocked: true } : {}),
       });
@@ -167,6 +175,8 @@ export function QuickEditModal({
       note,
       tags: parsedTags,
       ...(starred ? { starred: true } : {}),
+      ...(checked ? { checked: true } : {}),
+      ...(pinnedToDock ? { pinnedToDock: true } : {}),
       ...(nextProduct ? { product: nextProduct } : {}),
       ...(hasManualTags ? { tagsLocked: true } : {}),
     });
@@ -321,24 +331,66 @@ export function QuickEditModal({
             </Select>
           </div>
 
-          <div className="flex items-center justify-between gap-3 rounded-control border border-border bg-panel/60 px-3 py-2">
-            <label
-              htmlFor="link-starred"
-              className="flex items-center gap-2 text-xs text-fg select-none cursor-pointer"
-            >
-              <Star
-                className={cn(
-                  'h-3.5 w-3.5',
-                  starred ? 'fill-accent text-accent' : 'text-fg-muted',
-                )}
+          <div className="divide-y divide-border/70 rounded-control border border-border bg-panel/60 px-3">
+            <div className="flex items-center justify-between gap-3 py-2">
+              <label
+                htmlFor="link-starred"
+                className="flex items-center gap-2 text-xs text-fg select-none cursor-pointer"
+              >
+                <Star
+                  className={cn(
+                    'h-3.5 w-3.5',
+                    starred ? 'fill-accent text-accent' : 'text-fg-muted',
+                  )}
+                />
+                <span>Starred / Highlighted</span>
+              </label>
+              <Switch
+                id="link-starred"
+                checked={starred}
+                onCheckedChange={setStarred}
               />
-              <span>Starred / Highlighted</span>
-            </label>
-            <Switch
-              id="link-starred"
-              checked={starred}
-              onCheckedChange={setStarred}
-            />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 py-2">
+              <label
+                htmlFor="link-pinned-dock"
+                className="flex items-center gap-2 text-xs text-fg select-none cursor-pointer"
+              >
+                <Pin
+                  className={cn(
+                    'h-3.5 w-3.5',
+                    pinnedToDock ? 'text-accent' : 'text-fg-muted',
+                  )}
+                />
+                <span>Pin to Quick Launch</span>
+              </label>
+              <Switch
+                id="link-pinned-dock"
+                checked={pinnedToDock}
+                onCheckedChange={setPinnedToDock}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 py-2">
+              <label
+                htmlFor="link-checked"
+                className="flex items-center gap-2 text-xs text-fg select-none cursor-pointer"
+              >
+                <Check
+                  className={cn(
+                    'h-3.5 w-3.5',
+                    checked ? 'text-accent' : 'text-fg-muted',
+                  )}
+                />
+                <span>Marked Done / Bought</span>
+              </label>
+              <Switch
+                id="link-checked"
+                checked={checked}
+                onCheckedChange={setChecked}
+              />
+            </div>
           </div>
 
           <ProductFieldsSection

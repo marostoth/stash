@@ -103,7 +103,7 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
       slamTimerRef.current = setTimeout(() => {
         setSlamActive(false);
         slamTimerRef.current = null;
-      }, 560);
+      }, 720);
     });
   };
 
@@ -253,14 +253,14 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
             <motion.div
               animate={
                 slamActive && arcade && (settings.fxDeskJolt ?? true)
-                  ? { x: [0, 6, 0], scale: [1, 0.985, 1] }
+                  ? { x: [0, 8, -1.5, 0], scale: [1, 0.98, 1.005, 1] }
                   : { x: 0, scale: 1 }
               }
               transition={{
-                duration: 0.28,
-                delay: 0.04,
-                times: [0, 0.34, 1],
-                ease: [0.22, 1, 0.36, 1],
+                duration: 0.38,
+                delay: 0.065,
+                times: [0, 0.28, 0.66, 1],
+                ease: [0.22, 0.85, 0.34, 1],
               }}
               className="hidden w-24 shrink-0 rounded-card border border-border/75 bg-card/75 px-2.5 py-2.5 opacity-80 sm:block"
             >

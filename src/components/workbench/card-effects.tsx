@@ -35,8 +35,8 @@ export function StarredCardAccents({
       <span
         aria-hidden="true"
         className={cn(
-          'pointer-events-none absolute right-2 top-2 z-[12] flex items-center justify-center text-accent opacity-90 transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0',
-          viewMode === 'cover' && 'rounded-full bg-panel/95 p-1',
+          'pointer-events-none absolute right-1.5 top-1.5 z-[12] flex h-7 w-7 items-center justify-center text-accent opacity-90 transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0',
+          viewMode === 'cover' && 'rounded-control bg-panel/95',
         )}
       >
         <Star className="h-3.5 w-3.5 fill-accent text-accent" />
@@ -93,15 +93,25 @@ export function resolveLinkCardMotion(params: {
           : neighborJolt
             ? {
                 opacity: 1,
-                x: [0, neighborJolt.dx, 0],
-                y: [0, neighborJolt.dy, 0],
-                scale: [1, 0.988, 1],
+                x: [
+                  0,
+                  neighborJolt.dx,
+                  Number((-neighborJolt.dx * 0.18).toFixed(2)),
+                  0,
+                ],
+                y: [
+                  0,
+                  neighborJolt.dy,
+                  Number((-neighborJolt.dy * 0.18).toFixed(2)),
+                  0,
+                ],
+                scale: [1, 0.98, 1.006, 1],
                 rotate: 0,
               }
             : { opacity: 1, x: 0, y: 0, rotate: 0, scale: 1 };
 
   const transition = vaporizing
-    ? { duration: arcade ? 0.17 : 0.11, ease: 'easeIn' as const }
+    ? { duration: arcade ? 0.29 : 0.16, ease: 'easeIn' as const }
     : isHighlighted && arcade
       ? ARCADE_HEADSHAKE_TRANSITION
       : isSettling && arcade
@@ -110,13 +120,16 @@ export function resolveLinkCardMotion(params: {
           ? TACTILE_SETTLE_TRANSITION
           : neighborJolt
             ? {
-                duration: 0.28,
+                duration: 0.38,
                 delay: neighborJolt.delaySec,
-                times: [0, 0.32, 1],
-                ease: [0.22, 1, 0.36, 1] as const,
+                times: [0, 0.28, 0.66, 1],
+                ease: [0.22, 0.85, 0.34, 1] as const,
               }
             : tactile && cascadeActive
-              ? { ...TACTILE_SPRING, delay: computeCascadeDelay(index) }
+              ? {
+                  ...TACTILE_SPRING,
+                  delay: computeCascadeDelay(index, arcade ? 0.055 : 0.038),
+                }
               : TACTILE_SPRING;
 
   return { animate, transition };
@@ -163,7 +176,7 @@ export function useNeighborJolt(
     setJolt({ ...vec, seq: settledImpact.seq });
     const clearTimer = setTimeout(() => {
       setJolt((prev) => (prev?.seq === settledImpact.seq ? null : prev));
-    }, 340);
+    }, 620);
     return () => clearTimeout(clearTimer);
   }, [cardRef, collectionId, enabled, linkId, settledImpact]);
 
@@ -171,12 +184,12 @@ export function useNeighborJolt(
 }
 
 const STAR_SPARK_RAYS = [
-  { angle: -155, dist: 18 },
-  { angle: -120, dist: 22 },
-  { angle: -75, dist: 20 },
-  { angle: -25, dist: 16 },
-  { angle: 135, dist: 16 },
-  { angle: 175, dist: 20 },
+  { angle: -155, dist: 24 },
+  { angle: -120, dist: 28 },
+  { angle: -75, dist: 26 },
+  { angle: -25, dist: 22 },
+  { angle: 135, dist: 22 },
+  { angle: 175, dist: 26 },
 ] as const;
 
 /**
@@ -214,9 +227,9 @@ export function StarShimmerOverlay({
                 return (
                   <motion.span
                     key={ray.angle}
-                    initial={{ x: 0, y: 0, scale: 0.4, opacity: 0.95 }}
+                    initial={{ x: 0, y: 0, scale: 0.45, opacity: 0.95 }}
                     animate={{ x: tx, y: ty, scale: 0, opacity: 0 }}
-                    transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+                    transition={{ duration: 0.62, ease: [0.16, 0.84, 0.3, 1] }}
                     className="absolute h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent"
                     style={{
                       boxShadow:
@@ -265,8 +278,8 @@ export function DeleteVaporPuff({ active }: { active: boolean }) {
                 opacity: 0,
               }}
               transition={{
-                duration: 0.2,
-                delay: i * 0.008,
+                duration: 0.44,
+                delay: i * 0.018,
                 ease: 'easeOut',
               }}
               style={{

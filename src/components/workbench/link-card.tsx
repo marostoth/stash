@@ -4,7 +4,10 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { CoverCardBanner } from '@/components/CoverCardBanner';
 import { LinkFavicon } from '@/components/LinkFavicon';
-import { CardActionDrawer } from '@/components/workbench/card-action-drawer';
+import {
+  CardActionDrawer,
+  useActionDrawerHover,
+} from '@/components/workbench/card-action-drawer';
 import {
   CardTagsRow,
   DeleteVaporPuff,
@@ -172,7 +175,8 @@ export const LinkCard = memo(function LinkCard({
     event: React.PointerEvent<HTMLAnchorElement>,
   ) => {
     if (!hoverPreviews || isDragging) return;
-    const rect = event.currentTarget.getBoundingClientRect();
+    const { top, right, bottom, left, width, height } =
+      event.currentTarget.getBoundingClientRect();
     schedulePreview({
       id: `link:${link.id}`,
       url: link.url,
@@ -180,14 +184,7 @@ export const LinkCard = memo(function LinkCard({
       note: link.note || undefined,
       tags: link.tags,
       faviconUrl: link.faviconUrl,
-      anchor: {
-        top: rect.top,
-        right: rect.right,
-        bottom: rect.bottom,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-      },
+      anchor: { top, right, bottom, left, width, height },
       preferredSide: 'bottom',
     });
   };
@@ -223,7 +220,7 @@ export const LinkCard = memo(function LinkCard({
 
     if (tactile) {
       setVaporizing(true);
-      await new Promise((resolve) => setTimeout(resolve, arcade ? 175 : 120));
+      await new Promise((resolve) => setTimeout(resolve, arcade ? 280 : 155));
     }
 
     const deleted = await stashRepo.deleteLink(snapshot.id);
@@ -261,7 +258,8 @@ export const LinkCard = memo(function LinkCard({
       neighborJolt,
     });
 
-  const wakeDelayMs = Math.min(index, 14) * 34;
+  const drawerHover = useActionDrawerHover(dismissPreview);
+  const wakeDelayMs = Math.min(index, 14) * 62;
 
   return (
     /* Outer wrapper strictly owns @dnd-kit/react ref & transforms — never apply Motion transforms here */
@@ -330,8 +328,14 @@ export const LinkCard = memo(function LinkCard({
                 : undefined
             }
             onPointerEnter={foil.handlePointerEnter}
-            onPointerMove={foil.handlePointerMove}
-            onPointerLeave={foil.handlePointerLeave}
+            onPointerMove={(event) => {
+              foil.handlePointerMove(event);
+              drawerHover.handleCardPointerMove(event);
+            }}
+            onPointerLeave={() => {
+              foil.handlePointerLeave();
+              drawerHover.handleCardPointerLeave();
+            }}
             className={cn(
               'group relative z-[1] h-full rounded-card border border-border bg-card transition-all hover:border-accent/45 hover:bg-card-hover',
               isStarred && !isChecked && 'stash-card-starred',
@@ -477,7 +481,7 @@ export const LinkCard = memo(function LinkCard({
               starred={isStarred}
               checked={isChecked}
               motionMode={motionMode}
-              onEnterDrawer={dismissPreview}
+              drawer={drawerHover}
               onToggleChecked={() => void handleToggleChecked()}
               onToggleStar={() => void handleToggleStar()}
               onEdit={() => openEditLink(link)}

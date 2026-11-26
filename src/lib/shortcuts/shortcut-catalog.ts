@@ -45,24 +45,26 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
     items: [
       {
         id: 'focus-search',
-        keys: ['/'],
-        label: 'Focus search bar',
+        keys: ['/', 'Ctrl+K'],
+        joiner: '/',
+        label: 'Focus live search bar',
       },
       {
         id: 'navigate-cards',
-        keys: ['↑', '↓'],
+        keys: ['↑', '↓', '←', '→'],
         joiner: '/',
-        label: 'Move keyboard selection across filtered cards',
+        label: 'Glide keyboard spotlight across visible links',
       },
       {
         id: 'open-selected',
         keys: ['Enter'],
-        label: 'Open selected link',
+        label: 'Open spotlighted link',
       },
       {
         id: 'clear-or-close',
         keys: ['Esc'],
-        label: 'Clear search, clear Starred filter, or close active modal',
+        label:
+          'Clear search, Smart Views, Starred filter, multi-select, or close modal',
       },
       {
         id: 'open-shortcuts',
@@ -83,15 +85,33 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
   },
   {
     id: 'cards-previews',
-    title: 'Cards & Previews',
+    title: 'Cards, Selection & Editing',
     subtitle:
-      'Quickly inspect saved pages and drop open browser tabs into collections.',
+      'Inspect pages, batch-organize links, and edit shopping specs without leaving the board.',
     items: [
       {
         id: 'instant-preview',
         keys: ['Space'],
         qualifier: 'on card hover/focus',
         label: 'Instant peek preview',
+      },
+      {
+        id: 'multi-select',
+        keys: ['Alt', 'Click'],
+        joiner: '+',
+        label: 'Toggle multi-select & open Bulk Action Bar',
+      },
+      {
+        id: 'range-select',
+        keys: ['Shift', 'Click'],
+        joiner: '+',
+        label: 'Select a contiguous range of visible links',
+      },
+      {
+        id: 'inline-details-edit',
+        keys: ['Click'],
+        qualifier: 'Details Spec or Price cell',
+        label: 'Edit product spec, note, or unit price inline',
       },
       {
         id: 'drag-open-tab',

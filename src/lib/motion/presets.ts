@@ -124,23 +124,23 @@ export const MODAL_SPRING = {
 };
 
 export const ARCADE_SQUASH_KEYFRAMES = {
-  scale: [1.07, 0.96, 1.008, 1],
-  y: [-7, 2.5, -0.5, 0],
+  scale: [1.08, 0.952, 1.01, 1],
+  y: [-7, 3, -0.8, 0],
 };
 
 export const ARCADE_SQUASH_TRANSITION = {
-  duration: 0.34,
-  times: [0, 0.24, 0.64, 1],
+  duration: 0.37,
+  times: [0, 0.22, 0.62, 1],
   ease: [0.22, 1, 0.36, 1] as const,
 };
 
 export const TACTILE_SETTLE_KEYFRAMES = {
-  scale: [1.022, 0.992, 1],
-  y: [-2, 0.5, 0],
+  scale: [1.024, 0.99, 1],
+  y: [-2.5, 0.6, 0],
 };
 
 export const TACTILE_SETTLE_TRANSITION = {
-  duration: 0.22,
+  duration: 0.26,
   times: [0, 0.42, 1],
   ease: 'easeOut' as const,
 };
@@ -173,8 +173,8 @@ export interface NeighborJoltVector {
 export function computeNeighborJolt(
   impact: Point2D,
   neighbor: Point2D,
-  maxDisplacementPx = 7,
-  radiusPx = 460,
+  maxDisplacementPx = 9,
+  radiusPx = 580,
 ): NeighborJoltVector | null {
   const rawDx = neighbor.x - impact.x;
   const rawDy = neighbor.y - impact.y;
@@ -182,11 +182,13 @@ export function computeNeighborJolt(
   if (!Number.isFinite(dist) || dist < 12 || dist > radiusPx) {
     return null;
   }
-  const falloff = (1 - dist / radiusPx) ** 1.4;
-  const magnitude = Math.max(1.2, maxDisplacementPx * falloff);
+  const falloff = (1 - dist / radiusPx) ** 1.35;
+  const magnitude = Math.max(1.5, maxDisplacementPx * falloff);
   const dx = Number(((rawDx / dist) * magnitude).toFixed(2));
   const dy = Number(((rawDy / dist) * magnitude).toFixed(2));
-  const delaySec = Number(Math.min(0.11, (dist / radiusPx) * 0.095).toFixed(3));
+  const delaySec = Number(
+    Math.min(0.16, 0.025 + (dist / radiusPx) * 0.135).toFixed(3),
+  );
   return { dx, dy, delaySec };
 }
 

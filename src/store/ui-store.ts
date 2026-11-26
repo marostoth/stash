@@ -316,7 +316,7 @@ export const useUiStore = create<UiStoreState>((set) => ({
         state.settledLinkId === linkId ? { settledLinkId: null } : state,
       );
       settleTimer = null;
-    }, 560);
+    }, 720);
   },
 
   addTaggingLink: (linkId) =>
@@ -353,7 +353,7 @@ export const useUiStore = create<UiStoreState>((set) => ({
           (id) => id !== collectionId,
         ),
       }));
-    }, 520);
+    }, 1050);
     cascadeTimers.set(collectionId, timer);
   },
 

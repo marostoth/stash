@@ -74,7 +74,7 @@ export const useFxStore = create<FxStoreState>((set) => ({
           state.settledImpact?.seq === seq ? { settledImpact: null } : state,
         );
         impactTimer = null;
-      }, 420);
+      }, 640);
     });
   },
 
@@ -88,7 +88,7 @@ export const useFxStore = create<FxStoreState>((set) => ({
           : state,
       );
       wakeTimer = null;
-    }, 900);
+    }, 1700);
   },
 
   triggerCollectionSlam: (collectionId) => {
@@ -101,7 +101,7 @@ export const useFxStore = create<FxStoreState>((set) => ({
           : state,
       );
       slamColTimer = null;
-    }, 520);
+    }, 860);
   },
 
   setSessionSweeping: (sweeping) => set({ sessionSweeping: sweeping }),
@@ -116,7 +116,7 @@ export const useFxStore = create<FxStoreState>((set) => ({
         state.swallowedSpace?.seq === seq ? { swallowedSpace: null } : state,
       );
       swallowTimer = null;
-    }, 680);
+    }, 950);
   },
 
   setSpaceSlideDirection: (direction) =>
@@ -130,6 +130,6 @@ export const useFxStore = create<FxStoreState>((set) => ({
         state.starFlashLinkId === linkId ? { starFlashLinkId: null } : state,
       );
       starFlashTimer = null;
-    }, 620);
+    }, 860);
   },
 }));

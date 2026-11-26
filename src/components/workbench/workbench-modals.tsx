@@ -1,0 +1,162 @@
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { StashErrorBoundary } from '@/components/ui/error-boundary';
+import { CollectionModal } from '@/components/workbench/collection-modal';
+import { LinkPreviewPopover } from '@/components/workbench/link-preview-popover';
+import { QuickEditModal } from '@/components/workbench/quick-edit-modal';
+import type {
+  CategorizationRule,
+  Collection,
+  LinkItem,
+  Space,
+  StashSettings,
+  ThemeDefinition,
+} from '@/lib/types/stash';
+import { useUiStore } from '@/store/ui-store';
+
+const SettingsModal = lazy(() =>
+  import('@/components/settings/settings-modal').then((m) => ({
+    default: m.SettingsModal,
+  })),
+);
+
+const HealthCheckModal = lazy(() =>
+  import('@/components/HealthCheckModal').then((m) => ({
+    default: m.HealthCheckModal,
+  })),
+);
+
+const ReorganizeModal = lazy(() =>
+  import('@/components/reorganize/ReorganizeModal').then((m) => ({
+    default: m.ReorganizeModal,
+  })),
+);
+
+const TriageModal = lazy(() =>
+  import('@/components/workbench/triage-modal').then((m) => ({
+    default: m.TriageModal,
+  })),
+);
+
+interface WorkbenchModalsProps {
+  spaces: readonly Space[];
+  collections: readonly Collection[];
+  links: readonly LinkItem[];
+  rules: readonly CategorizationRule[];
+  settings: StashSettings;
+  allThemes: readonly ThemeDefinition[];
+  activeTheme: ThemeDefinition;
+  activeSpace: Space | undefined;
+  resolvedSpaceId: string;
+  defaultCurrency: string;
+}
+
+/**
+ * Hosts lightweight workbench dialogs eagerly and lazily loads heavy feature
+ * modals (Settings, Health Check, Smart Reorganize, Auto-Categorize Triage)
+ * on first open. Sticky mount latches keep minimized background jobs alive
+ * once a modal has been opened.
+ */
+export function WorkbenchModals({
+  spaces,
+  collections,
+  links,
+  rules,
+  settings,
+  allThemes,
+  activeTheme,
+  activeSpace,
+  resolvedSpaceId,
+  defaultCurrency,
+}: WorkbenchModalsProps) {
+  const settingsOpen = useUiStore((s) => s.settingsOpen);
+  const healthCheckOpen = useUiStore((s) => s.healthCheckOpen);
+  const reorganizeOpen = useUiStore((s) => s.reorganizeOpen);
+  const triageOpen = useUiStore((s) => s.triageOpen);
+
+  const [mountedSettings, setMountedSettings] = useState(false);
+  const [mountedHealthCheck, setMountedHealthCheck] = useState(false);
+  const [mountedReorganize, setMountedReorganize] = useState(false);
+  const [mountedTriage, setMountedTriage] = useState(false);
+
+  useEffect(() => {
+    if (settingsOpen) setMountedSettings(true);
+  }, [settingsOpen]);
+
+  useEffect(() => {
+    if (healthCheckOpen) setMountedHealthCheck(true);
+  }, [healthCheckOpen]);
+
+  useEffect(() => {
+    if (reorganizeOpen) setMountedReorganize(true);
+  }, [reorganizeOpen]);
+
+  useEffect(() => {
+    if (triageOpen) setMountedTriage(true);
+  }, [triageOpen]);
+
+  return (
+    <>
+      <CollectionModal spaces={spaces} activeSpaceId={resolvedSpaceId} />
+      <QuickEditModal
+        collections={collections}
+        spaces={spaces}
+        defaultCurrency={defaultCurrency}
+      />
+
+      {mountedSettings && (
+        <StashErrorBoundary
+          scope="Settings"
+          compact
+          onReset={() => useUiStore.getState().closeSettings()}
+        >
+          <Suspense fallback={null}>
+            <SettingsModal
+              spaces={spaces}
+              collections={collections}
+              links={links}
+              rules={rules}
+              settings={settings}
+              allThemes={allThemes}
+              activeTheme={activeTheme}
+            />
+          </Suspense>
+        </StashErrorBoundary>
+      )}
+
+      {mountedHealthCheck && (
+        <Suspense fallback={null}>
+          <HealthCheckModal collections={collections} links={links} />
+        </Suspense>
+      )}
+
+      {mountedReorganize && (
+        <Suspense fallback={null}>
+          <ReorganizeModal
+            collections={collections}
+            links={links}
+            settings={settings}
+            activeSpace={activeSpace}
+          />
+        </Suspense>
+      )}
+
+      {mountedTriage && (
+        <Suspense fallback={null}>
+          <TriageModal
+            spaces={spaces}
+            collections={collections}
+            links={links}
+            rules={rules}
+            settings={settings}
+          />
+        </Suspense>
+      )}
+
+      <LinkPreviewPopover
+        hoverPreviews={settings.hoverPreviews}
+        visualPreviewsEnabled={settings.visualPreviewsEnabled}
+        motionMode={settings.motionMode}
+      />
+    </>
+  );
+}

@@ -239,6 +239,12 @@ export function BackupImportPanel({
           />
         </div>
 
+        <p className="font-mono text-[10px] text-fg-muted">
+          JSON backups stay compact by excluding locally uploaded wallpaper
+          images and custom audio clips (re-upload them on a new device if
+          needed).
+        </p>
+
         {pendingBundle && (
           <div className="space-y-2.5 rounded-control border border-accent/45 bg-panel p-3">
             <div className="text-xs font-medium text-fg">
@@ -400,7 +406,8 @@ export function BackupImportPanel({
         </div>
         <p className="font-mono text-[10px] text-fg-muted">
           Direct Chrome import requests optional bookmarks permission on click.
-          HTML import supports Chrome, Edge, Firefox, and Toby exports.
+          HTML import supports standard Netscape HTML bookmark exports (Chrome,
+          Edge, Firefox, and other bookmark managers).
         </p>
       </SettingsSectionCard>
     </div>

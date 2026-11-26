@@ -42,17 +42,18 @@ interface UseWorkbenchShortcutsOptions {
   visibleLinks: readonly LinkItem[];
   spaces: readonly Space[];
   openLinkInNewTab: boolean;
+  onSelectSpace?: (spaceId: string) => void;
 }
 
 /**
  * Global keyboard shortcuts for the Stash New Tab workbench:
  * - Ctrl/Cmd+K or `/`: focus live search
- * - 1–9: switch active Space directly
- * - ArrowDown / ArrowUp: cycle keyboard focus across visible link cards
+ * - 1–9: switch active Space directly (with directional slide)
+ * - ArrowDown / ArrowUp / ArrowLeft / ArrowRight: glide keyboard spotlight across visible links
  * - Enter: open the highlighted link card immediately
  * - Space: immediately open hovered link preview
  * - ?: toggle Keyboard Shortcuts panel
- * - Esc: dismiss preview, clear search/highlight, or clear active Starred filter
+ * - Esc: dismiss preview, clear search/spotlight, or reset Starred & Smart Views
  */
 export function useWorkbenchShortcuts({
   searchInputRef,
@@ -60,6 +61,7 @@ export function useWorkbenchShortcuts({
   visibleLinks,
   spaces,
   openLinkInNewTab,
+  onSelectSpace,
 }: UseWorkbenchShortcutsOptions): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -123,7 +125,11 @@ export function useWorkbenchShortcuts({
         const targetSpace = spaces[Number(event.key) - 1];
         if (targetSpace) {
           event.preventDefault();
-          useUiStore.getState().setActiveSpaceId(targetSpace.id);
+          if (onSelectSpace) {
+            onSelectSpace(targetSpace.id);
+          } else {
+            useUiStore.getState().setActiveSpaceId(targetSpace.id);
+          }
           return;
         }
       }
@@ -131,25 +137,37 @@ export function useWorkbenchShortcuts({
       const ui = useUiStore.getState();
       const modalOpen = isAnyModalOpen();
       const searchFocused = document.activeElement === searchInputRef.current;
+      const editableTarget = isEditableElement(event.target);
 
-      if (
-        !modalOpen &&
-        visibleLinks.length > 0 &&
-        (searchFocused || ui.keyboardFocusedLinkId !== null)
-      ) {
-        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (!modalOpen && visibleLinks.length > 0) {
+        const canCycleVertical =
+          searchFocused ||
+          ui.keyboardFocusedLinkId !== null ||
+          (!editableTarget && event.key === 'ArrowDown');
+        const canCycleHorizontal =
+          !searchFocused &&
+          !editableTarget &&
+          ui.keyboardFocusedLinkId !== null;
+
+        const moveForward =
+          (canCycleVertical && event.key === 'ArrowDown') ||
+          (canCycleHorizontal && event.key === 'ArrowRight');
+        const moveBackward =
+          (canCycleVertical && event.key === 'ArrowUp') ||
+          (canCycleHorizontal && event.key === 'ArrowLeft');
+
+        if (moveForward || moveBackward) {
           event.preventDefault();
           const currentIdx = ui.keyboardFocusedLinkId
             ? visibleLinks.findIndex((l) => l.id === ui.keyboardFocusedLinkId)
             : -1;
-          const nextIdx =
-            event.key === 'ArrowDown'
-              ? currentIdx < 0
-                ? 0
-                : (currentIdx + 1) % visibleLinks.length
-              : currentIdx <= 0
-                ? visibleLinks.length - 1
-                : currentIdx - 1;
+          const nextIdx = moveForward
+            ? currentIdx < 0
+              ? 0
+              : (currentIdx + 1) % visibleLinks.length
+            : currentIdx <= 0
+              ? visibleLinks.length - 1
+              : currentIdx - 1;
           const nextLink = visibleLinks[nextIdx];
           if (nextLink) {
             ui.setKeyboardFocusedLinkId(nextLink.id);
@@ -158,7 +176,11 @@ export function useWorkbenchShortcuts({
           return;
         }
 
-        if (event.key === 'Enter' && ui.keyboardFocusedLinkId) {
+        if (
+          event.key === 'Enter' &&
+          ui.keyboardFocusedLinkId &&
+          (searchFocused || !editableTarget)
+        ) {
           const targetLink = visibleLinks.find(
             (l) => l.id === ui.keyboardFocusedLinkId,
           );
@@ -182,7 +204,7 @@ export function useWorkbenchShortcuts({
         !event.ctrlKey &&
         !event.metaKey &&
         !event.altKey &&
-        !isEditableElement(event.target)
+        !editableTarget
       ) {
         if (!modalOpen && ui.hoveredPreviewCandidate) {
           event.preventDefault();
@@ -208,6 +230,9 @@ export function useWorkbenchShortcuts({
           if (ui.starredOnly) {
             ui.setStarredOnly(false);
           }
+          if (ui.smartFilter !== 'all') {
+            ui.setSmartFilter('all');
+          }
           return;
         }
         if (!modalOpen) {
@@ -215,8 +240,9 @@ export function useWorkbenchShortcuts({
             ui.setKeyboardFocusedLinkId(null);
             return;
           }
-          if (ui.starredOnly) {
-            ui.setStarredOnly(false);
+          if (ui.starredOnly || ui.smartFilter !== 'all') {
+            if (ui.starredOnly) ui.setStarredOnly(false);
+            if (ui.smartFilter !== 'all') ui.setSmartFilter('all');
           }
         }
       }
@@ -224,5 +250,12 @@ export function useWorkbenchShortcuts({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [hoverPreviews, openLinkInNewTab, searchInputRef, spaces, visibleLinks]);
+  }, [
+    hoverPreviews,
+    onSelectSpace,
+    openLinkInNewTab,
+    searchInputRef,
+    spaces,
+    visibleLinks,
+  ]);
 }

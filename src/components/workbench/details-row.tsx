@@ -26,6 +26,7 @@ import {
   createDebouncedWriter,
   type DebouncedWriter,
 } from '@/lib/utils/coalesce';
+import { HighlightText } from '@/lib/utils/highlight-match';
 import { normalizeCurrencyCode } from '@/lib/utils/price-math';
 import { normalizeStoreName } from '@/lib/utils/product-url';
 import { useSelectionStore } from '@/store/selection-store';
@@ -82,6 +83,7 @@ function DetailsRowView({
     (s) => s.keyboardFocusedLinkId === link.id,
   );
   const isSettling = useUiStore((s) => s.settledLinkId === link.id);
+  const searchQuery = useUiStore((s) => s.searchQuery);
   const isSelected = useSelectionStore((s) => s.selectedIds.includes(link.id));
   const selectionMode = useSelectionStore((s) => s.selectedIds.length > 0);
   const toggleSelect = useSelectionStore((s) => s.toggleSelect);
@@ -350,7 +352,7 @@ function DetailsRowView({
               : 'text-fg group-hover:text-accent',
           )}
         >
-          {link.title}
+          <HighlightText text={link.title} query={searchQuery} />
         </span>
       </a>
 

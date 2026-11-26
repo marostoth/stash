@@ -161,7 +161,7 @@ export function CustomAudioCard({
     <SettingsSectionCard
       icon={<Music className="h-4 w-4" />}
       title="Custom Audio Clips (.mp3 / .wav / .ogg)"
-      subtitle="Drop in your own recorded sound effects for any slot (up to 512 KB each). Unfilled slots automatically use your active Sound Pack above."
+      subtitle="Drop in your own recorded sound effects for any slot (up to 512 KB each). Unfilled slots automatically use your active Sound Pack above. Clips stay local on this device and are not included in JSON backups."
       badge={{
         label: uploadedCount > 0 ? `${uploadedCount} / 7 custom` : 'Optional',
         tone: uploadedCount > 0 && overridesEnabled ? 'accent' : 'neutral',
