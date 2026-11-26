@@ -273,6 +273,14 @@ export function CollectionSection({
                   SESSION
                 </span>
               )}
+              {collection.isAutoInbox && (
+                <span
+                  title="Temporary Space Inbox — auto-removes once empty; rename to keep permanently"
+                  className="hidden shrink-0 rounded-pill border border-border bg-canvas px-2 py-0.5 font-mono text-[10px] text-fg-muted sm:inline-block"
+                >
+                  AUTO-CLEANS
+                </span>
+              )}
               {collectionTotalText && (
                 <span className="shrink-0 rounded-pill border border-border bg-panel px-2 py-0.5 font-mono text-[10px] text-fg">
                   {collectionTotalText}

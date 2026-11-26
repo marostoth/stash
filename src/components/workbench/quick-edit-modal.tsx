@@ -11,7 +11,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input, Select, Textarea } from '@/components/ui/input';
-import { SpaceGroupedCollectionOptions } from '@/components/ui/space-grouped-collection-options';
+import {
+  parseSpaceInboxValue,
+  SpaceGroupedCollectionOptions,
+} from '@/components/ui/space-grouped-collection-options';
 import { Switch } from '@/components/ui/switch';
 import {
   buildProductMetaFromDraft,
@@ -115,6 +118,11 @@ export function QuickEditModal({
     }
     if (!collectionId) return;
 
+    const targetSpaceForInbox = parseSpaceInboxValue(collectionId);
+    const resolvedCollectionId = targetSpaceForInbox
+      ? (await stashRepo.getOrCreateSpaceInbox(targetSpaceForInbox)).id
+      : collectionId;
+
     if (modal?.mode === 'edit') {
       const tagsChanged =
         tagsTouched ||
@@ -123,7 +131,7 @@ export function QuickEditModal({
 
       const nextProduct = buildProductMetaFromDraft(productDraft);
       const result = await stashRepo.updateLink(modal.link.id, {
-        collectionId,
+        collectionId: resolvedCollectionId,
         url: normalizedUrl,
         title,
         note,
@@ -135,7 +143,10 @@ export function QuickEditModal({
 
       if (!result.ok) {
         if (result.reason === 'duplicate') {
-          await revealDuplicateCard(result.existingLink.id, collectionId);
+          await revealDuplicateCard(
+            result.existingLink.id,
+            resolvedCollectionId,
+          );
           return;
         }
         toast.error('Could not update link');
@@ -150,7 +161,7 @@ export function QuickEditModal({
     const nextProduct = buildProductMetaFromDraft(productDraft);
     const hasManualTags = parsedTags.length > 0;
     const result = await stashRepo.addLink({
-      collectionId,
+      collectionId: resolvedCollectionId,
       url: normalizedUrl,
       title,
       note,
@@ -161,7 +172,7 @@ export function QuickEditModal({
     });
 
     if (!result.ok) {
-      await revealDuplicateCard(result.existingLink.id, collectionId);
+      await revealDuplicateCard(result.existingLink.id, resolvedCollectionId);
       return;
     }
 

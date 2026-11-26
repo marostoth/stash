@@ -75,7 +75,7 @@ export function QuickStashCollectionPicker({
         ) : null}
       </div>
 
-      {spaces.length > 1 && orderedCollections.length > 0 ? (
+      {spaces.length > 1 ? (
         <Select
           aria-label="Target collection"
           value={selectedCollectionId}

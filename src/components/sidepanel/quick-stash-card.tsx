@@ -5,17 +5,10 @@ import { QuickStashCollectionPicker } from '@/components/sidepanel/quick-stash-c
 import { QuickStashProductPanel } from '@/components/sidepanel/quick-stash-product-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { parseSpaceInboxValue } from '@/components/ui/space-grouped-collection-options';
+import { useQuickStashCategorizer } from '@/hooks/use-quick-stash-categorizer';
 import { useQuickStashProduct } from '@/hooks/use-quick-stash-product';
 import { playDrop, playError } from '@/lib/audio/foley';
-import { categorizeLink } from '@/lib/categorizer/categorizer';
-import { matchFromLibraryMemory } from '@/lib/categorizer/library-matcher';
-import {
-  acquireWarmNanoSession,
-  type NanoCategorizerSession,
-  releaseWarmNanoSession,
-} from '@/lib/categorizer/nano-engine';
-import { evaluateTier1Rules } from '@/lib/categorizer/rules-engine';
-import type { CategorizationSuggestion } from '@/lib/categorizer/types';
 import { stashRepo } from '@/lib/storage/repo';
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
 import { closeTabs } from '@/lib/tabs/tab-actions';
@@ -55,11 +48,6 @@ export function QuickStashCard({
   const [note, setNote] = useState('');
   const [tagsRaw, setTagsRaw] = useState('');
   const [tagsEditedByUser, setTagsEditedByUser] = useState(false);
-  const [suggestion, setSuggestion] = useState<CategorizationSuggestion | null>(
-    null,
-  );
-  const [categorizing, setCategorizing] = useState(false);
-  const [enrichingTags, setEnrichingTags] = useState(false);
   const [saving, setSaving] = useState(false);
   const [faviconFailed, setFaviconFailed] = useState(false);
   const [creatingName, setCreatingName] = useState<string | null>(null);
@@ -81,131 +69,32 @@ export function QuickStashCard({
     return [...regular, ...sessions];
   }, [collections]);
 
-  // Keep latest library state in refs so background storage updates do not abort/restart Nano
-  const latestDataRef = useRef({
+  const { suggestion, categorizing, enrichingTags } = useQuickStashCategorizer({
+    tabUrl: activeTab?.url ?? '',
+    tabTitle: activeTab?.title ?? '',
+    loadingData,
+    enableOnDeviceAi: settings.enableOnDeviceAi,
     rules,
     collections,
+    orderedCollections,
     links,
     spaces,
-    orderedCollections,
+    onResetTab: () => {
+      setFaviconFailed(false);
+      setNote('');
+      setTagsRaw('');
+      setTagsEditedByUser(false);
+      userPickedCollectionRef.current = false;
+      userEditedNoteRef.current = false;
+      userEditedTagsRef.current = false;
+    },
+    onSelectCollection: setSelectedCollectionId,
+    onFillNote: setNote,
+    onFillTags: setTagsRaw,
+    hasUserPickedCollection: () => userPickedCollectionRef.current,
+    hasUserEditedNote: () => userEditedNoteRef.current,
+    hasUserEditedTags: () => userEditedTagsRef.current,
   });
-  latestDataRef.current = {
-    rules,
-    collections,
-    links,
-    spaces,
-    orderedCollections,
-  };
-
-  const tabUrl = activeTab?.url ?? '';
-  const tabTitle = activeTab?.title ?? '';
-
-  // Run instant Tier 1 / Tier 1.5 matching on frame 0, then optional Nano enrichment
-  useEffect(() => {
-    setFaviconFailed(false);
-    setNote('');
-    setTagsRaw('');
-    setTagsEditedByUser(false);
-    setSuggestion(null);
-    setCategorizing(false);
-    setEnrichingTags(false);
-    userPickedCollectionRef.current = false;
-    userEditedNoteRef.current = false;
-    userEditedTagsRef.current = false;
-
-    if (!tabUrl || loadingData) return;
-
-    const {
-      rules: curRules,
-      collections: curCols,
-      links: curLinks,
-      spaces: curSpaces,
-      orderedCollections: curOrdered,
-    } = latestDataRef.current;
-
-    const target = { url: tabUrl, title: tabTitle };
-    const validIds = new Set(curCols.map((c) => c.id));
-
-    // Tier 1 rules: instant 0ms short-circuit (no Nano needed)
-    const instantRule = evaluateTier1Rules(target, curRules, validIds);
-    if (instantRule) {
-      setSuggestion(instantRule);
-      if (instantRule.collectionId) {
-        setSelectedCollectionId(instantRule.collectionId);
-      }
-      if (instantRule.tags.length > 0) {
-        setTagsRaw(instantRule.tags.join(', '));
-      }
-      return;
-    }
-
-    // Tier 1.5 Library Memory: lock collection immediately in 0ms
-    const instantLibrary = matchFromLibraryMemory(target, curCols, curLinks);
-    if (instantLibrary) {
-      setSelectedCollectionId(instantLibrary.collectionId);
-      setSuggestion({
-        source: 'library',
-        collectionId: instantLibrary.collectionId,
-        matchedLibraryReason: instantLibrary.reason,
-        tags: [],
-      });
-      if (!settings.enableOnDeviceAi) return;
-      setEnrichingTags(true);
-    } else {
-      if (!settings.enableOnDeviceAi) {
-        if (curOrdered[0]) setSelectedCollectionId(curOrdered[0].id);
-        return;
-      }
-      setCategorizing(true);
-    }
-
-    const controller = new AbortController();
-
-    const runSuggestion = async () => {
-      let warmSession: NanoCategorizerSession | null = null;
-      try {
-        warmSession = await acquireWarmNanoSession(controller.signal);
-        if (controller.signal.aborted) return;
-        const result = await categorizeLink(target, {
-          rules: curRules,
-          collections: curCols,
-          links: curLinks,
-          spaces: curSpaces,
-          enableOnDeviceAi: settings.enableOnDeviceAi,
-          enrichLibraryMatchWithNano: true,
-          nanoSession: warmSession,
-          signal: controller.signal,
-        });
-        if (controller.signal.aborted) return;
-        setSuggestion(result);
-        if (!userPickedCollectionRef.current) {
-          if (result.collectionId) {
-            setSelectedCollectionId(result.collectionId);
-          } else if (curOrdered[0]) {
-            setSelectedCollectionId(curOrdered[0].id);
-          }
-        }
-        if (result.tags.length > 0 && !userEditedTagsRef.current) {
-          setTagsRaw(result.tags.join(', '));
-        }
-        if (result.summaryNote && !userEditedNoteRef.current) {
-          setNote(result.summaryNote);
-        }
-      } finally {
-        releaseWarmNanoSession(warmSession);
-        if (!controller.signal.aborted) {
-          setCategorizing(false);
-          setEnrichingTags(false);
-        }
-      }
-    };
-
-    void runSuggestion();
-
-    return () => {
-      controller.abort();
-    };
-  }, [tabUrl, tabTitle, loadingData, settings.enableOnDeviceAi]);
 
   // Keep a valid default selection if collections arrive after mount
   useEffect(() => {
@@ -220,6 +109,7 @@ export function QuickStashCard({
 
   const alreadyInSelected = useMemo(() => {
     if (!activeTab || !selectedCollectionId) return false;
+    if (parseSpaceInboxValue(selectedCollectionId)) return false;
     return Boolean(
       stashRepo.findDuplicateInList(
         links,
@@ -248,7 +138,12 @@ export function QuickStashCard({
     if (!activeTab || saving) return;
 
     let targetId = selectedCollectionId;
-    if (!targetId) {
+    const targetSpaceForInbox = parseSpaceInboxValue(targetId);
+    if (targetSpaceForInbox) {
+      const inbox = await stashRepo.getOrCreateSpaceInbox(targetSpaceForInbox);
+      targetId = inbox.id;
+      setSelectedCollectionId(targetId);
+    } else if (!targetId) {
       const created = await stashRepo.createCollection({ name: 'Saved Links' });
       targetId = created.id;
       setSelectedCollectionId(targetId);

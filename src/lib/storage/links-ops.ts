@@ -6,6 +6,7 @@ import type {
   UpdateLinkInput,
   UpdateLinkResult,
 } from '@/lib/storage/repo-types';
+import { pruneEmptyAutoInboxesInStorage } from '@/lib/storage/spaces-ops';
 import type { LinkItem, ProductMeta } from '@/lib/types/stash';
 import {
   insertLinkAtIndexInList,
@@ -195,9 +196,11 @@ export async function updateLinkInStorage(
     updatedAt: nowIso(),
   };
 
-  await linksStorage.setValue(
-    existing.map((item) => (item.id === id ? updated : item)),
-  );
+  const nextLinks = existing.map((item) => (item.id === id ? updated : item));
+  await linksStorage.setValue(nextLinks);
+  if (current.collectionId !== targetCollectionId) {
+    await pruneEmptyAutoInboxesInStorage([current.collectionId], nextLinks);
+  }
   return { ok: true, link: updated };
 }
 
@@ -231,6 +234,9 @@ export async function moveOrReorderLinkInStorage(
   targetIndex?: number,
 ): Promise<MoveLinkResult> {
   const existing = await linksStorage.getValue();
+  const previousCollectionId = existing.find(
+    (item) => item.id === linkId,
+  )?.collectionId;
   const result: MoveLinkListResult = moveOrReorderLinkInList(
     existing,
     linkId,
@@ -240,6 +246,9 @@ export async function moveOrReorderLinkInStorage(
   );
   if (!result.ok) return result;
   await linksStorage.setValue(result.links);
+  if (previousCollectionId && previousCollectionId !== targetCollectionId) {
+    await pruneEmptyAutoInboxesInStorage([previousCollectionId], result.links);
+  }
   return { ok: true, link: result.link };
 }
 

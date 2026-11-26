@@ -83,6 +83,7 @@ export function Workbench() {
     useWorkbenchDnd({
       soundEffects: settings.soundEffects,
       motionMode: settings.motionMode,
+      onSwitchSpace: setActiveSpaceId,
     });
 
   // Hydrate initial search query when opened from Chrome's `s <query>` omnibox
@@ -237,8 +238,9 @@ export function Workbench() {
                         yet
                       </p>
                       <p className="mt-1 text-xs text-fg-muted">
-                        Create a collection here or move an existing collection
-                        from another Space via its menu.
+                        Create a collection here, or drag any card, tab, or
+                        collection onto the {activeSpace?.name ?? 'Space'} tab
+                        above.
                       </p>
                       <Button
                         variant="primary"

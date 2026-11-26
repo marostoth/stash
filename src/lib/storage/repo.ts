@@ -62,6 +62,7 @@ import {
   createSpaceInStorage,
   deleteSpaceInStorage,
   getActiveSpaceIdFromStorage,
+  getOrCreateSpaceInboxInStorage,
   getSpacesFromStorage,
   moveCollectionToSpaceInStorage,
   normalizeCollectionsSpaceIds,
@@ -121,6 +122,8 @@ export const stashRepo = {
     targetSpaceId: string,
   ): Promise<Collection | null> =>
     moveCollectionToSpaceInStorage(collectionId, targetSpaceId),
+  getOrCreateSpaceInbox: (spaceId: string): Promise<Collection> =>
+    getOrCreateSpaceInboxInStorage(spaceId),
 
   async getCollections(): Promise<Collection[]> {
     const [spaces, raw] = await Promise.all([
@@ -165,6 +168,7 @@ export const stashRepo = {
       order: maxOrder + 1,
       collapsed: false,
       isSession: input.isSession,
+      ...(input.isAutoInbox ? { isAutoInbox: true } : {}),
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -180,11 +184,16 @@ export const stashRepo = {
     let updated: Collection | null = null;
     const next = existing.map((item) => {
       if (item.id !== id) return item;
+      const nextName =
+        patch.name !== undefined ? patch.name.trim() || item.name : item.name;
+      const renamedAwayFromInbox =
+        patch.name !== undefined &&
+        nextName.toLowerCase() !== 'inbox' &&
+        item.isAutoInbox === true;
       updated = {
         ...item,
-        ...(patch.name !== undefined
-          ? { name: patch.name.trim() || item.name }
-          : {}),
+        name: nextName,
+        ...(renamedAwayFromInbox ? { isAutoInbox: undefined } : {}),
         ...(patch.description !== undefined
           ? { description: patch.description.trim() || undefined }
           : {}),

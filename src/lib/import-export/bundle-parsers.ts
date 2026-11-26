@@ -159,6 +159,7 @@ export function parseCollection(
     order: typeof obj.order === 'number' ? obj.order : fallbackOrder,
     collapsed: Boolean(obj.collapsed),
     isSession: obj.isSession === true ? true : undefined,
+    isAutoInbox: obj.isAutoInbox === true ? true : undefined,
     createdAt: typeof obj.createdAt === 'string' ? obj.createdAt : now,
     updatedAt: typeof obj.updatedAt === 'string' ? obj.updatedAt : now,
   };

@@ -33,6 +33,11 @@ export type DropTargetData =
   | {
       kind: 'collection-drop';
       collectionId: string;
+    }
+  | {
+      kind: 'space-drop';
+      spaceId: string;
+      spaceName: string;
     };
 
 export function isDragItemData(value: unknown): value is DragItemData {
@@ -44,5 +49,10 @@ export function isDragItemData(value: unknown): value is DragItemData {
 export function isDropTargetData(value: unknown): value is DropTargetData {
   if (!value || typeof value !== 'object') return false;
   const kind = (value as { kind?: unknown }).kind;
-  return kind === 'link' || kind === 'collection' || kind === 'collection-drop';
+  return (
+    kind === 'link' ||
+    kind === 'collection' ||
+    kind === 'collection-drop' ||
+    kind === 'space-drop'
+  );
 }

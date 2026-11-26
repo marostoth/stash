@@ -88,6 +88,7 @@ export interface Collection {
   order: number;
   collapsed: boolean;
   isSession?: boolean;
+  isAutoInbox?: boolean;
   createdAt: string;
   updatedAt: string;
 }

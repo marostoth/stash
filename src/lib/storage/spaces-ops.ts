@@ -1,6 +1,7 @@
 import {
   activeSpaceIdStorage,
   collectionsStorage,
+  linksStorage,
   spacesStorage,
 } from '@/lib/storage/items';
 import type {
@@ -235,4 +236,103 @@ export async function moveCollectionToSpaceInStorage(
   if (!moved) return null;
   await collectionsStorage.setValue(next);
   return moved;
+}
+
+/**
+ * Finds an existing Inbox collection in `spaceId` (preferring an auto-Inbox or
+ * a non-session collection named "Inbox"), or creates a lightweight ephemeral
+ * `Inbox` at the top of that Space that auto-deletes once emptied.
+ */
+export async function getOrCreateSpaceInboxInStorage(
+  spaceId: string,
+): Promise<Collection> {
+  const [spaces, rawCollections] = await Promise.all([
+    getSpacesFromStorage(),
+    collectionsStorage.getValue(),
+  ]);
+  const resolvedSpaceId = spaces.some((s) => s.id === spaceId)
+    ? spaceId
+    : (spaces[0]?.id ?? DEFAULT_SPACE_ID);
+
+  const normalized = normalizeCollectionsSpaceIds(rawCollections, spaces);
+  const existing = normalized.find(
+    (col) =>
+      !col.isSession &&
+      col.spaceId === resolvedSpaceId &&
+      (col.isAutoInbox === true || col.name.trim().toLowerCase() === 'inbox'),
+  );
+  if (existing) {
+    if (existing.collapsed) {
+      const updated = { ...existing, collapsed: false, updatedAt: nowIso() };
+      await collectionsStorage.setValue(
+        rawCollections.map((c) => (c.id === existing.id ? updated : c)),
+      );
+      return updated;
+    }
+    return existing;
+  }
+
+  const timestamp = nowIso();
+  const created: Collection = {
+    id: crypto.randomUUID(),
+    name: 'Inbox',
+    color: 'cyan',
+    icon: 'inbox',
+    spaceId: resolvedSpaceId,
+    order: 0,
+    collapsed: false,
+    isAutoInbox: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+
+  const reindexed = [created, ...sortByOrder(rawCollections)].map(
+    (col, idx) => ({
+      ...col,
+      order: idx,
+    }),
+  );
+  await collectionsStorage.setValue(reindexed);
+  return created;
+}
+
+/**
+ * Deletes any auto-created ephemeral `Inbox` collection in `candidateIds`
+ * that no longer contains any links.
+ */
+export async function pruneEmptyAutoInboxesInStorage(
+  candidateCollectionIds: readonly string[],
+  knownLinks?: readonly { collectionId: string }[],
+): Promise<string[]> {
+  const uniqueIds = Array.from(new Set(candidateCollectionIds));
+  if (uniqueIds.length === 0) return [];
+
+  const [collections, links] = await Promise.all([
+    collectionsStorage.getValue(),
+    knownLinks ? Promise.resolve(knownLinks) : linksStorage.getValue(),
+  ]);
+
+  const nonEmptyIds = new Set(links.map((l) => l.collectionId));
+  const toRemove = new Set<string>();
+
+  for (const col of collections) {
+    if (
+      col.isAutoInbox === true &&
+      uniqueIds.includes(col.id) &&
+      !nonEmptyIds.has(col.id)
+    ) {
+      toRemove.add(col.id);
+    }
+  }
+
+  if (toRemove.size === 0) return [];
+
+  const remaining = sortByOrder(
+    collections.filter((col) => !toRemove.has(col.id)),
+  ).map((col, idx) => ({
+    ...col,
+    order: idx,
+  }));
+  await collectionsStorage.setValue(remaining);
+  return Array.from(toRemove);
 }

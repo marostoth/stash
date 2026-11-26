@@ -16,6 +16,7 @@ import type {
   SaveSessionResult,
   StashSnapshot,
 } from '@/lib/storage/repo-types';
+import { pruneEmptyAutoInboxesInStorage } from '@/lib/storage/spaces-ops';
 import {
   formatSessionName,
   type OpenTabInfo,
@@ -287,6 +288,7 @@ export async function deleteLinkInStorage(id: string): Promise<boolean> {
   });
 
   await linksStorage.setValue(finalLinks);
+  await pruneEmptyAutoInboxesInStorage([target.collectionId], finalLinks);
   return true;
 }
 
@@ -363,6 +365,10 @@ export async function deleteLinksInStorage(
   });
 
   await linksStorage.setValue(finalLinks);
+  await pruneEmptyAutoInboxesInStorage(
+    Array.from(affectedCollections),
+    finalLinks,
+  );
   return sortByOrder(removed);
 }
 

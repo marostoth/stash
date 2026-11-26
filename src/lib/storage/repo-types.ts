@@ -46,6 +46,7 @@ export interface CreateCollectionInput {
   viewMode?: CollectionViewMode;
   spaceId?: string;
   isSession?: boolean;
+  isAutoInbox?: boolean;
 }
 
 export interface UpdateCollectionInput {

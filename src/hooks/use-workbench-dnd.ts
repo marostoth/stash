@@ -7,12 +7,13 @@ import { isDragItemData, isDropTargetData } from '@/lib/dnd/types';
 import { stashRepo } from '@/lib/storage/repo';
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
 import { triggerAutoTagSingleLink } from '@/lib/tagging/trigger-auto-tag';
-import type { MotionMode } from '@/lib/types/stash';
+import { DEFAULT_SPACE_ID, type MotionMode } from '@/lib/types/stash';
 import { useUiStore } from '@/store/ui-store';
 
 interface UseWorkbenchDndOptions {
   soundEffects: boolean;
   motionMode: MotionMode;
+  onSwitchSpace: (spaceId: string) => void;
 }
 
 /**
@@ -21,6 +22,7 @@ interface UseWorkbenchDndOptions {
 export function useWorkbenchDnd({
   soundEffects,
   motionMode,
+  onSwitchSpace,
 }: UseWorkbenchDndOptions) {
   const pulseLink = useUiStore((s) => s.pulseLink);
   const settleLink = useUiStore((s) => s.settleLink);
@@ -84,6 +86,84 @@ export function useWorkbenchDnd({
       const sourceData = source.data;
       const targetData = target.data;
       if (!isDragItemData(sourceData) || !isDropTargetData(targetData)) return;
+
+      // 0. Drop link, open tab, or collection directly onto a Space pill
+      if (targetData.kind === 'space-drop') {
+        const { spaceId, spaceName } = targetData;
+
+        if (sourceData.kind === 'collection') {
+          const currentSpaceId =
+            sourceData.collection.spaceId ?? DEFAULT_SPACE_ID;
+          if (currentSpaceId === spaceId) return;
+          void stashRepo
+            .moveCollectionToSpace(sourceData.collection.id, spaceId)
+            .then((moved) => {
+              if (!moved) return;
+              playDrop(soundEffects);
+              toast.success(`Moved "${moved.name}" to ${spaceName}`, {
+                action: {
+                  label: 'Open Space',
+                  onClick: () => onSwitchSpace(spaceId),
+                },
+              });
+            });
+          return;
+        }
+
+        if (sourceData.kind === 'open-tab') {
+          void (async () => {
+            const inbox = await stashRepo.getOrCreateSpaceInbox(spaceId);
+            const result = await stashRepo.addLink({
+              collectionId: inbox.id,
+              url: sourceData.tab.url,
+              title: sourceData.tab.title,
+              faviconUrl: sourceData.tab.favIconUrl,
+            });
+            if (!result.ok) {
+              playError(soundEffects);
+              toast.info(`Already in ${spaceName} → ${inbox.name}`);
+              return;
+            }
+            playDrop(soundEffects, motionMode);
+            settleLink(result.link.id);
+            toast.success(`Stashed to ${spaceName} → ${inbox.name}`, {
+              action: {
+                label: 'Open Space',
+                onClick: () => onSwitchSpace(spaceId),
+              },
+            });
+            void triggerAutoTagSingleLink(result.link.id);
+          })();
+          return;
+        }
+
+        if (sourceData.kind === 'link') {
+          void (async () => {
+            const inbox = await stashRepo.getOrCreateSpaceInbox(spaceId);
+            if (sourceData.collectionId === inbox.id) return;
+            const result = await stashRepo.moveOrReorderLink(
+              sourceData.link.id,
+              inbox.id,
+            );
+            if (!result.ok && result.reason === 'duplicate') {
+              playError(soundEffects);
+              toast.info(`Already in ${spaceName} → ${inbox.name}`);
+              return;
+            }
+            if (result.ok) {
+              playDrop(soundEffects, motionMode);
+              settleLink(sourceData.link.id);
+              toast.success(`Moved to ${spaceName} → ${inbox.name}`, {
+                action: {
+                  label: 'Open Space',
+                  onClick: () => onSwitchSpace(spaceId),
+                },
+              });
+            }
+          })();
+          return;
+        }
+      }
 
       // 1. Reorder collections vertically
       if (
@@ -168,7 +248,14 @@ export function useWorkbenchDnd({
         }
       }
     },
-    [handleQuickStashTab, revealDuplicate, soundEffects, settleLink],
+    [
+      handleQuickStashTab,
+      revealDuplicate,
+      soundEffects,
+      motionMode,
+      settleLink,
+      onSwitchSpace,
+    ],
   );
 
   return { handleQuickStashTab, handleDragStart, handleDragEnd };

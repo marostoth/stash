@@ -1,3 +1,4 @@
+import { useDroppable } from '@dnd-kit/react';
 import {
   Layers,
   LayoutGrid,
@@ -21,6 +22,96 @@ import {
   type SpaceViewMode,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+
+interface DroppableSpacePillProps {
+  space: Space;
+  index: number;
+  isActive: boolean;
+  colCount: number;
+  onSelect: () => void;
+  onToggleEdit: () => void;
+}
+
+function DroppableSpacePill({
+  space,
+  index,
+  isActive,
+  colCount,
+  onSelect,
+  onToggleEdit,
+}: DroppableSpacePillProps) {
+  const SpaceIcon = getCuratedCollectionIcon(space.icon) ?? Layers;
+  const { ref, isDropTarget } = useDroppable({
+    id: `space-drop:${space.id}`,
+    accept: ['link', 'open-tab', 'collection'],
+    collisionPriority: 3,
+    data: {
+      kind: 'space-drop',
+      spaceId: space.id,
+      spaceName: space.name,
+    },
+  });
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        'group relative inline-flex shrink-0 items-center rounded-control border transition-all',
+        isDropTarget
+          ? 'border-accent bg-accent/20 text-fg ring-2 ring-accent/65'
+          : isActive
+            ? 'border-accent/55 bg-accent/12 text-fg'
+            : 'border-transparent text-fg-muted hover:border-border hover:bg-card/60 hover:text-fg',
+      )}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-current={isActive ? 'page' : undefined}
+        title={
+          index < 9
+            ? `${space.name} (press ${index + 1} · drag cards, tabs, or collections here)`
+            : `${space.name} (drag cards, tabs, or collections here)`
+        }
+        className={cn(
+          'inline-flex h-7 items-center gap-1.5 px-2.5 text-xs font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded-control',
+          isActive && 'pr-1.5',
+        )}
+      >
+        <SpaceIcon
+          className={cn(
+            'h-3.5 w-3.5 shrink-0',
+            isActive || isDropTarget ? 'text-accent' : 'text-fg-muted',
+          )}
+          aria-hidden="true"
+        />
+        <span className="max-w-[140px] truncate">{space.name}</span>
+        <span className="font-mono text-[10px] text-fg-muted/85">
+          {colCount}
+        </span>
+      </button>
+
+      {isActive && (
+        <button
+          type="button"
+          onClick={onToggleEdit}
+          aria-label={`Edit ${space.name} space`}
+          title="Rename, icon, density, or delete Space"
+          className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded text-fg-muted transition-colors hover:bg-panel hover:text-accent cursor-pointer"
+        >
+          <SlidersHorizontal className="h-3 w-3" />
+        </button>
+      )}
+
+      {isActive && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-2 -bottom-[7px] h-[2px] rounded-full bg-accent"
+        />
+      )}
+    </div>
+  );
+}
 
 interface SpaceBarProps {
   spaces: readonly Space[];
@@ -118,72 +209,22 @@ export function SpaceBar({
           )}
         >
           <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
-            {spaces.map((space, idx) => {
-              const isActive = space.id === activeSpaceId;
-              const SpaceIcon = getCuratedCollectionIcon(space.icon) ?? Layers;
-              const colCount = collectionCountBySpace.get(space.id) ?? 0;
-
-              return (
-                <div
-                  key={space.id}
-                  className={cn(
-                    'group relative inline-flex shrink-0 items-center rounded-control border transition-colors',
-                    isActive
-                      ? 'border-accent/55 bg-accent/12 text-fg'
-                      : 'border-transparent text-fg-muted hover:border-border hover:bg-card/60 hover:text-fg',
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onSelectSpace(space.id)}
-                    aria-current={isActive ? 'page' : undefined}
-                    title={
-                      idx < 9 ? `${space.name} (press ${idx + 1})` : space.name
-                    }
-                    className={cn(
-                      'inline-flex h-7 items-center gap-1.5 px-2.5 text-xs font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded-control',
-                      isActive && 'pr-1.5',
-                    )}
-                  >
-                    <SpaceIcon
-                      className={cn(
-                        'h-3.5 w-3.5 shrink-0',
-                        isActive ? 'text-accent' : 'text-fg-muted',
-                      )}
-                      aria-hidden="true"
-                    />
-                    <span className="max-w-[140px] truncate">{space.name}</span>
-                    <span className="font-mono text-[10px] text-fg-muted/85">
-                      {colCount}
-                    </span>
-                  </button>
-
-                  {isActive && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCreating(false);
-                        setEditingSpaceId((prev) =>
-                          prev === space.id ? null : space.id,
-                        );
-                      }}
-                      aria-label={`Edit ${space.name} space`}
-                      title="Rename, icon, density, or delete Space"
-                      className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded text-fg-muted transition-colors hover:bg-panel hover:text-accent cursor-pointer"
-                    >
-                      <SlidersHorizontal className="h-3 w-3" />
-                    </button>
-                  )}
-
-                  {isActive && (
-                    <span
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-2 -bottom-[7px] h-[2px] rounded-full bg-accent"
-                    />
-                  )}
-                </div>
-              );
-            })}
+            {spaces.map((space, idx) => (
+              <DroppableSpacePill
+                key={space.id}
+                space={space}
+                index={idx}
+                isActive={space.id === activeSpaceId}
+                colCount={collectionCountBySpace.get(space.id) ?? 0}
+                onSelect={() => onSelectSpace(space.id)}
+                onToggleEdit={() => {
+                  setCreating(false);
+                  setEditingSpaceId((prev) =>
+                    prev === space.id ? null : space.id,
+                  );
+                }}
+              />
+            ))}
 
             <button
               type="button"

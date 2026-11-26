@@ -621,4 +621,78 @@ describe('stashRepo', () => {
     expect(afterBatch?.starred).toBeUndefined();
     expect(afterBatch?.product?.orderQty).toBe(4);
   });
+
+  it('creates an auto-cleaning Space Inbox on demand and removes it once emptied', async () => {
+    const shop = await stashRepo.createSpace({ name: 'Shopping List' });
+    const permanent = await stashRepo.createCollection({
+      name: 'Autoglym',
+      spaceId: shop.id,
+    });
+
+    const inbox = await stashRepo.getOrCreateSpaceInbox(shop.id);
+    expect(inbox.name).toBe('Inbox');
+    expect(inbox.spaceId).toBe(shop.id);
+    expect(inbox.isAutoInbox).toBe(true);
+
+    // Calling again reuses the exact same Inbox
+    const reused = await stashRepo.getOrCreateSpaceInbox(shop.id);
+    expect(reused.id).toBe(inbox.id);
+
+    const added = await stashRepo.addLink({
+      collectionId: inbox.id,
+      url: 'https://autoglym.com/clean-wheels',
+      title: 'Clean Wheels',
+    });
+    expect(added.ok).toBe(true);
+    if (!added.ok) return;
+
+    // Moving the last link out of the auto-Inbox removes the empty Inbox
+    const moved = await stashRepo.moveOrReorderLink(
+      added.link.id,
+      permanent.id,
+    );
+    expect(moved.ok).toBe(true);
+
+    const colsAfterMove = await stashRepo.getCollections();
+    expect(colsAfterMove.some((c) => c.id === inbox.id)).toBe(false);
+    expect(colsAfterMove.some((c) => c.id === permanent.id)).toBe(true);
+  });
+
+  it('promotes an auto-Inbox to permanent on rename and deletes empty auto-Inbox on link delete', async () => {
+    const work = await stashRepo.createSpace({ name: 'Work' });
+    const inbox1 = await stashRepo.getOrCreateSpaceInbox(work.id);
+    const l1 = await stashRepo.addLink({
+      collectionId: inbox1.id,
+      url: 'https://example.com/temp',
+      title: 'Temp',
+    });
+    expect(l1.ok).toBe(true);
+    if (!l1.ok) return;
+
+    // Deleting the last link from an auto-Inbox removes the Inbox
+    await stashRepo.deleteLink(l1.link.id);
+    expect(
+      (await stashRepo.getCollections()).some((c) => c.id === inbox1.id),
+    ).toBe(false);
+
+    // Renaming an auto-Inbox promotes it to permanent so emptying it keeps it
+    const inbox2 = await stashRepo.getOrCreateSpaceInbox(work.id);
+    const promoted = await stashRepo.updateCollection(inbox2.id, {
+      name: 'Sprint Docs',
+    });
+    expect(promoted?.isAutoInbox).toBeUndefined();
+
+    const l2 = await stashRepo.addLink({
+      collectionId: inbox2.id,
+      url: 'https://example.com/spec',
+      title: 'Spec',
+    });
+    expect(l2.ok).toBe(true);
+    if (!l2.ok) return;
+
+    await stashRepo.deleteLink(l2.link.id);
+    expect(
+      (await stashRepo.getCollections()).some((c) => c.id === inbox2.id),
+    ).toBe(true);
+  });
 });
