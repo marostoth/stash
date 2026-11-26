@@ -167,6 +167,9 @@ export const stashRepo = {
       tintColor: input.tintColor?.trim() || undefined,
       icon: input.icon?.trim() || undefined,
       viewMode: input.viewMode,
+      ...(input.sortMode && input.sortMode !== 'manual'
+        ? { sortMode: input.sortMode }
+        : {}),
       spaceId: resolvedSpaceId,
       order: maxOrder + 1,
       collapsed: false,
@@ -208,6 +211,12 @@ export const stashRepo = {
           ? { icon: patch.icon?.trim() || undefined }
           : {}),
         ...(patch.viewMode !== undefined ? { viewMode: patch.viewMode } : {}),
+        ...(patch.sortMode !== undefined
+          ? {
+              sortMode:
+                patch.sortMode === 'manual' ? undefined : patch.sortMode,
+            }
+          : {}),
         ...(patch.spaceId !== undefined ? { spaceId: patch.spaceId } : {}),
         ...(patch.collapsed !== undefined
           ? { collapsed: patch.collapsed }

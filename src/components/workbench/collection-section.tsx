@@ -22,6 +22,7 @@ import {
   CollectionHeaderBadges,
   resolveCollectionGridClass,
 } from '@/components/workbench/collection-header-badges';
+import { CollectionSortMenu } from '@/components/workbench/collection-sort-menu';
 import { LinkCard } from '@/components/workbench/link-card';
 import { useAutoTagSweep } from '@/hooks/use-auto-tag-sweep';
 import { COLLAPSE_SPRING, isTactileMotion } from '@/lib/motion/presets';
@@ -137,6 +138,8 @@ export function CollectionSection({
   });
 
   const isCollapsed = collection.collapsed && !forceExpanded;
+  const isAutoSorted =
+    collection.sortMode !== undefined && collection.sortMode !== 'manual';
   const colorHex =
     collection.tintColor ?? TAB_GROUP_COLOR_SWATCH[collection.color];
   const viewMode = collection.viewMode ?? 'compact';
@@ -145,16 +148,13 @@ export function CollectionSection({
     ? ({ '--collection-tint': collection.tintColor } as CSSProperties)
     : undefined;
 
-  const handleToggleViewMode = () => {
+  const handleToggleViewMode = () =>
     void stashRepo.updateCollection(collection.id, {
       viewMode: viewMode === 'cover' ? 'compact' : 'cover',
     });
-  };
 
   const handleToggleCollapse = () => {
-    if (collection.collapsed) {
-      triggerCollectionCascade(collection.id);
-    }
+    if (collection.collapsed) triggerCollectionCascade(collection.id);
     void stashRepo.toggleCollectionCollapsed(collection.id);
   };
 
@@ -402,6 +402,8 @@ export function CollectionSection({
               )}
             </Button>
 
+            <CollectionSortMenu collection={collection} />
+
             <CollectionAppearancePopover
               collection={collection}
               sampleLinkTitles={links.slice(0, 5).map((l) => l.title)}
@@ -453,7 +455,7 @@ export function CollectionSection({
                         index={cardIndex}
                         openInNewTab={openInNewTab}
                         density={density}
-                        dragDisabled={dragDisabled}
+                        dragDisabled={dragDisabled || isAutoSorted}
                         motionMode={motionMode}
                         dropEffectStyle={dropEffectStyle}
                         fxDeskJolt={fxDeskJolt}

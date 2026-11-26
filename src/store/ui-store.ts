@@ -76,6 +76,7 @@ interface UiStoreState {
   searchQuery: string;
   starredOnly: boolean;
   smartFilter: SmartFilter;
+  selectedTags: string[];
   searchAllSpaces: boolean;
   keyboardFocusedLinkId: string | null;
   collectionModal: CollectionModalState;
@@ -97,6 +98,8 @@ interface UiStoreState {
   setStarredOnly: (starredOnly: boolean) => void;
   toggleStarredOnly: () => void;
   setSmartFilter: (filter: SmartFilter) => void;
+  toggleSelectedTag: (tag: string) => void;
+  clearSelectedTags: () => void;
   setSearchAllSpaces: (allSpaces: boolean) => void;
   toggleSearchAllSpaces: () => void;
   setKeyboardFocusedLinkId: (linkId: string | null) => void;
@@ -146,6 +149,7 @@ export const useUiStore = create<UiStoreState>((set) => ({
   searchQuery: '',
   starredOnly: false,
   smartFilter: 'all',
+  selectedTags: [],
   searchAllSpaces: false,
   keyboardFocusedLinkId: null,
   collectionModal: null,
@@ -169,7 +173,11 @@ export const useUiStore = create<UiStoreState>((set) => ({
     if (persist) {
       void stashRepo.setActiveSpaceId(trimmed).catch(() => undefined);
     }
-    set({ activeSpaceId: trimmed, keyboardFocusedLinkId: null });
+    set({
+      activeSpaceId: trimmed,
+      selectedTags: [],
+      keyboardFocusedLinkId: null,
+    });
   },
   setSearchQuery: (query) =>
     set({ searchQuery: query, keyboardFocusedLinkId: null }),
@@ -182,6 +190,18 @@ export const useUiStore = create<UiStoreState>((set) => ({
     })),
   setSmartFilter: (smartFilter) =>
     set({ smartFilter, keyboardFocusedLinkId: null }),
+  toggleSelectedTag: (rawTag) => {
+    const tag = rawTag.trim().toLowerCase();
+    if (!tag) return;
+    set((state) => ({
+      selectedTags: state.selectedTags.includes(tag)
+        ? state.selectedTags.filter((t) => t !== tag)
+        : [...state.selectedTags, tag],
+      keyboardFocusedLinkId: null,
+    }));
+  },
+  clearSelectedTags: () =>
+    set({ selectedTags: [], keyboardFocusedLinkId: null }),
   setSearchAllSpaces: (allSpaces) =>
     set({ searchAllSpaces: allSpaces, keyboardFocusedLinkId: null }),
   toggleSearchAllSpaces: () =>

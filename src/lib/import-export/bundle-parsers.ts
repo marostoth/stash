@@ -5,6 +5,7 @@ import {
   type CardDensity,
   type CategorizationRule,
   type Collection,
+  type CollectionSortMode,
   DEFAULT_SETTINGS,
   type LinkItem,
   type ProductMeta,
@@ -145,6 +146,14 @@ export function parseCollection(
     obj.viewMode === 'compact' || obj.viewMode === 'cover'
       ? obj.viewMode
       : undefined;
+  const sortMode: CollectionSortMode | undefined =
+    obj.sortMode === 'title-asc' ||
+    obj.sortMode === 'newest' ||
+    obj.sortMode === 'last-opened' ||
+    obj.sortMode === 'price-asc' ||
+    obj.sortMode === 'price-desc'
+      ? obj.sortMode
+      : undefined;
 
   return {
     id: obj.id.trim(),
@@ -160,6 +169,7 @@ export function parseCollection(
         ? obj.icon.trim()
         : undefined,
     viewMode,
+    ...(sortMode ? { sortMode } : {}),
     spaceId:
       typeof obj.spaceId === 'string' && obj.spaceId.trim()
         ? obj.spaceId.trim()

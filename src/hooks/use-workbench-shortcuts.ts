@@ -233,6 +233,9 @@ export function useWorkbenchShortcuts({
           if (ui.smartFilter !== 'all') {
             ui.setSmartFilter('all');
           }
+          if (ui.selectedTags.length > 0) {
+            ui.clearSelectedTags();
+          }
           return;
         }
         if (!modalOpen) {
@@ -240,9 +243,14 @@ export function useWorkbenchShortcuts({
             ui.setKeyboardFocusedLinkId(null);
             return;
           }
-          if (ui.starredOnly || ui.smartFilter !== 'all') {
+          if (
+            ui.starredOnly ||
+            ui.smartFilter !== 'all' ||
+            ui.selectedTags.length > 0
+          ) {
             if (ui.starredOnly) ui.setStarredOnly(false);
             if (ui.smartFilter !== 'all') ui.setSmartFilter('all');
+            if (ui.selectedTags.length > 0) ui.clearSelectedTags();
           }
         }
       }

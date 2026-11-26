@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/workbench/empty-state';
 import { OpenTabsSidebar } from '@/components/workbench/open-tabs-sidebar';
 import { QuickLaunchBar } from '@/components/workbench/quick-launch-bar';
 import { SpaceBar } from '@/components/workbench/space-bar';
+import { TagFilterBar } from '@/components/workbench/tag-filter-bar';
 import { TopBar } from '@/components/workbench/top-bar';
 import { WallpaperLayer } from '@/components/workbench/wallpaper-layer';
 import {
@@ -78,6 +79,8 @@ export function Workbench() {
   const setStarredOnly = useUiStore((s) => s.setStarredOnly);
   const smartFilter = useUiStore((s) => s.smartFilter);
   const setSmartFilter = useUiStore((s) => s.setSmartFilter);
+  const selectedTags = useUiStore((s) => s.selectedTags);
+  const clearSelectedTags = useUiStore((s) => s.clearSelectedTags);
   const searchAllSpaces = useUiStore((s) => s.searchAllSpaces);
   const openCreateCollection = useUiStore((s) => s.openCreateCollection);
   const dismissPreview = useUiStore((s) => s.dismissPreview);
@@ -171,6 +174,7 @@ export function Workbench() {
       groupAndFilterCollections(collections, links, searchQuery, {
         starredOnly,
         smartFilter,
+        selectedTags,
         activeSpaceId: resolvedSpaceId,
         searchAllSpaces,
       }),
@@ -180,13 +184,17 @@ export function Workbench() {
       searchQuery,
       starredOnly,
       smartFilter,
+      selectedTags,
       resolvedSpaceId,
       searchAllSpaces,
     ],
   );
 
   const isFiltering =
-    searchQuery.trim().length > 0 || starredOnly || smartFilter !== 'all';
+    searchQuery.trim().length > 0 ||
+    starredOnly ||
+    smartFilter !== 'all' ||
+    selectedTags.length > 0;
   const hideCheckedInSpace = activeSpace?.hideChecked === true && !isFiltering;
   const checkedCountInSpace = useMemo(
     () =>
@@ -286,6 +294,13 @@ export function Workbench() {
               />
             )}
 
+            <TagFilterBar
+              links={links}
+              activeSpaceCollectionIds={activeSpaceCollectionIds}
+              searchAllSpaces={searchAllSpaces}
+              wideBoard={wideBoard}
+            />
+
             <div className="flex min-h-0 flex-1 overflow-hidden">
               <main
                 onScroll={dismissPreview}
@@ -327,6 +342,7 @@ export function Workbench() {
                         setSearchQuery('');
                         setStarredOnly(false);
                         setSmartFilter('all');
+                        clearSelectedTags();
                       }}
                     />
                   ) : activeViewMode === 'details' ? (

@@ -34,6 +34,13 @@ export const TAB_GROUP_COLOR_SWATCH: Record<TabGroupColor, string> = {
 };
 
 export type CollectionViewMode = 'compact' | 'cover';
+export type CollectionSortMode =
+  | 'manual'
+  | 'title-asc'
+  | 'newest'
+  | 'last-opened'
+  | 'price-asc'
+  | 'price-desc';
 export type SpaceViewMode = 'grid' | 'details';
 export type SpaceGroupBy = 'collection' | 'store';
 export type ProductMetaSource = 'extracted' | 'ai' | 'manual';
@@ -86,6 +93,7 @@ export interface Collection {
   tintColor?: string;
   icon?: string;
   viewMode?: CollectionViewMode;
+  sortMode?: CollectionSortMode;
   spaceId?: string;
   order: number;
   collapsed: boolean;

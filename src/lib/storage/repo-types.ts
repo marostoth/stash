@@ -3,6 +3,7 @@ import type {
   CardDensity,
   CategorizationRule,
   Collection,
+  CollectionSortMode,
   CollectionViewMode,
   LinkItem,
   ProductMeta,
@@ -45,6 +46,7 @@ export interface CreateCollectionInput {
   tintColor?: string;
   icon?: string;
   viewMode?: CollectionViewMode;
+  sortMode?: CollectionSortMode;
   spaceId?: string;
   isSession?: boolean;
   isAutoInbox?: boolean;
@@ -57,6 +59,7 @@ export interface UpdateCollectionInput {
   tintColor?: string | null;
   icon?: string | null;
   viewMode?: CollectionViewMode;
+  sortMode?: CollectionSortMode;
   spaceId?: string;
   collapsed?: boolean;
   order?: number;

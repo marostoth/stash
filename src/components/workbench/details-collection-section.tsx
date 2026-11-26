@@ -12,6 +12,7 @@ import {
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { RollingCurrency } from '@/components/ui/rolling-currency';
+import { CollectionSortMenu } from '@/components/workbench/collection-sort-menu';
 import { CopyListButton } from '@/components/workbench/details-inline-cells';
 import { DetailsRow } from '@/components/workbench/details-row';
 import { isTactileMotion } from '@/lib/motion/presets';
@@ -129,9 +130,12 @@ export function DetailsCollectionSection({
     summarizePrices(colStarred, defaultCurrency),
   );
 
+  const hasCollectionSort = Boolean(
+    collection.sortMode && collection.sortMode !== 'manual',
+  );
   const rowDragMode = dragDisabled
     ? 'none'
-    : sortActive
+    : sortActive || hasCollectionSort
       ? 'cross-only'
       : 'collection';
 
@@ -234,6 +238,9 @@ export function DetailsCollectionSection({
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
+            {sortedLinks.length > 0 && (
+              <CollectionSortMenu collection={collection} />
+            )}
             {sortedLinks.length > 0 && (
               <CopyListButton
                 label="Copy"
