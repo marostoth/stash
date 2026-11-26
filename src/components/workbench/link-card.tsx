@@ -1,5 +1,4 @@
 import { useSortable } from '@dnd-kit/react/sortable';
-import { Star } from 'lucide-react';
 import { motion } from 'motion/react';
 import { memo, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -10,6 +9,7 @@ import {
   DeleteVaporPuff,
   LinkCardDragPlaceholder,
   resolveLinkCardMotion,
+  StarredCardAccents,
   StarShimmerOverlay,
   useNeighborJolt,
 } from '@/components/workbench/card-effects';
@@ -21,6 +21,7 @@ import {
   FOIL_PERSPECTIVE_PX,
   isArcadeMotion,
   isTactileMotion,
+  TACTILE_SPRING,
   TAG_POP_SPRING,
 } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
@@ -32,6 +33,7 @@ import type {
   MotionMode,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+import { HighlightText } from '@/lib/utils/highlight-match';
 import { extractDomain } from '@/lib/utils/url';
 import { useFxStore } from '@/store/fx-store';
 import { useUiStore } from '@/store/ui-store';
@@ -83,6 +85,7 @@ export const LinkCard = memo(function LinkCard({
   const isKeyboardFocused = useUiStore(
     (s) => s.keyboardFocusedLinkId === link.id,
   );
+  const searchQuery = useUiStore((s) => s.searchQuery);
   const triggerStarFlash = useFxStore((s) => s.triggerStarFlash);
   const isStarFlashing = useFxStore((s) => s.starFlashLinkId === link.id);
   const triggerSettledImpact = useFxStore((s) => s.triggerSettledImpact);
@@ -227,6 +230,7 @@ export const LinkCard = memo(function LinkCard({
       isHighlighted,
       isSettling,
       arcade,
+      tactile,
       cascadeActive,
       index,
       neighborJolt,
@@ -273,11 +277,23 @@ export const LinkCard = memo(function LinkCard({
           <DropSparks active={arcade && isSettling} variant={dropEffectStyle} />
           <DeleteVaporPuff active={arcade && vaporizing} />
 
+          {/* Gliding keyboard navigation spotlight frame */}
+          {isKeyboardFocused && tactile && (
+            <motion.div
+              layoutId="stash-kbd-spotlight"
+              transition={TACTILE_SPRING}
+              aria-hidden="true"
+              className="pointer-events-none absolute -inset-[2px] z-[18] rounded-[calc(var(--stash-radius-card)+2px)] border-2 border-accent shadow-[0_0_18px_-3px_color-mix(in_srgb,var(--stash-accent)_68%,transparent)]"
+            />
+          )}
+
           <motion.div
             initial={
-              arcade && cascadeActive
-                ? { opacity: 0, y: 12, rotate: -2 }
-                : false
+              cascadeActive && arcade
+                ? { opacity: 0, y: 16, x: -10, rotate: -2.5, scale: 0.94 }
+                : cascadeActive && tactile
+                  ? { opacity: 0, y: 10, scale: 0.97 }
+                  : false
             }
             animate={cardAnimate}
             whileHover={tactile && !vaporizing ? { y: -2 } : undefined}
@@ -297,34 +313,14 @@ export const LinkCard = memo(function LinkCard({
               !dragDisabled && 'cursor-grab active:cursor-grabbing',
               isDropTarget && 'border-accent ring-2 ring-accent/40',
               isKeyboardFocused &&
+                !tactile &&
                 'border-accent ring-2 ring-accent/75 ring-offset-2 ring-offset-canvas',
               isHighlighted && !arcade && 'stash-duplicate-pulse',
               isHighlighted && arcade && 'border-danger ring-2 ring-danger/45',
               isTagging && arcade && 'border-accent/65',
             )}
           >
-            {/* Starred bottom hardware underglow strip */}
-            {isStarred && (
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 z-[2] overflow-hidden rounded-card"
-              >
-                <div className="stash-card-underglow-strip absolute inset-x-0 bottom-0 h-[2px]" />
-              </div>
-            )}
-
-            {/* Idle Star badge in top-right */}
-            {isStarred && (
-              <span
-                aria-hidden="true"
-                className={cn(
-                  'pointer-events-none absolute right-2 top-2 z-[12] flex items-center justify-center text-accent opacity-90 transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0',
-                  viewMode === 'cover' && 'rounded-full bg-panel/95 p-1',
-                )}
-              >
-                <Star className="h-3.5 w-3.5 fill-accent text-accent" />
-              </span>
-            )}
+            {isStarred && <StarredCardAccents viewMode={viewMode} />}
 
             {/* Star pop shimmer sweep + Arcade micro-burst */}
             <StarShimmerOverlay
@@ -413,7 +409,7 @@ export const LinkCard = memo(function LinkCard({
                           : 'line-clamp-2 text-sm',
                       )}
                     >
-                      {link.title}
+                      <HighlightText text={link.title} query={searchQuery} />
                     </div>
                     <div
                       className={cn(
@@ -421,14 +417,14 @@ export const LinkCard = memo(function LinkCard({
                         isMicro ? 'text-[10px]' : 'text-[11px]',
                       )}
                     >
-                      {domain}
+                      <HighlightText text={domain} query={searchQuery} />
                     </div>
                   </div>
                 </div>
 
                 {showNote && (
                   <p className="line-clamp-1 text-xs text-fg-muted">
-                    {link.note}
+                    <HighlightText text={link.note} query={searchQuery} />
                   </p>
                 )}
 

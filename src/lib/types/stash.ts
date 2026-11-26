@@ -128,6 +128,12 @@ export interface CategorizationRule {
 
 export type MotionMode = 'arcade' | 'tactile' | 'reduced' | 'off';
 export type DropEffectStyle = 'dust' | 'accent';
+export type SoundPack =
+  | 'arpg-heavy'
+  | 'studio-desk'
+  | 'mechanical-thock'
+  | 'retro-synth'
+  | 'glass-ceramic';
 export type CardDensity = 'micro' | 'compact' | 'comfortable';
 export type BoardWidthMode = 'standard' | 'wide';
 export type CardRadiusPreset = 'sharp' | 'standard' | 'rounded';
@@ -161,6 +167,7 @@ export interface StashSettings {
   fxAmbientWaves: boolean;
   soundEffects: boolean;
   soundVolume: number;
+  soundPack: SoundPack;
   hoverPreviews: boolean;
   visualPreviewsEnabled: boolean;
   density: CardDensity;
@@ -248,6 +255,7 @@ export const DEFAULT_SETTINGS: StashSettings = {
   fxAmbientWaves: true,
   soundEffects: true,
   soundVolume: 75,
+  soundPack: 'studio-desk',
   hoverPreviews: true,
   visualPreviewsEnabled: false,
   density: 'comfortable',

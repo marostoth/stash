@@ -3,6 +3,7 @@ import {
   computeNeighborJolt,
   computeSpaceSlideDirection,
 } from '@/lib/motion/presets';
+import { splitHighlightSegments } from '@/lib/utils/highlight-match';
 
 describe('computeNeighborJolt', () => {
   it('pushes cards radially away from impact center with distance falloff', () => {
@@ -42,5 +43,24 @@ describe('computeSpaceSlideDirection', () => {
     expect(computeSpaceSlideDirection(ids, 'research', 'main')).toBe(-1);
     expect(computeSpaceSlideDirection(ids, 'main', 'main')).toBe(0);
     expect(computeSpaceSlideDirection(ids, 'main', 'missing')).toBe(0);
+  });
+});
+
+describe('splitHighlightSegments', () => {
+  it('highlights case-insensitive multi-word matches and escapes regex characters', () => {
+    const segs = splitHighlightSegments(
+      'Autoglym Clean Wheels (C++)',
+      'clean c++',
+    );
+    expect(segs.filter((s) => s.match).map((s) => s.text)).toEqual([
+      'Clean',
+      'C++',
+    ]);
+  });
+
+  it('ignores empty or 1-character queries', () => {
+    expect(splitHighlightSegments('TradingView', 't')).toEqual([
+      { text: 'TradingView', match: false },
+    ]);
   });
 });

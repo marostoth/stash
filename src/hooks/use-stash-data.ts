@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   setFoleyMotionMode,
   setSoundEffectsEnabled,
+  setSoundPack,
   setSoundVolume,
 } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
@@ -136,11 +137,17 @@ export function useStashData(): StashDataState {
   useEffect(() => {
     setSoundEffectsEnabled(settings.soundEffects);
     setSoundVolume(settings.soundVolume);
+    setSoundPack(settings.soundPack ?? 'studio-desk');
     setFoleyMotionMode(settings.motionMode);
     if (typeof document !== 'undefined') {
       document.documentElement.dataset.motion = settings.motionMode;
     }
-  }, [settings.soundEffects, settings.soundVolume, settings.motionMode]);
+  }, [
+    settings.soundEffects,
+    settings.soundVolume,
+    settings.soundPack,
+    settings.motionMode,
+  ]);
 
   return {
     loading,

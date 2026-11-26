@@ -441,6 +441,19 @@ html[data-theme-mode="light"] .stash-card-underglow-strip {
   animation: stash-total-highlight 520ms ease-out forwards;
 }
 
+@keyframes stash-match-pop {
+  0% {
+    background-color: color-mix(in srgb, var(--stash-accent) 44%, transparent);
+  }
+  100% {
+    background-color: color-mix(in srgb, var(--stash-accent) 22%, transparent);
+  }
+}
+
+.stash-match-highlight {
+  animation: stash-match-pop 280ms ease-out both;
+}
+
 html[data-motion="reduced"] .stash-indeterminate-bar,
 html[data-motion="off"] .stash-indeterminate-bar,
 html[data-motion="reduced"] .stash-skeleton-row,

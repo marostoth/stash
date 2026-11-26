@@ -1,3 +1,4 @@
+import { Star } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type RefObject, useEffect, useState } from 'react';
 import {
@@ -12,8 +13,35 @@ import {
   TACTILE_SETTLE_TRANSITION,
   TACTILE_SPRING,
 } from '@/lib/motion/presets';
+import type { CollectionViewMode } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 import { useFxStore } from '@/store/fx-store';
+
+export function StarredCardAccents({
+  viewMode,
+}: {
+  viewMode: CollectionViewMode;
+}) {
+  return (
+    <>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-[2] overflow-hidden rounded-card"
+      >
+        <div className="stash-card-underglow-strip absolute inset-x-0 bottom-0 h-[2px]" />
+      </div>
+      <span
+        aria-hidden="true"
+        className={cn(
+          'pointer-events-none absolute right-2 top-2 z-[12] flex items-center justify-center text-accent opacity-90 transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0',
+          viewMode === 'cover' && 'rounded-full bg-panel/95 p-1',
+        )}
+      >
+        <Star className="h-3.5 w-3.5 fill-accent text-accent" />
+      </span>
+    </>
+  );
+}
 
 export interface ActiveNeighborJolt extends NeighborJoltVector {
   seq: number;
@@ -24,6 +52,7 @@ export function resolveLinkCardMotion(params: {
   isHighlighted: boolean;
   isSettling: boolean;
   arcade: boolean;
+  tactile: boolean;
   cascadeActive: boolean;
   index: number;
   neighborJolt: ActiveNeighborJolt | null;
@@ -33,6 +62,7 @@ export function resolveLinkCardMotion(params: {
     isHighlighted,
     isSettling,
     arcade,
+    tactile,
     cascadeActive,
     index,
     neighborJolt,
@@ -83,7 +113,7 @@ export function resolveLinkCardMotion(params: {
                 times: [0, 0.32, 1],
                 ease: [0.22, 1, 0.36, 1] as const,
               }
-            : arcade && cascadeActive
+            : tactile && cascadeActive
               ? { ...TACTILE_SPRING, delay: computeCascadeDelay(index) }
               : TACTILE_SPRING;
 

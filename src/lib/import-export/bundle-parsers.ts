@@ -344,6 +344,14 @@ export function parseSettings(raw: unknown): StashSettings {
       typeof obj.soundVolume === 'number' && Number.isFinite(obj.soundVolume)
         ? Math.max(0, Math.min(100, Math.round(obj.soundVolume)))
         : DEFAULT_SETTINGS.soundVolume,
+    soundPack:
+      obj.soundPack === 'arpg-heavy' ||
+      obj.soundPack === 'studio-desk' ||
+      obj.soundPack === 'mechanical-thock' ||
+      obj.soundPack === 'retro-synth' ||
+      obj.soundPack === 'glass-ceramic'
+        ? obj.soundPack
+        : DEFAULT_SETTINGS.soundPack,
     hoverPreviews:
       typeof obj.hoverPreviews === 'boolean'
         ? obj.hoverPreviews

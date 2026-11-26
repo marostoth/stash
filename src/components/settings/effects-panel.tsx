@@ -1,22 +1,12 @@
-import { Flame, Sparkles, Volume2, VolumeX, Zap } from 'lucide-react';
+import { Flame, Sparkles, Zap } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
+import { EffectsSoundCard } from '@/components/settings/effects-sound-card';
 import { EffectsTogglesCard } from '@/components/settings/effects-toggles-card';
-import {
-  SettingsSectionCard,
-  SettingsToggleRow,
-} from '@/components/settings/settings-section-card';
+import { SettingsSectionCard } from '@/components/settings/settings-section-card';
 import { Button } from '@/components/ui/button';
 import { DropSparks } from '@/components/workbench/drop-sparks';
-import {
-  playDelete,
-  playDrop,
-  playError,
-  playPickup,
-  playSessionFreeze,
-  playTagPop,
-  setSoundVolume,
-} from '@/lib/audio/foley';
+import { playDrop } from '@/lib/audio/foley';
 import {
   ARCADE_SQUASH_KEYFRAMES,
   ARCADE_SQUASH_TRANSITION,
@@ -32,10 +22,6 @@ import type {
   StashSettings,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
-import {
-  createDebouncedWriter,
-  type DebouncedWriter,
-} from '@/lib/utils/coalesce';
 
 interface EffectsPanelProps {
   settings: StashSettings;
@@ -52,7 +38,7 @@ const MOTION_OPTIONS: ReadonlyArray<{
     label: 'Arcade',
     badge: 'Peak FX',
     description:
-      'Heavy tile slam, perimeter dust shockwave, 3D foil tilt, and combo overtones.',
+      'Heavy tile slam, perimeter dust shockwave, neighbor jolt, drag trail, and combo overtones.',
   },
   {
     id: 'tactile',
@@ -91,27 +77,13 @@ const DROP_STYLE_OPTIONS: ReadonlyArray<{
   },
 ];
 
-const VOLUME_DEBOUNCE_MS = 150;
-
 export function EffectsPanel({ settings }: EffectsPanelProps) {
-  const [volumeDraft, setVolumeDraft] = useState(settings.soundVolume ?? 75);
   const [slamActive, setSlamActive] = useState(false);
   const [slamKey, setSlamKey] = useState(0);
   const slamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const volumeWriterRef = useRef<DebouncedWriter<number> | null>(null);
 
   useEffect(() => {
-    setVolumeDraft(settings.soundVolume ?? 75);
-  }, [settings.soundVolume]);
-
-  useEffect(() => {
-    const writer = createDebouncedWriter<number>((nextVol) => {
-      void stashRepo.updateSettings({ soundVolume: nextVol });
-    }, VOLUME_DEBOUNCE_MS);
-    volumeWriterRef.current = writer;
     return () => {
-      writer.flush();
-      volumeWriterRef.current = null;
       if (slamTimerRef.current) clearTimeout(slamTimerRef.current);
     };
   }, []);
@@ -321,133 +293,11 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
       {/* 3. Fine-Tune Physics & Waves */}
       <EffectsTogglesCard settings={settings} />
 
-      {/* 4. Sound Effects & Volume */}
-      <SettingsSectionCard
-        icon={
-          settings.soundEffects && volumeDraft > 0 ? (
-            <Volume2 className="h-4 w-4" />
-          ) : (
-            <VolumeX className="h-4 w-4" />
-          )
-        }
-        title="Mechanical Foley & Volume"
-        badge={{
-          label: settings.soundEffects ? `${volumeDraft}%` : 'Muted',
-          tone: settings.soundEffects && volumeDraft > 0 ? 'accent' : 'neutral',
-        }}
-      >
-        <div className="space-y-3">
-          <SettingsToggleRow
-            id="settings-sound-fx"
-            label="Mechanical sound effects"
-            hint="Synthesized locally with Web Audio (zero audio files)."
-            checked={settings.soundEffects}
-            onCheckedChange={(checked) => {
-              void stashRepo.updateSettings({ soundEffects: checked });
-              if (checked) {
-                playDrop(true, settings.motionMode);
-              }
-            }}
-          />
-
-          <label
-            className={cn(
-              'block space-y-1.5 text-xs',
-              !settings.soundEffects && 'opacity-50',
-            )}
-          >
-            <div className="flex items-center justify-between text-fg-muted">
-              <span>Effect volume</span>
-              <span className="font-mono text-[11px] font-medium text-fg tabular-nums">
-                {volumeDraft}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={5}
-              value={volumeDraft}
-              disabled={!settings.soundEffects}
-              onChange={(e) => {
-                const nextVol = Number(e.target.value);
-                setVolumeDraft(nextVol);
-                setSoundVolume(nextVol);
-                volumeWriterRef.current?.schedule(nextVol);
-              }}
-              onPointerUp={() => {
-                if (settings.soundEffects && volumeDraft > 0) {
-                  playDrop(true, settings.motionMode);
-                }
-              }}
-              className="w-full cursor-pointer accent-[var(--stash-accent)]"
-            />
-          </label>
-
-          {/* Foley Soundboard */}
-          <div className="border-t border-border/70 pt-2.5">
-            <div className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-fg-muted">
-              Audition Sound Effects
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={!settings.soundEffects || volumeDraft === 0}
-                onClick={() => triggerTestSlam()}
-                className="h-7 px-2.5 text-[11px]"
-              >
-                Drop Slam
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={!settings.soundEffects || volumeDraft === 0}
-                onClick={() => playPickup(true)}
-                className="h-7 px-2.5 text-[11px]"
-              >
-                Pickup
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={!settings.soundEffects || volumeDraft === 0}
-                onClick={() => playTagPop(true, 'arcade')}
-                className="h-7 px-2.5 text-[11px]"
-              >
-                Star / Tag
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={!settings.soundEffects || volumeDraft === 0}
-                onClick={() => playSessionFreeze(true, settings.motionMode)}
-                className="h-7 px-2.5 text-[11px]"
-              >
-                Session Lock
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={!settings.soundEffects || volumeDraft === 0}
-                onClick={() => playDelete(true)}
-                className="h-7 px-2.5 text-[11px]"
-              >
-                Delete
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={!settings.soundEffects || volumeDraft === 0}
-                onClick={() => playError(true)}
-                className="h-7 px-2.5 text-[11px]"
-              >
-                Blocked
-              </Button>
-            </div>
-          </div>
-        </div>
-      </SettingsSectionCard>
+      {/* 4. Sound Effects, Sound Packs & Volume */}
+      <EffectsSoundCard
+        settings={settings}
+        onTriggerTestSlam={() => triggerTestSlam()}
+      />
     </div>
   );
 }

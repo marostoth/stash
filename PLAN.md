@@ -116,13 +116,13 @@ Execute **one milestone at a time**. At the end of each milestone, run all four 
 - Dedicated **Settings → Effects** page with Live Impact Preview Stage, Volume Slider (`0%–100%`), Foley Soundboard, and 4 Fine-Tune Physics toggles (`fxDeskJolt`, `fxDragTilt`, `fxHoverSheen`, `fxAmbientWaves`).
 - Underneath perimeter dust shockwave (`Neutral Dust + Accent Ring` and `Full Accent Glow`), heavy tile slam, louder layered Web Audio foley with compressor bus, radial neighbor desk jolt, hover tilt sheen, star pop shimmer burst, delete vaporize, magnetic drop-zone breathing, Wake Up ignition wave, Save Session deck sweep, Space pill `+1` swallow, directional Space slide, Quick Stash vault stamp, and rolling odometer totals.
 
-### Milestone A (v1.18.0) — Effects Studio 2.0: Sound Packs & Tactile Polish (Next)
-- [ ] **4 Synthesized Web Audio Sound Packs** (`studio-desk`, `mechanical-thock`, `retro-synth`, `glass-ceramic`) selectable and auditionable in *Settings → Effects* (zero audio files, persisted in `StashSettings.soundPack`).
-- [ ] **Gliding Keyboard Spotlight:** Smooth `layoutId` focus frame sliding directly between cards during keyboard navigation.
-- [ ] **Arcade Drag Trail:** Subtle glowing trailing echoes following the dragged card/tab ghost in Arcade mode.
-- [ ] **Accordion Deal & Search Match Highlight:** Smooth diagonal card-deal fan on manual collection expand + highlighted matching text snippets with subtle pop when searching.
+### Milestone A (v1.18.0) — Effects Studio 2.0: Sound Packs & Tactile Polish (Shipped)
+- [x] **5 Synthesized Web Audio Sound Packs** (`arpg-heavy` *Heavy Stone & Iron*, `studio-desk`, `mechanical-thock`, `retro-synth`, `glass-ceramic`) powered by a Cinematic DSP bus (soft-clipping `WaveShaperNode`, stereo dark-hall `ConvolverNode`, stereo panning, brown noise, and 2-op FM synthesis).
+- [x] **Gliding Keyboard Spotlight:** Smooth `layoutId` focus frame sliding directly between cards during keyboard navigation.
+- [x] **Arcade Drag Trail:** Subtle glowing trailing echoes following the dragged card/tab ghost in Arcade mode.
+- [x] **Accordion Deal & Search Match Highlight:** Smooth diagonal card-deal fan on manual collection expand + highlighted matching text snippets with subtle pop when searching.
 
-### Milestone B (v1.19.0) — Shopping Lists Pro & Checkboxes (Queued)
+### Milestone B (v1.19.0) — Shopping Lists Pro & Checkboxes (In Progress)
 - [ ] **Checked / Bought ✓ Mode** on links (works in Details view + Grid cards for both Shopping Lists and Study/Watch lists, with animated checkmark + per-Space *Hide checked* toggle).
 - [ ] **Live Remaining Total Odometer:** Checking off items smoothly rolls down the remaining subtotal & Space total (showing Remaining vs Total when items are checked).
 - [ ] **Automatic Price Change Badges:** Save `previousPrice` whenever a price is updated or re-captured from the Side Panel and display green `↓ £X.XX` / red `↑ £X.XX` badges.
@@ -132,3 +132,6 @@ Execute **one milestone at a time**. At the end of each milestone, run all four 
 - [ ] **Multi-Select Bulk Bar:** `Ctrl/Cmd+Click` or `Shift+Click` cards/rows to select multiple links, springing up a floating bottom bar for Bulk Move, Tag, Star, Check, Open Tabs, and Delete.
 - [ ] **Pinned Quick Launch Strip:** Optional compact favicon dock right below the Space bar for 1-click launch of top daily sites.
 - [ ] **Smart Filter Views & Cross-Space Duplicate Finder:** Quick filters (*Recently Added*, *Most Opened*, *Untagged*) + 1-click cross-Space duplicate URL scanner inside *Settings → Library Tools*.
+
+### Future Backlog
+- [ ] **Custom Audio Pack Uploader:** Optional `.mp3` / `.wav` / `.ogg` per-event sound slot in *Settings → Effects* routed through the existing Cinematic DSP bus.

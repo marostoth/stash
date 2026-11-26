@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  playDelete,
   playDrop,
   playError,
   playHoverRiffle,
   playPickup,
   playSessionFreeze,
+  playTagPop,
   resetFoleyContextForTests,
   setSoundEffectsEnabled,
+  setSoundPack,
   setSoundVolume,
 } from '@/lib/audio/foley';
+import type { SoundPack } from '@/lib/types/stash';
 
 const globalWithAudio = globalThis as {
   AudioContext?: unknown;
@@ -99,7 +103,30 @@ function createMockAudioContextClass() {
           setValueAtTime: vi.fn(),
           exponentialRampToValueAtTime: vi.fn(),
         },
+        gain: { setValueAtTime: vi.fn() },
         Q: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+      };
+    }
+
+    createConvolver() {
+      return {
+        buffer: null,
+        connect: vi.fn(),
+      };
+    }
+
+    createWaveShaper() {
+      return {
+        curve: null,
+        oversample: 'none' as OverSampleType,
+        connect: vi.fn(),
+      };
+    }
+
+    createStereoPanner() {
+      return {
+        pan: { setValueAtTime: vi.fn() },
         connect: vi.fn(),
       };
     }
@@ -184,9 +211,37 @@ describe('Web Audio layered mechanical foley', () => {
     expect(ctorSpy).toHaveBeenCalledTimes(1);
     expect(resumeMock).toHaveBeenCalled();
     expect(gainSetValues).toContain(0.9);
-    expect(oscStartMock).toHaveBeenCalledTimes(7);
-    expect(oscStopMock).toHaveBeenCalledTimes(7);
+    expect(oscStartMock).toHaveBeenCalledTimes(8);
+    expect(oscStopMock).toHaveBeenCalledTimes(8);
     expect(noiseStartMock).toHaveBeenCalledTimes(7);
     expect(noiseStopMock).toHaveBeenCalledTimes(7);
+  });
+
+  it('plays every event cleanly across all 5 synthesized sound packs including ARPG Heavy', () => {
+    const { MockAudioContext, oscStartMock, noiseStartMock } =
+      createMockAudioContextClass();
+    globalWithAudio.AudioContext = MockAudioContext;
+
+    const packs: SoundPack[] = [
+      'arpg-heavy',
+      'studio-desk',
+      'mechanical-thock',
+      'retro-synth',
+      'glass-ceramic',
+    ];
+
+    packs.forEach((pack, idx) => {
+      setSoundPack(pack);
+      playPickup(true);
+      playDrop(true, 'arcade');
+      playSessionFreeze(true, 'arcade');
+      playTagPop(true, 'arcade');
+      expect(playHoverRiffle(true, 'arcade', 2000 + idx * 500)).toBe(true);
+      playDelete(true);
+      playError(true);
+    });
+
+    expect(oscStartMock.mock.calls.length).toBeGreaterThan(20);
+    expect(noiseStartMock.mock.calls.length).toBeGreaterThan(10);
   });
 });
