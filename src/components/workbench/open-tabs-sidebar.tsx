@@ -9,6 +9,7 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { LinkFavicon } from '@/components/LinkFavicon';
@@ -23,6 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ClearTabsButton } from '@/components/workbench/clear-tabs-button';
 import { playSessionFreeze } from '@/lib/audio/foley';
+import { isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import {
   type OpenTabInfo,
@@ -36,6 +38,7 @@ import {
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 import { extractDomain } from '@/lib/utils/url';
+import { useFxStore } from '@/store/fx-store';
 import { useUiStore } from '@/store/ui-store';
 
 interface OpenTabsSidebarProps {
@@ -51,7 +54,9 @@ interface OpenTabsSidebarProps {
 
 interface TabRowProps {
   tab: OpenTabInfo;
+  index: number;
   dimmed: boolean;
+  sweeping: boolean;
   hoverPreviews: boolean;
   collections: readonly Collection[];
   onQuickStashTab: (tab: OpenTabInfo, collectionId: string) => Promise<void>;
@@ -59,7 +64,9 @@ interface TabRowProps {
 
 function OpenTabRow({
   tab,
+  index,
   dimmed,
+  sweeping,
   hoverPreviews,
   collections,
   onQuickStashTab,
@@ -82,8 +89,18 @@ function OpenTabRow({
   };
 
   return (
-    <div
+    <motion.div
       ref={ref}
+      animate={
+        sweeping
+          ? { x: -54, y: 14, scale: 0.88, opacity: 0.12 }
+          : { x: 0, y: 0, scale: 1, opacity: 1 }
+      }
+      transition={{
+        duration: 0.22,
+        delay: sweeping ? Math.min(index, 10) * 0.022 : 0,
+        ease: [0.22, 1, 0.36, 1],
+      }}
       className={cn(
         'group relative flex items-center gap-2 rounded-control border border-transparent px-2 py-1.5 transition-colors hover:border-border hover:bg-card cursor-grab active:cursor-grabbing',
         dimmed && 'opacity-65 hover:opacity-95',
@@ -220,7 +237,7 @@ function OpenTabRow({
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -239,6 +256,11 @@ export function OpenTabsSidebar({
     (s) => s.triggerCollectionCascade,
   );
   const dismissPreview = useUiStore((s) => s.dismissPreview);
+  const sessionSweeping = useFxStore((s) => s.sessionSweeping);
+  const setSessionSweeping = useFxStore((s) => s.setSessionSweeping);
+  const triggerCollectionSlam = useFxStore((s) => s.triggerCollectionSlam);
+  const sweepEnabled =
+    isTactileMotion(settings.motionMode) && settings.fxAmbientWaves !== false;
 
   const eligibleTabs = selectTabsForSession(tabs, {
     includePinned: settings.includePinnedInSessions,
@@ -252,6 +274,10 @@ export function OpenTabsSidebar({
 
     setSaving(true);
     try {
+      if (sweepEnabled) {
+        setSessionSweeping(true);
+        await new Promise((resolve) => setTimeout(resolve, 230));
+      }
       const saved = await stashRepo.saveSessionCollection(tabs, {
         includePinned: settings.includePinnedInSessions,
         spaceId: activeSpaceId,
@@ -262,6 +288,9 @@ export function OpenTabsSidebar({
       }
 
       triggerCollectionCascade(saved.collection.id);
+      if (sweepEnabled) {
+        triggerCollectionSlam(saved.collection.id);
+      }
 
       if (closeAfterSave) {
         await closeTabs(saved.closableTabs.map((t) => t.id));
@@ -284,6 +313,7 @@ export function OpenTabsSidebar({
         );
       }
     } finally {
+      setSessionSweeping(false);
       setSaving(false);
     }
   };
@@ -390,11 +420,15 @@ export function OpenTabsSidebar({
                     {settings.includePinnedInSessions ? 'included' : 'skipped'}
                   </span>
                 </div>
-                {pinnedTabs.map((tab) => (
+                {pinnedTabs.map((tab, idx) => (
                   <OpenTabRow
                     key={tab.id}
                     tab={tab}
+                    index={idx}
                     dimmed={!settings.includePinnedInSessions}
+                    sweeping={
+                      sessionSweeping && settings.includePinnedInSessions
+                    }
                     hoverPreviews={settings.hoverPreviews}
                     collections={collections}
                     onQuickStashTab={onQuickStashTab}
@@ -410,11 +444,17 @@ export function OpenTabsSidebar({
                     Tabs ({regularTabs.length})
                   </div>
                 )}
-                {regularTabs.map((tab) => (
+                {regularTabs.map((tab, idx) => (
                   <OpenTabRow
                     key={tab.id}
                     tab={tab}
+                    index={
+                      settings.includePinnedInSessions
+                        ? pinnedTabs.length + idx
+                        : idx
+                    }
                     dimmed={false}
+                    sweeping={sessionSweeping}
                     hoverPreviews={settings.hoverPreviews}
                     collections={collections}
                     onQuickStashTab={onQuickStashTab}

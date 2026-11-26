@@ -8,6 +8,7 @@ import { stashRepo } from '@/lib/storage/repo';
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
 import { triggerAutoTagSingleLink } from '@/lib/tagging/trigger-auto-tag';
 import { DEFAULT_SPACE_ID, type MotionMode } from '@/lib/types/stash';
+import { useFxStore } from '@/store/fx-store';
 import { useUiStore } from '@/store/ui-store';
 
 interface UseWorkbenchDndOptions {
@@ -27,6 +28,8 @@ export function useWorkbenchDnd({
   const pulseLink = useUiStore((s) => s.pulseLink);
   const settleLink = useUiStore((s) => s.settleLink);
   const dismissPreview = useUiStore((s) => s.dismissPreview);
+  const triggerSettledImpact = useFxStore((s) => s.triggerSettledImpact);
+  const triggerSpaceSwallow = useFxStore((s) => s.triggerSpaceSwallow);
 
   const revealDuplicate = useCallback(
     async (existingLinkId: string, targetCollectionId: string) => {
@@ -66,10 +69,17 @@ export function useWorkbenchDnd({
       await stashRepo.updateCollection(collectionId, { collapsed: false });
       playDrop(soundEffects, motionMode);
       settleLink(result.link.id);
+      triggerSettledImpact(result.link.id, collectionId);
       toast.success(`Stashed "${result.link.title}"`);
       void triggerAutoTagSingleLink(result.link.id);
     },
-    [revealDuplicate, motionMode, soundEffects, settleLink],
+    [
+      revealDuplicate,
+      motionMode,
+      soundEffects,
+      settleLink,
+      triggerSettledImpact,
+    ],
   );
 
   const handleDragStart = useCallback(() => {
@@ -114,7 +124,8 @@ export function useWorkbenchDnd({
             .moveCollectionToSpace(sourceData.collection.id, spaceId)
             .then((moved) => {
               if (!moved) return;
-              playDrop(soundEffects);
+              playDrop(soundEffects, motionMode);
+              triggerSpaceSwallow(spaceId, '+1 col');
               toast.success(`Moved "${moved.name}" to ${spaceName}`, {
                 action: {
                   label: 'Open Space',
@@ -141,6 +152,7 @@ export function useWorkbenchDnd({
             }
             playDrop(soundEffects, motionMode);
             settleLink(result.link.id);
+            triggerSpaceSwallow(spaceId, '+1');
             toast.success(`Stashed to ${spaceName} → ${inbox.name}`, {
               action: {
                 label: 'Open Space',
@@ -168,6 +180,7 @@ export function useWorkbenchDnd({
             if (result.ok) {
               playDrop(soundEffects, motionMode);
               settleLink(sourceData.link.id);
+              triggerSpaceSwallow(spaceId, '+1');
               toast.success(`Moved to ${spaceName} → ${inbox.name}`, {
                 action: {
                   label: 'Open Space',
@@ -231,8 +244,9 @@ export function useWorkbenchDnd({
             return;
           }
           if (result.ok) {
-            playDrop(soundEffects);
+            playDrop(soundEffects, motionMode);
             settleLink(sourceData.link.id);
+            triggerSettledImpact(sourceData.link.id, targetCollectionId);
           }
         };
 
@@ -269,6 +283,8 @@ export function useWorkbenchDnd({
       soundEffects,
       motionMode,
       settleLink,
+      triggerSettledImpact,
+      triggerSpaceSwallow,
       onSwitchSpace,
     ],
   );

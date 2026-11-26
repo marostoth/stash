@@ -316,10 +316,34 @@ export function parseSettings(raw: unknown): StashSettings {
       obj.motionMode === 'off'
         ? obj.motionMode
         : DEFAULT_SETTINGS.motionMode,
+    dropEffectStyle:
+      obj.dropEffectStyle === 'dust' || obj.dropEffectStyle === 'accent'
+        ? obj.dropEffectStyle
+        : DEFAULT_SETTINGS.dropEffectStyle,
+    fxDeskJolt:
+      typeof obj.fxDeskJolt === 'boolean'
+        ? obj.fxDeskJolt
+        : DEFAULT_SETTINGS.fxDeskJolt,
+    fxDragTilt:
+      typeof obj.fxDragTilt === 'boolean'
+        ? obj.fxDragTilt
+        : DEFAULT_SETTINGS.fxDragTilt,
+    fxHoverSheen:
+      typeof obj.fxHoverSheen === 'boolean'
+        ? obj.fxHoverSheen
+        : DEFAULT_SETTINGS.fxHoverSheen,
+    fxAmbientWaves:
+      typeof obj.fxAmbientWaves === 'boolean'
+        ? obj.fxAmbientWaves
+        : DEFAULT_SETTINGS.fxAmbientWaves,
     soundEffects:
       typeof obj.soundEffects === 'boolean'
         ? obj.soundEffects
         : DEFAULT_SETTINGS.soundEffects,
+    soundVolume:
+      typeof obj.soundVolume === 'number' && Number.isFinite(obj.soundVolume)
+        ? Math.max(0, Math.min(100, Math.round(obj.soundVolume)))
+        : DEFAULT_SETTINGS.soundVolume,
     hoverPreviews:
       typeof obj.hoverPreviews === 'boolean'
         ? obj.hoverPreviews

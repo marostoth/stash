@@ -6,11 +6,9 @@ import {
   ChevronRight,
   GripVertical,
   Image as ImageIcon,
-  Layers,
   LayoutGrid,
   Plus,
   Sparkles,
-  Star,
   Tag,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -19,11 +17,14 @@ import { toast } from 'sonner';
 import { CollectionAppearancePopover } from '@/components/CollectionAppearancePopover';
 import { InlineProgressPill } from '@/components/ui/ai-activity-panel';
 import { Button } from '@/components/ui/button';
-import { OdometerCounter } from '@/components/ui/odometer-counter';
 import { CollectionActionsMenu } from '@/components/workbench/collection-actions-menu';
+import {
+  CollectionHeaderBadges,
+  resolveCollectionGridClass,
+} from '@/components/workbench/collection-header-badges';
 import { LinkCard } from '@/components/workbench/link-card';
 import { useAutoTagSweep } from '@/hooks/use-auto-tag-sweep';
-import { COLLAPSE_SPRING } from '@/lib/motion/physics';
+import { COLLAPSE_SPRING, isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import {
   wakeUpCollectionInNewWindow,
@@ -35,6 +36,7 @@ import {
   type CardDensity,
   type Collection,
   DEFAULT_SPACE_ID,
+  type DropEffectStyle,
   type LinkItem,
   type MotionMode,
   type Space,
@@ -45,6 +47,7 @@ import {
   formatCurrencySummaries,
   summarizePrices,
 } from '@/lib/utils/price-math';
+import { useFxStore } from '@/store/fx-store';
 import { useUiStore } from '@/store/ui-store';
 
 interface CollectionSectionProps {
@@ -61,6 +64,10 @@ interface CollectionSectionProps {
   forceExpanded: boolean;
   dragDisabled: boolean;
   motionMode: MotionMode;
+  dropEffectStyle?: DropEffectStyle;
+  fxDeskJolt?: boolean;
+  fxHoverSheen?: boolean;
+  fxAmbientWaves?: boolean;
   soundEffects: boolean;
   hoverPreviews: boolean;
 }
@@ -79,6 +86,10 @@ export function CollectionSection({
   forceExpanded,
   dragDisabled,
   motionMode,
+  dropEffectStyle = 'dust',
+  fxDeskJolt = true,
+  fxHoverSheen = true,
+  fxAmbientWaves = true,
   soundEffects,
   hoverPreviews,
 }: CollectionSectionProps) {
@@ -91,6 +102,10 @@ export function CollectionSection({
   const isCascading = useUiStore((s) =>
     s.cascadingCollectionIds.includes(collection.id),
   );
+  const isWaking = useFxStore((s) => s.wakingCollectionId === collection.id);
+  const isSlammed = useFxStore((s) => s.slammedCollectionId === collection.id);
+  const triggerWakeWave = useFxStore((s) => s.triggerWakeWave);
+  const tactile = isTactileMotion(motionMode);
   const autoTag = useAutoTagSweep(collection.id);
   const untaggedCount = links.filter(isEligibleForAutoTag).length;
 
@@ -174,6 +189,10 @@ export function CollectionSection({
       toast.info('No links in this collection to open.');
       return;
     }
+    if (tactile && fxAmbientWaves) {
+      triggerWakeWave(collection.id);
+      await new Promise((resolve) => setTimeout(resolve, 140));
+    }
     const opened = await wakeUpCollectionInTabGroup(collection, links);
     if (opened > 0) {
       toast.success(
@@ -186,6 +205,10 @@ export function CollectionSection({
     if (links.length === 0) {
       toast.info('No links in this collection to open.');
       return;
+    }
+    if (tactile && fxAmbientWaves) {
+      triggerWakeWave(collection.id);
+      await new Promise((resolve) => setTimeout(resolve, 140));
     }
     const opened = await wakeUpCollectionInNewWindow(links);
     if (opened > 0) {
@@ -203,19 +226,34 @@ export function CollectionSection({
         isDragging && 'opacity-40',
       )}
     >
-      <div
+      <motion.div
         ref={dropRef}
         style={tintStyle}
+        animate={
+          isSlammed && tactile
+            ? { scale: [1.03, 0.985, 1.004, 1], y: [-10, 2, 0, 0] }
+            : { scale: 1, y: 0 }
+        }
+        transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
         className={cn(
           'space-y-3 rounded-card transition-colors',
           collection.tintColor
             ? 'stash-collection-tinted p-3.5'
             : 'p-1.5 -m-1.5',
-          isDropTarget && 'bg-panel/60 ring-2 ring-accent/55',
+          isDropTarget &&
+            cn(
+              'bg-panel/60 ring-2 ring-accent/55',
+              tactile && 'stash-dropzone-breathe',
+            ),
         )}
       >
         {/* Collection Header */}
-        <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
+        <div
+          className={cn(
+            'flex items-center justify-between gap-2 border-b border-border pb-2 transition-transform duration-150',
+            isDropTarget && tactile && '-translate-y-0.5',
+          )}
+        >
           <div className="flex min-w-0 items-center gap-1.5">
             {!dragDisabled && (
               <button
@@ -265,52 +303,18 @@ export function CollectionSection({
               <h2 className="truncate text-sm font-semibold tracking-tight text-fg">
                 {collection.name}
               </h2>
-              <span className="shrink-0 rounded-pill border border-border bg-panel px-2 py-0.5 font-mono text-[10px] text-fg-muted">
-                <OdometerCounter value={links.length} motionMode={motionMode} />
-              </span>
-              {collection.isSession && (
-                <span className="hidden shrink-0 rounded-pill border border-accent/55 bg-accent/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-accent sm:inline-block">
-                  SESSION
-                </span>
-              )}
-              {collection.isAutoInbox && (
-                <span
-                  title="Temporary Space Inbox — auto-removes once empty; rename to keep permanently"
-                  className="hidden shrink-0 rounded-pill border border-border bg-canvas px-2 py-0.5 font-mono text-[10px] text-fg-muted sm:inline-block"
-                >
-                  AUTO-CLEANS
-                </span>
-              )}
-              {collectionTotalText && (
-                <span className="shrink-0 rounded-pill border border-border bg-panel px-2 py-0.5 font-mono text-[10px] text-fg">
-                  {collectionTotalText}
-                </span>
-              )}
-              {collectionTotalText && starredLinks.length > 0 && (
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-pill border border-accent/45 bg-accent/12 px-2 py-0.5 font-mono text-[10px] text-accent">
-                  <Star className="h-2.5 w-2.5 fill-accent" />
-                  {starredLinks.length}
-                  {starredTotalText ? ` · ${starredTotalText}` : ''}
-                </span>
-              )}
-              {collection.description && (
-                <span className="hidden truncate text-xs text-fg-muted lg:inline">
-                  — {collection.description}
-                </span>
-              )}
+              <CollectionHeaderBadges
+                collection={collection}
+                linkCount={links.length}
+                collectionTotalText={collectionTotalText}
+                starredCount={starredLinks.length}
+                starredTotalText={starredTotalText}
+                spaceBadge={spaceBadge}
+                motionMode={motionMode}
+                fxAmbientWaves={fxAmbientWaves}
+                onSwitchSpace={onSwitchSpace}
+              />
             </button>
-
-            {spaceBadge && onSwitchSpace && (
-              <button
-                type="button"
-                onClick={() => onSwitchSpace(spaceBadge.id)}
-                title={`Switch to ${spaceBadge.name} Space`}
-                className="inline-flex shrink-0 items-center gap-1 rounded-pill border border-border bg-panel px-2 py-0.5 font-mono text-[10px] text-fg-muted transition-colors hover:border-accent/50 hover:text-accent cursor-pointer"
-              >
-                <Layers className="h-2.5 w-2.5" />
-                <span>{spaceBadge.name}</span>
-              </button>
-            )}
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
@@ -424,28 +428,22 @@ export function CollectionSection({
           {!isCollapsed && (
             <motion.div
               key="collection-body"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
+              initial={{ height: 0, opacity: 0, overflow: 'hidden' }}
+              animate={{
+                height: 'auto',
+                opacity: 1,
+                transitionEnd: { overflow: 'visible' },
+              }}
+              exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
               transition={COLLAPSE_SPRING}
-              className="overflow-hidden"
             >
               <div className="px-0.5 py-1">
                 {links.length > 0 ? (
                   <div
-                    className={cn(
-                      density === 'micro' && viewMode !== 'cover'
-                        ? wideBoard
-                          ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 min-[1900px]:grid-cols-7'
-                          : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5'
-                        : wideBoard
-                          ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1900px]:grid-cols-6'
-                          : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4',
-                      density === 'micro'
-                        ? 'gap-2'
-                        : density === 'compact'
-                          ? 'gap-2.5'
-                          : 'gap-3.5',
+                    className={resolveCollectionGridClass(
+                      density,
+                      viewMode,
+                      wideBoard,
                     )}
                   >
                     {links.map((link, cardIndex) => (
@@ -457,8 +455,13 @@ export function CollectionSection({
                         density={density}
                         dragDisabled={dragDisabled}
                         motionMode={motionMode}
+                        dropEffectStyle={dropEffectStyle}
+                        fxDeskJolt={fxDeskJolt}
+                        fxHoverSheen={fxHoverSheen}
+                        fxAmbientWaves={fxAmbientWaves}
                         soundEffects={soundEffects}
                         cascadeActive={isCascading}
+                        wakeWaveActive={isWaking}
                         hoverPreviews={hoverPreviews}
                         viewMode={viewMode}
                         collectionTint={collection.tintColor}
@@ -486,7 +489,7 @@ export function CollectionSection({
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
     </section>
   );
 }

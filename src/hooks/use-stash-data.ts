@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
-import { setFoleyMotionMode, setSoundEffectsEnabled } from '@/lib/audio/foley';
+import {
+  setFoleyMotionMode,
+  setSoundEffectsEnabled,
+  setSoundVolume,
+} from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
 import {
   applyThemeToDocument,
@@ -131,11 +135,12 @@ export function useStashData(): StashDataState {
 
   useEffect(() => {
     setSoundEffectsEnabled(settings.soundEffects);
+    setSoundVolume(settings.soundVolume);
     setFoleyMotionMode(settings.motionMode);
     if (typeof document !== 'undefined') {
       document.documentElement.dataset.motion = settings.motionMode;
     }
-  }, [settings.soundEffects, settings.motionMode]);
+  }, [settings.soundEffects, settings.soundVolume, settings.motionMode]);
 
   return {
     loading,

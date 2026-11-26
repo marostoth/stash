@@ -6,28 +6,34 @@ import {
   Plus,
   SlidersHorizontal,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   CreateSpacePopover,
   EditSpacePopover,
 } from '@/components/workbench/space-bar-popovers';
+import { isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import { getCuratedCollectionIcon } from '@/lib/themes/collection-icons';
 import {
   type Collection,
   DEFAULT_SPACE_ID,
+  type MotionMode,
   type Space,
   type SpaceGroupBy,
   type SpaceViewMode,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+import { useFxStore } from '@/store/fx-store';
 
 interface DroppableSpacePillProps {
   space: Space;
   index: number;
   isActive: boolean;
   colCount: number;
+  motionMode: MotionMode;
+  fxAmbientWaves: boolean;
   onSelect: () => void;
   onToggleEdit: () => void;
 }
@@ -37,10 +43,17 @@ function DroppableSpacePill({
   index,
   isActive,
   colCount,
+  motionMode,
+  fxAmbientWaves,
   onSelect,
   onToggleEdit,
 }: DroppableSpacePillProps) {
   const SpaceIcon = getCuratedCollectionIcon(space.icon) ?? Layers;
+  const swallowedSpace = useFxStore((s) => s.swallowedSpace);
+  const tactile = isTactileMotion(motionMode);
+  const isSwallowing =
+    tactile && fxAmbientWaves && swallowedSpace?.spaceId === space.id;
+
   const { ref, isDropTarget } = useDroppable({
     id: `space-drop:${space.id}`,
     accept: ['link', 'open-tab', 'collection'],
@@ -53,62 +66,105 @@ function DroppableSpacePill({
   });
 
   return (
-    <div
-      ref={ref}
-      className={cn(
-        'group relative inline-flex shrink-0 items-center rounded-control border transition-all',
-        isDropTarget
-          ? 'border-accent bg-accent/20 text-fg ring-2 ring-accent/65'
-          : isActive
-            ? 'border-accent/55 bg-accent/12 text-fg'
-            : 'border-transparent text-fg-muted hover:border-border hover:bg-card/60 hover:text-fg',
-      )}
-    >
-      <button
-        type="button"
-        onClick={onSelect}
-        aria-current={isActive ? 'page' : undefined}
-        title={
-          index < 9
-            ? `${space.name} (press ${index + 1} · drag cards, tabs, or collections here)`
-            : `${space.name} (drag cards, tabs, or collections here)`
+    <div ref={ref} className="relative shrink-0">
+      <AnimatePresence>
+        {isSwallowing && swallowedSpace && (
+          <>
+            <motion.span
+              key={`ring-${swallowedSpace.seq}`}
+              aria-hidden="true"
+              initial={{ scale: 0.96, opacity: 0.85 }}
+              animate={{ scale: 1.32, opacity: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.44, ease: [0.16, 1, 0.3, 1] }}
+              className="pointer-events-none absolute inset-0 rounded-control border-2 border-accent"
+            />
+            <motion.span
+              key={`badge-${swallowedSpace.seq}`}
+              aria-hidden="true"
+              initial={{ y: 2, opacity: 0, scale: 0.7 }}
+              animate={{ y: -22, opacity: [0, 1, 1, 0], scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.62, ease: 'easeOut' }}
+              className="pointer-events-none absolute left-1/2 top-0 z-30 -translate-x-1/2 rounded-pill bg-accent px-1.5 py-0.25 font-mono text-[10px] font-bold text-accent-fg shadow-md"
+            >
+              {swallowedSpace.label}
+            </motion.span>
+          </>
+        )}
+      </AnimatePresence>
+
+      <motion.div
+        animate={
+          isSwallowing
+            ? { scale: [1, 1.14, 0.94, 1.03, 1] }
+            : isDropTarget && tactile
+              ? { scale: 1.04, y: -1 }
+              : { scale: 1, y: 0 }
+        }
+        transition={
+          isSwallowing
+            ? { duration: 0.38, ease: [0.22, 1, 0.36, 1] }
+            : { duration: 0.14 }
         }
         className={cn(
-          'inline-flex h-7 items-center gap-1.5 px-2.5 text-xs font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded-control',
-          isActive && 'pr-1.5',
+          'group relative inline-flex shrink-0 items-center rounded-control border transition-colors',
+          isDropTarget
+            ? cn(
+                'border-accent bg-accent/20 text-fg ring-2 ring-accent/65',
+                tactile && 'stash-dropzone-breathe',
+              )
+            : isActive
+              ? 'border-accent/55 bg-accent/12 text-fg'
+              : 'border-transparent text-fg-muted hover:border-border hover:bg-card/60 hover:text-fg',
         )}
       >
-        <SpaceIcon
-          className={cn(
-            'h-3.5 w-3.5 shrink-0',
-            isActive || isDropTarget ? 'text-accent' : 'text-fg-muted',
-          )}
-          aria-hidden="true"
-        />
-        <span className="max-w-[140px] truncate">{space.name}</span>
-        <span className="font-mono text-[10px] text-fg-muted/85">
-          {colCount}
-        </span>
-      </button>
-
-      {isActive && (
         <button
           type="button"
-          onClick={onToggleEdit}
-          aria-label={`Edit ${space.name} space`}
-          title="Rename, icon, density, or delete Space"
-          className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded text-fg-muted transition-colors hover:bg-panel hover:text-accent cursor-pointer"
+          onClick={onSelect}
+          aria-current={isActive ? 'page' : undefined}
+          title={
+            index < 9
+              ? `${space.name} (press ${index + 1} · drag cards, tabs, or collections here)`
+              : `${space.name} (drag cards, tabs, or collections here)`
+          }
+          className={cn(
+            'inline-flex h-7 items-center gap-1.5 px-2.5 text-xs font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded-control',
+            isActive && 'pr-1.5',
+          )}
         >
-          <SlidersHorizontal className="h-3 w-3" />
+          <SpaceIcon
+            className={cn(
+              'h-3.5 w-3.5 shrink-0',
+              isActive || isDropTarget ? 'text-accent' : 'text-fg-muted',
+            )}
+            aria-hidden="true"
+          />
+          <span className="max-w-[140px] truncate">{space.name}</span>
+          <span className="font-mono text-[10px] text-fg-muted/85">
+            {colCount}
+          </span>
         </button>
-      )}
 
-      {isActive && (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-2 -bottom-[7px] h-[2px] rounded-full bg-accent"
-        />
-      )}
+        {isActive && (
+          <button
+            type="button"
+            onClick={onToggleEdit}
+            aria-label={`Edit ${space.name} space`}
+            title="Rename, icon, density, or delete Space"
+            className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded text-fg-muted transition-colors hover:bg-panel hover:text-accent cursor-pointer"
+          >
+            <SlidersHorizontal className="h-3 w-3" />
+          </button>
+        )}
+
+        {isActive && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-2 -bottom-[7px] h-[2px] rounded-full bg-accent"
+          />
+        )}
+      </motion.div>
     </div>
   );
 }
@@ -118,6 +174,8 @@ interface SpaceBarProps {
   collections: readonly Collection[];
   activeSpaceId: string;
   wideBoard: boolean;
+  motionMode: MotionMode;
+  fxAmbientWaves: boolean;
   onSelectSpace: (spaceId: string) => void;
 }
 
@@ -126,6 +184,8 @@ export function SpaceBar({
   collections,
   activeSpaceId,
   wideBoard,
+  motionMode,
+  fxAmbientWaves,
   onSelectSpace,
 }: SpaceBarProps) {
   const [creating, setCreating] = useState(false);
@@ -216,6 +276,8 @@ export function SpaceBar({
                 index={idx}
                 isActive={space.id === activeSpaceId}
                 colCount={collectionCountBySpace.get(space.id) ?? 0}
+                motionMode={motionMode}
+                fxAmbientWaves={fxAmbientWaves}
                 onSelect={() => onSelectSpace(space.id)}
                 onToggleEdit={() => {
                   setCreating(false);

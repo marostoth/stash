@@ -20,11 +20,17 @@ import { extractDomain, getMonogram } from '@/lib/utils/url';
 interface DragGhostProps {
   data: DragItemData;
   motionMode: MotionMode;
+  dragTiltEnabled?: boolean;
 }
 
-export function DragGhost({ data, motionMode }: DragGhostProps) {
+export function DragGhost({
+  data,
+  motionMode,
+  dragTiltEnabled = true,
+}: DragGhostProps) {
   const arcade = isArcadeMotion(motionMode);
   const tactile = isTactileMotion(motionMode);
+  const tiltActive = tactile && dragTiltEnabled;
   const targetTilt = useMotionValue(0);
   const smoothTilt = useSpring(
     targetTilt,
@@ -32,7 +38,7 @@ export function DragGhost({ data, motionMode }: DragGhostProps) {
   );
 
   useEffect(() => {
-    if (!tactile) {
+    if (!tiltActive) {
       targetTilt.set(0);
       return;
     }
@@ -72,7 +78,7 @@ export function DragGhost({ data, motionMode }: DragGhostProps) {
       if (settleTimer) clearTimeout(settleTimer);
       targetTilt.set(0);
     };
-  }, [arcade, tactile, targetTilt]);
+  }, [arcade, tiltActive, targetTilt]);
 
   const glowStyle: React.CSSProperties = {
     boxShadow: arcade
@@ -91,7 +97,7 @@ export function DragGhost({ data, motionMode }: DragGhostProps) {
         transition={TACTILE_SPRING}
         style={{
           ...glowStyle,
-          rotate: tactile ? smoothTilt : 0,
+          rotate: tiltActive ? smoothTilt : 0,
         }}
         className="flex w-72 items-center gap-2 rounded-card border border-accent/75 bg-panel px-3.5 py-2.5 will-change-transform"
       >

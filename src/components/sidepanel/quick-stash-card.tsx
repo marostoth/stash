@@ -1,4 +1,5 @@
-import { BookmarkPlus, Loader2 } from 'lucide-react';
+import { BookmarkPlus, Check, Loader2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { QuickStashCollectionPicker } from '@/components/sidepanel/quick-stash-collection-picker';
@@ -9,6 +10,7 @@ import { parseSpaceInboxValue } from '@/components/ui/space-grouped-collection-o
 import { useQuickStashCategorizer } from '@/hooks/use-quick-stash-categorizer';
 import { useQuickStashProduct } from '@/hooks/use-quick-stash-product';
 import { playDrop, playError } from '@/lib/audio/foley';
+import { isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
 import { closeTabs } from '@/lib/tabs/tab-actions';
@@ -20,6 +22,7 @@ import type {
   Space,
   StashSettings,
 } from '@/lib/types/stash';
+import { cn } from '@/lib/utils/cn';
 import { extractDomain, getMonogram, parseTagsInput } from '@/lib/utils/url';
 
 interface QuickStashCardProps {
@@ -49,8 +52,25 @@ export function QuickStashCard({
   const [tagsRaw, setTagsRaw] = useState('');
   const [tagsEditedByUser, setTagsEditedByUser] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [justStamped, setJustStamped] = useState(false);
   const [faviconFailed, setFaviconFailed] = useState(false);
   const [creatingName, setCreatingName] = useState<string | null>(null);
+  const stampTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (stampTimerRef.current) clearTimeout(stampTimerRef.current);
+    };
+  }, []);
+
+  const triggerStampFeedback = () => {
+    if (stampTimerRef.current) clearTimeout(stampTimerRef.current);
+    setJustStamped(true);
+    stampTimerRef.current = setTimeout(() => {
+      setJustStamped(false);
+      stampTimerRef.current = null;
+    }, 1050);
+  };
 
   const userPickedCollectionRef = useRef(false);
   const userEditedNoteRef = useRef(false);
@@ -169,7 +189,8 @@ export function QuickStashCard({
               : {}),
           },
         });
-        playDrop(settings.soundEffects);
+        playDrop(settings.soundEffects, settings.motionMode);
+        triggerStampFeedback();
         toast.success('Updated product info');
         return;
       }
@@ -192,7 +213,8 @@ export function QuickStashCard({
         return;
       }
 
-      playDrop(settings.soundEffects);
+      playDrop(settings.soundEffects, settings.motionMode);
+      triggerStampFeedback();
       toast.success('Tab stashed');
       setNote('');
       setTagsRaw('');
@@ -232,11 +254,23 @@ export function QuickStashCard({
   const parsedTags = parseTagsInput(tagsRaw);
 
   const aiWorking = categorizing || enrichingTags;
+  const tactile = isTactileMotion(settings.motionMode);
+  const stampMotion =
+    justStamped && tactile && settings.fxAmbientWaves !== false;
 
   return (
-    <form
+    <motion.form
       onSubmit={(e) => void handleSubmit(e)}
-      className="relative space-y-3 overflow-hidden rounded-card border border-border bg-panel p-3.5 shadow-sm"
+      animate={
+        stampMotion
+          ? { y: [0, 6, -1.5, 0], scale: [1, 0.982, 1.005, 1] }
+          : { y: 0, scale: 1 }
+      }
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      className={cn(
+        'relative space-y-3 overflow-hidden rounded-card border border-border bg-panel p-3.5 shadow-sm transition-colors',
+        stampMotion && 'border-accent/80 stash-stamp-flash',
+      )}
     >
       {/* Top animated progress bar while On-Device AI is matching or tagging */}
       {aiWorking && (
@@ -381,14 +415,44 @@ export function QuickStashCard({
           disabled={saving || (alreadyInSelected && !product.productMeta)}
           className="gap-1.5"
         >
-          <BookmarkPlus className="h-3.5 w-3.5" />
-          {alreadyInSelected
-            ? product.productMeta
-              ? 'Save Product'
-              : 'Saved'
-            : 'Stash Tab'}
+          <AnimatePresence mode="wait" initial={false}>
+            {justStamped ? (
+              <motion.span
+                key="stamped"
+                initial={tactile ? { scale: 0.55, opacity: 0 } : false}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                transition={{
+                  type: 'spring',
+                  stiffness: 560,
+                  damping: 22,
+                }}
+                className="inline-flex items-center gap-1.5"
+              >
+                <Check className="h-3.5 w-3.5" />
+                <span>Stashed!</span>
+              </motion.span>
+            ) : (
+              <motion.span
+                key="idle"
+                initial={false}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="inline-flex items-center gap-1.5"
+              >
+                <BookmarkPlus className="h-3.5 w-3.5" />
+                <span>
+                  {alreadyInSelected
+                    ? product.productMeta
+                      ? 'Save Product'
+                      : 'Saved'
+                    : 'Stash Tab'}
+                </span>
+              </motion.span>
+            )}
+          </AnimatePresence>
         </Button>
       </div>
-    </form>
+    </motion.form>
   );
 }

@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { RollingCurrency } from '@/components/ui/rolling-currency';
 import { DetailsCollectionSection } from '@/components/workbench/details-collection-section';
 import {
   type DetailsSortColumn,
@@ -16,6 +17,7 @@ import {
 import {
   type Collection,
   DEFAULT_SPACE_ID,
+  type DropEffectStyle,
   type LinkItem,
   type MotionMode,
   type Space,
@@ -38,6 +40,8 @@ interface DetailsViewProps {
   openInNewTab: boolean;
   defaultCurrency: string;
   motionMode: MotionMode;
+  dropEffectStyle?: DropEffectStyle;
+  fxAmbientWaves?: boolean;
   soundEffects: boolean;
   hoverPreviews: boolean;
   onSwitchSpace: (spaceId: string) => void;
@@ -52,6 +56,8 @@ export function DetailsView({
   openInNewTab,
   defaultCurrency,
   motionMode,
+  dropEffectStyle = 'dust',
+  fxAmbientWaves = true,
   soundEffects,
   hoverPreviews,
   onSwitchSpace,
@@ -262,6 +268,8 @@ export function DetailsView({
                 defaultCurrency={defaultCurrency}
                 openInNewTab={openInNewTab}
                 motionMode={motionMode}
+                dropEffectStyle={dropEffectStyle}
+                fxAmbientWaves={fxAmbientWaves}
                 soundEffects={soundEffects}
                 hoverPreviews={hoverPreviews}
                 gridTemplateClass={gridTemplateClass}
@@ -293,6 +301,8 @@ export function DetailsView({
                 defaultCurrency={defaultCurrency}
                 openInNewTab={openInNewTab}
                 motionMode={motionMode}
+                dropEffectStyle={dropEffectStyle}
+                fxAmbientWaves={fxAmbientWaves}
                 soundEffects={soundEffects}
                 hoverPreviews={hoverPreviews}
                 gridTemplateClass={gridTemplateClass}
@@ -320,7 +330,17 @@ export function DetailsView({
                 <Star className="h-3 w-3 fill-accent" />
                 <span>
                   Starred ({starredAll.length}):{' '}
-                  <strong>{starredTotalText || '—'}</strong>
+                  <strong>
+                    {starredTotalText ? (
+                      <RollingCurrency
+                        value={starredTotalText}
+                        motionMode={motionMode}
+                        enabled={fxAmbientWaves}
+                      />
+                    ) : (
+                      '—'
+                    )}
+                  </strong>
                 </span>
               </div>
             )}
@@ -336,7 +356,11 @@ export function DetailsView({
               Space Total
             </span>
             <strong className="font-semibold text-fg tabular-nums">
-              {spaceTotalText}
+              <RollingCurrency
+                value={spaceTotalText}
+                motionMode={motionMode}
+                enabled={fxAmbientWaves}
+              />
             </strong>
           </div>
 

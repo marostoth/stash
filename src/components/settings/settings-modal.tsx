@@ -5,11 +5,13 @@ import {
   SlidersHorizontal,
   Sparkles,
   Wrench,
+  Zap,
 } from 'lucide-react';
 import { type ComponentType, useEffect, useState } from 'react';
 import { AiRulesPanel } from '@/components/settings/ai-rules-panel';
 import { AppearancePanel } from '@/components/settings/appearance-panel';
 import { BackupImportPanel } from '@/components/settings/backup-import-panel';
+import { EffectsPanel } from '@/components/settings/effects-panel';
 import { GeneralPanel } from '@/components/settings/general-panel';
 import { LibraryToolsPanel } from '@/components/settings/library-tools-panel';
 import { ShortcutsPanel } from '@/components/settings/shortcuts-panel';
@@ -61,8 +63,15 @@ const NAV_ITEMS: readonly NavItemSpec[] = [
     id: 'appearance',
     label: 'Appearance',
     description:
-      'Built-in skins, Theme Studio, backdrops, wallpaper, and foley.',
+      'Built-in skins, Theme Studio, canvas backdrops, and wallpaper.',
     Icon: Palette,
+  },
+  {
+    id: 'effects',
+    label: 'Effects',
+    description:
+      'Motion physics, drop shockwaves, mechanical foley, and effect volume.',
+    Icon: Zap,
   },
   {
     id: 'ai-rules',
@@ -265,6 +274,8 @@ export function SettingsModal({
               activeTheme={activeTheme}
               settings={settings}
             />
+          ) : activeTab === 'effects' ? (
+            <EffectsPanel settings={settings} />
           ) : activeTab === 'ai-rules' ? (
             <AiRulesPanel
               collections={collections}

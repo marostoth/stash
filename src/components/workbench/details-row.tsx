@@ -8,9 +8,16 @@ import {
   InlinePriceCell,
   InlineSpecCell,
 } from '@/components/workbench/details-inline-cells';
+import { DropSparks } from '@/components/workbench/drop-sparks';
 import { playDelete, playDrop, playTagPop } from '@/lib/audio/foley';
+import { isArcadeMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
-import type { LinkItem, MotionMode, ProductMeta } from '@/lib/types/stash';
+import type {
+  DropEffectStyle,
+  LinkItem,
+  MotionMode,
+  ProductMeta,
+} from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 import {
   createDebouncedWriter,
@@ -33,6 +40,7 @@ interface DetailsRowProps {
   defaultCurrency: string;
   openInNewTab: boolean;
   motionMode: MotionMode;
+  dropEffectStyle?: DropEffectStyle;
   soundEffects: boolean;
   hoverPreviews: boolean;
   gridTemplateClass: string;
@@ -64,6 +72,7 @@ function DetailsRowView({
   defaultCurrency,
   openInNewTab,
   motionMode,
+  dropEffectStyle = 'dust',
   soundEffects,
   hoverPreviews,
   gridTemplateClass,
@@ -79,6 +88,8 @@ function DetailsRowView({
   const isKeyboardFocused = useUiStore(
     (s) => s.keyboardFocusedLinkId === link.id,
   );
+  const isSettling = useUiStore((s) => s.settledLinkId === link.id);
+  const arcade = isArcadeMotion(motionMode);
 
   const isStarred = link.starred === true;
   const product = link.product;
@@ -232,6 +243,11 @@ function DetailsRowView({
           className="pointer-events-none absolute inset-y-0 left-0 w-[2px] bg-accent"
         />
       )}
+      <DropSparks
+        active={arcade && isSettling}
+        variant={dropEffectStyle}
+        compact
+      />
 
       {/* 1. Left Drag Handle + Star toggle */}
       <div className="flex items-center gap-0.5">

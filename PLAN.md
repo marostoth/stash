@@ -107,3 +107,28 @@ Execute **one milestone at a time**. At the end of each milestone, run all four 
 2. Test importing your existing Chrome bookmarks (or a small `.html` bookmark export) from the Empty State.
 3. Export a theme JSON, tweak the accent hex color, re-import it as a custom theme, and verify it applies live.
 4. Confirm `.output/stash-*-chrome.zip` is generated and ready for Unlisted upload to the Chrome Web Store.
+
+---
+
+## Active Feature Roadmap (v1.17.0 – v1.20.0)
+
+### v1.17.0 — Effects Studio, Perimeter Shockwaves & Tactile Animations (Shipped)
+- Dedicated **Settings → Effects** page with Live Impact Preview Stage, Volume Slider (`0%–100%`), Foley Soundboard, and 4 Fine-Tune Physics toggles (`fxDeskJolt`, `fxDragTilt`, `fxHoverSheen`, `fxAmbientWaves`).
+- Underneath perimeter dust shockwave (`Neutral Dust + Accent Ring` and `Full Accent Glow`), heavy tile slam, louder layered Web Audio foley with compressor bus, radial neighbor desk jolt, hover tilt sheen, star pop shimmer burst, delete vaporize, magnetic drop-zone breathing, Wake Up ignition wave, Save Session deck sweep, Space pill `+1` swallow, directional Space slide, Quick Stash vault stamp, and rolling odometer totals.
+
+### Milestone A (v1.18.0) — Effects Studio 2.0: Sound Packs & Tactile Polish (Next)
+- [ ] **4 Synthesized Web Audio Sound Packs** (`studio-desk`, `mechanical-thock`, `retro-synth`, `glass-ceramic`) selectable and auditionable in *Settings → Effects* (zero audio files, persisted in `StashSettings.soundPack`).
+- [ ] **Gliding Keyboard Spotlight:** Smooth `layoutId` focus frame sliding directly between cards during keyboard navigation.
+- [ ] **Arcade Drag Trail:** Subtle glowing trailing echoes following the dragged card/tab ghost in Arcade mode.
+- [ ] **Accordion Deal & Search Match Highlight:** Smooth diagonal card-deal fan on manual collection expand + highlighted matching text snippets with subtle pop when searching.
+
+### Milestone B (v1.19.0) — Shopping Lists Pro & Checkboxes (Queued)
+- [ ] **Checked / Bought ✓ Mode** on links (works in Details view + Grid cards for both Shopping Lists and Study/Watch lists, with animated checkmark + per-Space *Hide checked* toggle).
+- [ ] **Live Remaining Total Odometer:** Checking off items smoothly rolls down the remaining subtotal & Space total (showing Remaining vs Total when items are checked).
+- [ ] **Automatic Price Change Badges:** Save `previousPrice` whenever a price is updated or re-captured from the Side Panel and display green `↓ £X.XX` / red `↑ £X.XX` badges.
+- [ ] **1-Click Copy Shopping List:** Clean formatted text/Markdown copy button on collections and Space Details footer (items, store, qty, price, subtotals, grand total).
+
+### Milestone C (v1.20.0) — Power Workbench (Queued)
+- [ ] **Multi-Select Bulk Bar:** `Ctrl/Cmd+Click` or `Shift+Click` cards/rows to select multiple links, springing up a floating bottom bar for Bulk Move, Tag, Star, Check, Open Tabs, and Delete.
+- [ ] **Pinned Quick Launch Strip:** Optional compact favicon dock right below the Space bar for 1-click launch of top daily sites.
+- [ ] **Smart Filter Views & Cross-Space Duplicate Finder:** Quick filters (*Recently Added*, *Most Opened*, *Untagged*) + 1-click cross-Space duplicate URL scanner inside *Settings → Library Tools*.

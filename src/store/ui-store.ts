@@ -33,6 +33,7 @@ function writeLocalActiveSpaceId(spaceId: string): void {
 export type SettingsTab =
   | 'general'
   | 'appearance'
+  | 'effects'
   | 'ai-rules'
   | 'library-tools'
   | 'shortcuts'
@@ -308,7 +309,7 @@ export const useUiStore = create<UiStoreState>((set) => ({
         state.settledLinkId === linkId ? { settledLinkId: null } : state,
       );
       settleTimer = null;
-    }, 420);
+    }, 560);
   },
 
   addTaggingLink: (linkId) =>

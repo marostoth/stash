@@ -127,6 +127,7 @@ export interface CategorizationRule {
 }
 
 export type MotionMode = 'arcade' | 'tactile' | 'reduced' | 'off';
+export type DropEffectStyle = 'dust' | 'accent';
 export type CardDensity = 'micro' | 'compact' | 'comfortable';
 export type BoardWidthMode = 'standard' | 'wide';
 export type CardRadiusPreset = 'sharp' | 'standard' | 'rounded';
@@ -153,7 +154,13 @@ export interface StashSettings {
   enableOnDeviceAi: boolean;
   autoTagOnSave: boolean;
   motionMode: MotionMode;
+  dropEffectStyle: DropEffectStyle;
+  fxDeskJolt: boolean;
+  fxDragTilt: boolean;
+  fxHoverSheen: boolean;
+  fxAmbientWaves: boolean;
   soundEffects: boolean;
+  soundVolume: number;
   hoverPreviews: boolean;
   visualPreviewsEnabled: boolean;
   density: CardDensity;
@@ -234,7 +241,13 @@ export const DEFAULT_SETTINGS: StashSettings = {
   enableOnDeviceAi: true,
   autoTagOnSave: true,
   motionMode: 'tactile',
+  dropEffectStyle: 'dust',
+  fxDeskJolt: true,
+  fxDragTilt: true,
+  fxHoverSheen: true,
+  fxAmbientWaves: true,
   soundEffects: true,
+  soundVolume: 75,
   hoverPreviews: true,
   visualPreviewsEnabled: false,
   density: 'comfortable',

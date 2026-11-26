@@ -11,11 +11,14 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { RollingCurrency } from '@/components/ui/rolling-currency';
 import { DetailsRow } from '@/components/workbench/details-row';
+import { isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import { getCuratedCollectionIcon } from '@/lib/themes/collection-icons';
 import {
   type Collection,
+  type DropEffectStyle,
   type LinkItem,
   type MotionMode,
   type Space,
@@ -39,6 +42,8 @@ interface DetailsCollectionSectionProps {
   defaultCurrency: string;
   openInNewTab: boolean;
   motionMode: MotionMode;
+  dropEffectStyle?: DropEffectStyle;
+  fxAmbientWaves?: boolean;
   soundEffects: boolean;
   hoverPreviews: boolean;
   gridTemplateClass: string;
@@ -63,6 +68,8 @@ export function DetailsCollectionSection({
   defaultCurrency,
   openInNewTab,
   motionMode,
+  dropEffectStyle = 'dust',
+  fxAmbientWaves = true,
   soundEffects,
   hoverPreviews,
   gridTemplateClass,
@@ -115,6 +122,8 @@ export function DetailsCollectionSection({
       ? 'cross-only'
       : 'collection';
 
+  const tactile = isTactileMotion(motionMode);
+
   return (
     <section
       ref={sortableRef}
@@ -127,7 +136,11 @@ export function DetailsCollectionSection({
         ref={dropRef}
         className={cn(
           'overflow-hidden rounded-card border border-border bg-card transition-colors',
-          isDropTarget && 'border-accent ring-2 ring-accent/55',
+          isDropTarget &&
+            cn(
+              'border-accent ring-2 ring-accent/55',
+              tactile && 'stash-dropzone-breathe',
+            ),
         )}
       >
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-panel/70 px-3 py-2">
@@ -247,6 +260,7 @@ export function DetailsCollectionSection({
                       defaultCurrency={defaultCurrency}
                       openInNewTab={openInNewTab}
                       motionMode={motionMode}
+                      dropEffectStyle={dropEffectStyle}
                       soundEffects={soundEffects}
                       hoverPreviews={hoverPreviews}
                       gridTemplateClass={gridTemplateClass}
@@ -269,7 +283,11 @@ export function DetailsCollectionSection({
                         Subtotal
                       </span>
                       <strong className="font-semibold text-fg tabular-nums">
-                        {totalText}
+                        <RollingCurrency
+                          value={totalText}
+                          motionMode={motionMode}
+                          enabled={fxAmbientWaves}
+                        />
                       </strong>
                     </div>
                     <span aria-hidden="true" />

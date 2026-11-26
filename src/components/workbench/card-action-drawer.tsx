@@ -67,12 +67,31 @@ export function CardActionDrawer({
               starred ? 'text-accent' : 'text-fg-muted hover:text-accent',
             )}
           >
-            <Star
-              className={cn(
-                'h-3.5 w-3.5',
-                starred && 'fill-accent text-accent',
-              )}
-            />
+            <motion.span
+              key={starred ? 'starred' : 'unstarred'}
+              initial={
+                tactile && starred ? { scale: 0.55, rotate: -32 } : false
+              }
+              animate={{ scale: 1, rotate: 0 }}
+              transition={
+                tactile
+                  ? {
+                      type: 'spring',
+                      stiffness: 620,
+                      damping: 16,
+                      mass: 0.55,
+                    }
+                  : { duration: 0.05 }
+              }
+              className="inline-flex items-center justify-center"
+            >
+              <Star
+                className={cn(
+                  'h-3.5 w-3.5',
+                  starred && 'fill-accent text-accent',
+                )}
+              />
+            </motion.span>
           </button>
 
           <button

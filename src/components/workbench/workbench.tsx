@@ -5,8 +5,8 @@ import {
   PointerSensor,
 } from '@dnd-kit/react';
 import { FolderPlus, SearchX } from 'lucide-react';
-import { MotionConfig } from 'motion/react';
-import { useEffect, useMemo, useRef } from 'react';
+import { MotionConfig, motion } from 'motion/react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Toaster } from 'sonner';
 import { HealthCheckModal } from '@/components/HealthCheckModal';
 import { ReorganizeModal } from '@/components/reorganize/ReorganizeModal';
@@ -31,7 +31,11 @@ import { useStashData } from '@/hooks/use-stash-data';
 import { useWorkbenchDnd } from '@/hooks/use-workbench-dnd';
 import { useWorkbenchShortcuts } from '@/hooks/use-workbench-shortcuts';
 import { isDragItemData } from '@/lib/dnd/types';
-import { resolveReducedMotionPolicy } from '@/lib/motion/physics';
+import {
+  computeSpaceSlideDirection,
+  isTactileMotion,
+  resolveReducedMotionPolicy,
+} from '@/lib/motion/presets';
 import { DEFAULT_SPACE_ID } from '@/lib/types/stash';
 import {
   formatCurrencySummaries,
@@ -39,6 +43,7 @@ import {
 } from '@/lib/utils/price-math';
 import { groupAndFilterCollections } from '@/lib/utils/search';
 import { useBackgroundJobsStore } from '@/store/background-jobs-store';
+import { useFxStore } from '@/store/fx-store';
 import { useUiStore } from '@/store/ui-store';
 
 const WORKBENCH_SENSORS = [
@@ -76,8 +81,29 @@ export function Workbench() {
   const searchAllSpaces = useUiStore((s) => s.searchAllSpaces);
   const openCreateCollection = useUiStore((s) => s.openCreateCollection);
   const dismissPreview = useUiStore((s) => s.dismissPreview);
+  const spaceSlideDirection = useFxStore((s) => s.spaceSlideDirection);
+  const setSpaceSlideDirection = useFxStore((s) => s.setSpaceSlideDirection);
   const trayHeightPx = useBackgroundJobsStore((s) => s.trayHeightPx);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  const activeSpace = useMemo(
+    () => spaces.find((s) => s.id === activeSpaceId) ?? spaces[0],
+    [spaces, activeSpaceId],
+  );
+  const resolvedSpaceId = activeSpace?.id ?? DEFAULT_SPACE_ID;
+
+  const handleSelectSpace = useCallback(
+    (nextSpaceId: string) => {
+      const dir = computeSpaceSlideDirection(
+        spaces.map((s) => s.id),
+        resolvedSpaceId,
+        nextSpaceId,
+      );
+      setSpaceSlideDirection(dir);
+      setActiveSpaceId(nextSpaceId);
+    },
+    [resolvedSpaceId, setActiveSpaceId, setSpaceSlideDirection, spaces],
+  );
 
   const {
     handleQuickStashTab,
@@ -87,7 +113,7 @@ export function Workbench() {
   } = useWorkbenchDnd({
     soundEffects: settings.soundEffects,
     motionMode: settings.motionMode,
-    onSwitchSpace: setActiveSpaceId,
+    onSwitchSpace: handleSelectSpace,
   });
 
   // Hydrate initial search query when opened from Chrome's `s <query>` omnibox
@@ -103,11 +129,6 @@ export function Workbench() {
     searchInputRef.current?.focus();
   }, [setSearchQuery]);
 
-  const activeSpace = useMemo(
-    () => spaces.find((s) => s.id === activeSpaceId) ?? spaces[0],
-    [spaces, activeSpaceId],
-  );
-  const resolvedSpaceId = activeSpace?.id ?? DEFAULT_SPACE_ID;
   const spaceById = useMemo(
     () => new Map(spaces.map((s) => [s.id, s])),
     [spaces],
@@ -182,6 +203,14 @@ export function Workbench() {
   const effectiveDensity = activeSpace?.densityOverride ?? settings.density;
   const activeViewMode = activeSpace?.viewMode ?? 'grid';
   const wideBoard = settings.boardWidth === 'wide';
+  const fxDeskJolt = settings.fxDeskJolt ?? true;
+  const fxDragTilt = settings.fxDragTilt ?? true;
+  const fxHoverSheen = settings.fxHoverSheen ?? true;
+  const fxAmbientWaves = settings.fxAmbientWaves ?? true;
+  const spaceSlideActive =
+    isTactileMotion(settings.motionMode) &&
+    fxAmbientWaves &&
+    spaceSlideDirection !== 0;
 
   return (
     <MotionConfig
@@ -214,7 +243,9 @@ export function Workbench() {
               collections={collections}
               activeSpaceId={resolvedSpaceId}
               wideBoard={wideBoard}
-              onSelectSpace={setActiveSpaceId}
+              motionMode={settings.motionMode}
+              fxAmbientWaves={fxAmbientWaves}
+              onSelectSpace={handleSelectSpace}
             />
 
             <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -222,7 +253,15 @@ export function Workbench() {
                 onScroll={dismissPreview}
                 className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6"
               >
-                <div
+                <motion.div
+                  key={resolvedSpaceId}
+                  initial={
+                    spaceSlideActive
+                      ? { x: spaceSlideDirection * 30, opacity: 0.45 }
+                      : false
+                  }
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                   className={
                     wideBoard
                       ? 'mx-auto max-w-[1720px]'
@@ -299,9 +338,11 @@ export function Workbench() {
                       openInNewTab={settings.openLinkInNewTab}
                       defaultCurrency={defaultCurrency}
                       motionMode={settings.motionMode}
+                      dropEffectStyle={settings.dropEffectStyle}
+                      fxAmbientWaves={fxAmbientWaves}
                       soundEffects={settings.soundEffects}
                       hoverPreviews={settings.hoverPreviews}
-                      onSwitchSpace={setActiveSpaceId}
+                      onSwitchSpace={handleSelectSpace}
                     />
                   ) : (
                     <div className="space-y-8">
@@ -323,7 +364,7 @@ export function Workbench() {
                               links={collectionLinks}
                               spaces={spaces}
                               spaceBadge={outsideActiveSpace}
-                              onSwitchSpace={setActiveSpaceId}
+                              onSwitchSpace={handleSelectSpace}
                               openInNewTab={settings.openLinkInNewTab}
                               defaultCurrency={defaultCurrency}
                               density={effectiveDensity}
@@ -331,6 +372,10 @@ export function Workbench() {
                               forceExpanded={isFiltering}
                               dragDisabled={isFiltering}
                               motionMode={settings.motionMode}
+                              dropEffectStyle={settings.dropEffectStyle}
+                              fxDeskJolt={fxDeskJolt}
+                              fxHoverSheen={fxHoverSheen}
+                              fxAmbientWaves={fxAmbientWaves}
                               soundEffects={settings.soundEffects}
                               hoverPreviews={settings.hoverPreviews}
                             />
@@ -339,7 +384,7 @@ export function Workbench() {
                       )}
                     </div>
                   )}
-                </div>
+                </motion.div>
               </main>
 
               {settings.openTabsSidebarVisible && (
@@ -404,6 +449,7 @@ export function Workbench() {
                 <DragGhost
                   data={source.data}
                   motionMode={settings.motionMode}
+                  dragTiltEnabled={fxDragTilt}
                 />
               ) : null
             }

@@ -124,12 +124,24 @@ export const MODAL_SPRING = {
 };
 
 export const ARCADE_SQUASH_KEYFRAMES = {
-  scaleX: [1, 1.05, 0.98, 1],
-  scaleY: [1, 0.94, 1.02, 1],
+  scale: [1.07, 0.96, 1.008, 1],
+  y: [-7, 2.5, -0.5, 0],
 };
 
 export const ARCADE_SQUASH_TRANSITION = {
-  duration: 0.24,
+  duration: 0.34,
+  times: [0, 0.24, 0.64, 1],
+  ease: [0.22, 1, 0.36, 1] as const,
+};
+
+export const TACTILE_SETTLE_KEYFRAMES = {
+  scale: [1.022, 0.992, 1],
+  y: [-2, 0.5, 0],
+};
+
+export const TACTILE_SETTLE_TRANSITION = {
+  duration: 0.22,
+  times: [0, 0.42, 1],
   ease: 'easeOut' as const,
 };
 
@@ -141,3 +153,55 @@ export const ARCADE_HEADSHAKE_TRANSITION = {
   duration: 0.36,
   ease: 'easeInOut' as const,
 };
+
+export interface Point2D {
+  x: number;
+  y: number;
+}
+
+export interface NeighborJoltVector {
+  dx: number;
+  dy: number;
+  delaySec: number;
+}
+
+/**
+ * Computes a radial desk-jolt impulse pushing a sibling card away from a
+ * heavy drop impact center, attenuated by distance. Returns null when the
+ * card is outside the shockwave radius or coincides with the impact origin.
+ */
+export function computeNeighborJolt(
+  impact: Point2D,
+  neighbor: Point2D,
+  maxDisplacementPx = 7,
+  radiusPx = 460,
+): NeighborJoltVector | null {
+  const rawDx = neighbor.x - impact.x;
+  const rawDy = neighbor.y - impact.y;
+  const dist = Math.hypot(rawDx, rawDy);
+  if (!Number.isFinite(dist) || dist < 12 || dist > radiusPx) {
+    return null;
+  }
+  const falloff = (1 - dist / radiusPx) ** 1.4;
+  const magnitude = Math.max(1.2, maxDisplacementPx * falloff);
+  const dx = Number(((rawDx / dist) * magnitude).toFixed(2));
+  const dy = Number(((rawDy / dist) * magnitude).toFixed(2));
+  const delaySec = Number(Math.min(0.11, (dist / radiusPx) * 0.095).toFixed(3));
+  return { dx, dy, delaySec };
+}
+
+/**
+ * Resolves directional slide sign (+1 moving right, -1 moving left, 0 same/unknown)
+ * when switching between Spaces in the SpaceBar.
+ */
+export function computeSpaceSlideDirection(
+  spaceIds: readonly string[],
+  prevSpaceId: string,
+  nextSpaceId: string,
+): -1 | 0 | 1 {
+  if (prevSpaceId === nextSpaceId) return 0;
+  const prevIdx = spaceIds.indexOf(prevSpaceId);
+  const nextIdx = spaceIds.indexOf(nextSpaceId);
+  if (prevIdx < 0 || nextIdx < 0) return 0;
+  return nextIdx > prevIdx ? 1 : -1;
+}

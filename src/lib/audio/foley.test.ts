@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   playDrop,
   playError,
+  playHoverRiffle,
   playPickup,
   playSessionFreeze,
   resetFoleyContextForTests,
   setSoundEffectsEnabled,
+  setSoundVolume,
 } from '@/lib/audio/foley';
 
 const globalWithAudio = globalThis as {
@@ -17,14 +19,18 @@ const originalAudioContext = globalWithAudio.AudioContext;
 const originalWebkitAudioContext = globalWithAudio.webkitAudioContext;
 
 function createMockAudioContextClass() {
-  const startMock = vi.fn();
-  const stopMock = vi.fn();
+  const oscStartMock = vi.fn();
+  const oscStopMock = vi.fn();
+  const noiseStartMock = vi.fn();
+  const noiseStopMock = vi.fn();
   const resumeMock = vi.fn().mockResolvedValue(undefined);
   const ctorSpy = vi.fn();
+  const gainSetValues: number[] = [];
 
   class MockAudioContext {
     state: AudioContextState = 'suspended';
     currentTime = 1.0;
+    sampleRate = 44_100;
     destination = {};
 
     constructor() {
@@ -41,24 +47,74 @@ function createMockAudioContextClass() {
           exponentialRampToValueAtTime: vi.fn(),
         },
         connect: vi.fn(),
-        start: startMock,
-        stop: stopMock,
+        start: oscStartMock,
+        stop: oscStopMock,
       };
     }
 
     createGain() {
       return {
         gain: {
-          setValueAtTime: vi.fn(),
+          setValueAtTime: vi.fn((val: number) => {
+            gainSetValues.push(val);
+          }),
           linearRampToValueAtTime: vi.fn(),
           exponentialRampToValueAtTime: vi.fn(),
         },
         connect: vi.fn(),
       };
     }
+
+    createDynamicsCompressor() {
+      return {
+        threshold: { setValueAtTime: vi.fn() },
+        knee: { setValueAtTime: vi.fn() },
+        ratio: { setValueAtTime: vi.fn() },
+        attack: { setValueAtTime: vi.fn() },
+        release: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+      };
+    }
+
+    createBuffer(_channels: number, length: number) {
+      const data = new Float32Array(length);
+      return {
+        getChannelData: () => data,
+      };
+    }
+
+    createBufferSource() {
+      return {
+        buffer: null,
+        connect: vi.fn(),
+        start: noiseStartMock,
+        stop: noiseStopMock,
+      };
+    }
+
+    createBiquadFilter() {
+      return {
+        type: 'lowpass' as BiquadFilterType,
+        frequency: {
+          setValueAtTime: vi.fn(),
+          exponentialRampToValueAtTime: vi.fn(),
+        },
+        Q: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+      };
+    }
   }
 
-  return { MockAudioContext, ctorSpy, startMock, stopMock, resumeMock };
+  return {
+    MockAudioContext,
+    ctorSpy,
+    oscStartMock,
+    oscStopMock,
+    noiseStartMock,
+    noiseStopMock,
+    resumeMock,
+    gainSetValues,
+  };
 }
 
 beforeEach(() => {
@@ -74,7 +130,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('Web Audio mechanical foley', () => {
+describe('Web Audio layered mechanical foley', () => {
   it('fails silently when AudioContext is absent', () => {
     expect(() => playPickup(true)).not.toThrow();
     expect(() => playDrop(true)).not.toThrow();
@@ -82,8 +138,8 @@ describe('Web Audio mechanical foley', () => {
     expect(() => playError(true)).not.toThrow();
   });
 
-  it('does not initialize AudioContext or synthesize sound when soundEffects is disabled', () => {
-    const { MockAudioContext, ctorSpy, startMock } =
+  it('does not initialize AudioContext when disabled or volume is 0%', () => {
+    const { MockAudioContext, ctorSpy, oscStartMock, noiseStartMock } =
       createMockAudioContextClass();
     globalWithAudio.AudioContext = MockAudioContext;
 
@@ -95,26 +151,42 @@ describe('Web Audio mechanical foley', () => {
     setSoundEffectsEnabled(false);
     playPickup();
     playDrop();
-    playSessionFreeze();
-    playError();
+
+    setSoundEffectsEnabled(true);
+    setSoundVolume(0);
+    playDrop(true, 'arcade');
 
     expect(ctorSpy).not.toHaveBeenCalled();
-    expect(startMock).not.toHaveBeenCalled();
+    expect(oscStartMock).not.toHaveBeenCalled();
+    expect(noiseStartMock).not.toHaveBeenCalled();
   });
 
-  it('lazily creates one shared AudioContext, resumes it, and schedules tones when enabled', () => {
-    const { MockAudioContext, ctorSpy, startMock, stopMock, resumeMock } =
-      createMockAudioContextClass();
+  it('lazily creates one shared AudioContext, applies volume, and schedules layered tones + filtered noise', () => {
+    const {
+      MockAudioContext,
+      ctorSpy,
+      oscStartMock,
+      oscStopMock,
+      noiseStartMock,
+      noiseStopMock,
+      resumeMock,
+      gainSetValues,
+    } = createMockAudioContextClass();
     globalWithAudio.AudioContext = MockAudioContext;
 
+    setSoundVolume(90);
     playPickup(true);
-    playDrop(true);
-    playSessionFreeze(true);
+    playDrop(true, 'arcade');
+    playSessionFreeze(true, 'tactile');
     playError(true);
+    expect(playHoverRiffle(true, 'arcade', 1000)).toBe(true);
 
     expect(ctorSpy).toHaveBeenCalledTimes(1);
     expect(resumeMock).toHaveBeenCalled();
-    expect(startMock).toHaveBeenCalledTimes(8);
-    expect(stopMock).toHaveBeenCalledTimes(8);
+    expect(gainSetValues).toContain(0.9);
+    expect(oscStartMock).toHaveBeenCalledTimes(7);
+    expect(oscStopMock).toHaveBeenCalledTimes(7);
+    expect(noiseStartMock).toHaveBeenCalledTimes(7);
+    expect(noiseStopMock).toHaveBeenCalledTimes(7);
   });
 });
