@@ -1,4 +1,4 @@
-import { BookmarkPlus, Check, Loader2 } from 'lucide-react';
+import { BookmarkPlus, Check, Loader2, Star } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -29,6 +29,7 @@ interface QuickStashCardProps {
   activeTab: OpenTabInfo | null;
   loadingTab: boolean;
   loadingData: boolean;
+  activeSpaceId?: string;
   spaces: readonly Space[];
   collections: readonly Collection[];
   links: readonly LinkItem[];
@@ -40,6 +41,7 @@ export function QuickStashCard({
   activeTab,
   loadingTab,
   loadingData,
+  activeSpaceId,
   spaces,
   collections,
   links,
@@ -50,6 +52,7 @@ export function QuickStashCard({
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('');
   const [note, setNote] = useState('');
   const [tagsRaw, setTagsRaw] = useState('');
+  const [starOnSave, setStarOnSave] = useState(false);
   const [tagsEditedByUser, setTagsEditedByUser] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justStamped, setJustStamped] = useState(false);
@@ -103,6 +106,7 @@ export function QuickStashCard({
       setFaviconFailed(false);
       setNote('');
       setTagsRaw('');
+      setStarOnSave(false);
       setTagsEditedByUser(false);
       userPickedCollectionRef.current = false;
       userEditedNoteRef.current = false;
@@ -147,7 +151,10 @@ export function QuickStashCard({
   const handleCreateQuickCollection = async (nameToCreate: string) => {
     const trimmed = nameToCreate.trim();
     if (!trimmed) return;
-    const created = await stashRepo.createCollection({ name: trimmed });
+    const created = await stashRepo.createCollection({
+      name: trimmed,
+      ...(activeSpaceId ? { spaceId: activeSpaceId } : {}),
+    });
     setSelectedCollectionId(created.id);
     setCreatingName(null);
     toast.success(`Created "${created.name}"`);
@@ -202,6 +209,7 @@ export function QuickStashCard({
         title: product.titleOverride.trim() || activeTab.title,
         note,
         tags: submittedTags,
+        ...(starOnSave ? { starred: true } : {}),
         ...(product.productMeta ? { product: product.productMeta } : {}),
         ...(shouldLockTags ? { tagsLocked: true } : {}),
         faviconUrl: activeTab.favIconUrl,
@@ -218,6 +226,7 @@ export function QuickStashCard({
       toast.success('Tab stashed');
       setNote('');
       setTagsRaw('');
+      setStarOnSave(false);
       setTagsEditedByUser(false);
 
       if (!shouldLockTags && submittedTags.length === 0) {
@@ -394,19 +403,40 @@ export function QuickStashCard({
 
       {/* Confirm Footer */}
       <div className="flex items-center justify-between gap-2 pt-0.5">
-        <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-fg-muted select-none hover:text-fg">
-          <input
-            type="checkbox"
-            checked={settings.closeTabOnQuickStash}
-            onChange={() =>
-              void stashRepo.updateSettings({
-                closeTabOnQuickStash: !settings.closeTabOnQuickStash,
-              })
+        <div className="flex items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-fg-muted select-none hover:text-fg">
+            <input
+              type="checkbox"
+              checked={settings.closeTabOnQuickStash}
+              onChange={() =>
+                void stashRepo.updateSettings({
+                  closeTabOnQuickStash: !settings.closeTabOnQuickStash,
+                })
+              }
+              className="h-3.5 w-3.5 accent-[var(--stash-accent)] cursor-pointer"
+            />
+            <span>Close tab</span>
+          </label>
+          <button
+            type="button"
+            aria-pressed={starOnSave}
+            onClick={() => setStarOnSave((prev) => !prev)}
+            title={
+              starOnSave ? 'Will save as Starred' : 'Star this link when saving'
             }
-            className="h-3.5 w-3.5 accent-[var(--stash-accent)] cursor-pointer"
-          />
-          <span>Close tab after saving</span>
-        </label>
+            className={cn(
+              'inline-flex h-6 items-center gap-1 rounded-pill border px-2 text-[10px] font-medium transition-colors cursor-pointer',
+              starOnSave
+                ? 'border-accent/60 bg-accent/15 text-accent'
+                : 'border-border bg-canvas/70 text-fg-muted hover:border-accent/40 hover:text-fg',
+            )}
+          >
+            <Star
+              className={cn('h-3 w-3', starOnSave && 'fill-accent text-accent')}
+            />
+            <span>Star</span>
+          </button>
+        </div>
 
         <Button
           type="submit"
