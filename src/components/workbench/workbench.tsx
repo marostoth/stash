@@ -4,16 +4,15 @@ import {
   KeyboardSensor,
   PointerSensor,
 } from '@dnd-kit/react';
-import { FolderPlus, SearchX } from 'lucide-react';
 import { MotionConfig, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Toaster } from 'sonner';
 import { HealthCheckModal } from '@/components/HealthCheckModal';
 import { ReorganizeModal } from '@/components/reorganize/ReorganizeModal';
 import { SettingsModal } from '@/components/settings/settings-modal';
-import { Button } from '@/components/ui/button';
 import { StashErrorBoundary } from '@/components/ui/error-boundary';
 import { BackgroundJobsTray } from '@/components/workbench/background-jobs-tray';
+import { BulkActionBar } from '@/components/workbench/bulk-action-bar';
 import { CollectionModal } from '@/components/workbench/collection-modal';
 import { CollectionSection } from '@/components/workbench/collection-section';
 import { DetailsView } from '@/components/workbench/details-view';
@@ -22,10 +21,15 @@ import { EmptyState } from '@/components/workbench/empty-state';
 import { LinkPreviewPopover } from '@/components/workbench/link-preview-popover';
 import { OpenTabsSidebar } from '@/components/workbench/open-tabs-sidebar';
 import { QuickEditModal } from '@/components/workbench/quick-edit-modal';
+import { QuickLaunchBar } from '@/components/workbench/quick-launch-bar';
 import { SpaceBar } from '@/components/workbench/space-bar';
 import { TopBar } from '@/components/workbench/top-bar';
 import { TriageModal } from '@/components/workbench/triage-modal';
 import { WallpaperLayer } from '@/components/workbench/wallpaper-layer';
+import {
+  EmptySpaceNotice,
+  NoFilterMatchesNotice,
+} from '@/components/workbench/workbench-empty-states';
 import { useOpenTabs } from '@/hooks/use-open-tabs';
 import { useStashData } from '@/hooks/use-stash-data';
 import { useWorkbenchDnd } from '@/hooks/use-workbench-dnd';
@@ -44,6 +48,7 @@ import {
 import { groupAndFilterCollections } from '@/lib/utils/search';
 import { useBackgroundJobsStore } from '@/store/background-jobs-store';
 import { useFxStore } from '@/store/fx-store';
+import { useSelectionStore } from '@/store/selection-store';
 import { useUiStore } from '@/store/ui-store';
 
 const WORKBENCH_SENSORS = [
@@ -78,6 +83,8 @@ export function Workbench() {
   const setSearchQuery = useUiStore((s) => s.setSearchQuery);
   const starredOnly = useUiStore((s) => s.starredOnly);
   const setStarredOnly = useUiStore((s) => s.setStarredOnly);
+  const smartFilter = useUiStore((s) => s.smartFilter);
+  const setSmartFilter = useUiStore((s) => s.setSmartFilter);
   const searchAllSpaces = useUiStore((s) => s.searchAllSpaces);
   const openCreateCollection = useUiStore((s) => s.openCreateCollection);
   const dismissPreview = useUiStore((s) => s.dismissPreview);
@@ -170,6 +177,7 @@ export function Workbench() {
     () =>
       groupAndFilterCollections(collections, links, searchQuery, {
         starredOnly,
+        smartFilter,
         activeSpaceId: resolvedSpaceId,
         searchAllSpaces,
       }),
@@ -178,12 +186,14 @@ export function Workbench() {
       links,
       searchQuery,
       starredOnly,
+      smartFilter,
       resolvedSpaceId,
       searchAllSpaces,
     ],
   );
 
-  const isFiltering = searchQuery.trim().length > 0 || starredOnly;
+  const isFiltering =
+    searchQuery.trim().length > 0 || starredOnly || smartFilter !== 'all';
   const hideCheckedInSpace = activeSpace?.hideChecked === true && !isFiltering;
   const checkedCountInSpace = useMemo(
     () =>
@@ -204,6 +214,17 @@ export function Workbench() {
       }),
     [groups, isFiltering, hideCheckedInSpace],
   );
+
+  const visibleLinkIds = useMemo(
+    () => visibleLinks.map((l) => l.id),
+    [visibleLinks],
+  );
+  const setOrderedVisibleIds = useSelectionStore((s) => s.setOrderedVisibleIds);
+  const pruneMissingSelection = useSelectionStore((s) => s.pruneMissing);
+  useEffect(() => {
+    setOrderedVisibleIds(visibleLinkIds);
+    pruneMissingSelection(new Set(links.map((l) => l.id)));
+  }, [links, pruneMissingSelection, setOrderedVisibleIds, visibleLinkIds]);
 
   useWorkbenchShortcuts({
     searchInputRef,
@@ -262,6 +283,15 @@ export function Workbench() {
               onSelectSpace={handleSelectSpace}
             />
 
+            {settings.quickLaunchVisible !== false && (
+              <QuickLaunchBar
+                links={links}
+                activeSpaceCollectionIds={activeSpaceCollectionIds}
+                openInNewTab={settings.openLinkInNewTab}
+                wideBoard={wideBoard}
+              />
+            )}
+
             <div className="flex min-h-0 flex-1 overflow-hidden">
               <main
                 onScroll={dismissPreview}
@@ -289,59 +319,22 @@ export function Workbench() {
                   ) : collections.length === 0 ? (
                     <EmptyState />
                   ) : !isFiltering && activeSpaceCollections.length === 0 ? (
-                    <div className="mx-auto flex max-w-md flex-col items-center justify-center rounded-card border border-dashed border-border bg-panel/70 px-6 py-12 text-center">
-                      <FolderPlus className="mb-3 h-7 w-7 text-accent" />
-                      <p className="text-sm font-medium text-fg">
-                        No collections in {activeSpace?.name ?? 'this Space'}{' '}
-                        yet
-                      </p>
-                      <p className="mt-1 text-xs text-fg-muted">
-                        Create a collection here, or drag any card, tab, or
-                        collection onto the {activeSpace?.name ?? 'Space'} tab
-                        above.
-                      </p>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={openCreateCollection}
-                        className="mt-4"
-                      >
-                        New Collection
-                      </Button>
-                    </div>
+                    <EmptySpaceNotice
+                      spaceName={activeSpace?.name ?? 'this Space'}
+                      onCreateCollection={openCreateCollection}
+                    />
                   ) : groups.length === 0 ? (
-                    <div className="mx-auto flex max-w-md flex-col items-center justify-center rounded-card border border-border bg-panel px-6 py-12 text-center">
-                      <SearchX className="mb-3 h-7 w-7 text-fg-muted" />
-                      <p className="text-sm font-medium text-fg">
-                        {starredOnly && !searchQuery.trim()
-                          ? 'No starred links yet'
-                          : starredOnly
-                            ? `No starred matches for "${searchQuery.trim()}"`
-                            : `No matches for "${searchQuery.trim()}"`}
-                      </p>
-                      <p className="mt-1 text-xs text-fg-muted">
-                        {starredOnly && !searchQuery.trim()
-                          ? 'Star any link card to highlight it and filter it here.'
-                          : !searchAllSpaces && spaces.length > 1
-                            ? 'Searching active Space only. Enable "All Spaces" to search every board.'
-                            : 'Try searching by domain, title, tag, or note.'}
-                      </p>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          setSearchQuery('');
-                          setStarredOnly(false);
-                        }}
-                        className="mt-4"
-                      >
-                        {starredOnly && !searchQuery.trim()
-                          ? 'Show All Links'
-                          : starredOnly
-                            ? 'Clear Filters'
-                            : 'Clear Search'}
-                      </Button>
-                    </div>
+                    <NoFilterMatchesNotice
+                      starredOnly={starredOnly}
+                      searchQuery={searchQuery}
+                      searchAllSpaces={searchAllSpaces}
+                      spacesCount={spaces.length}
+                      onClear={() => {
+                        setSearchQuery('');
+                        setStarredOnly(false);
+                        setSmartFilter('all');
+                      }}
+                    />
                   ) : activeViewMode === 'details' ? (
                     <DetailsView
                       activeSpace={activeSpace}
@@ -472,6 +465,15 @@ export function Workbench() {
               ) : null
             }
           </DragOverlay>
+
+          <BulkActionBar
+            links={links}
+            visibleLinkIds={visibleLinkIds}
+            collections={collections}
+            spaces={spaces}
+            motionMode={settings.motionMode}
+            soundEffects={settings.soundEffects}
+          />
 
           <BackgroundJobsTray motionMode={settings.motionMode} />
 

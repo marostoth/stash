@@ -203,6 +203,7 @@ export function parseLink(
     tagsLocked: obj.tagsLocked === true ? true : undefined,
     starred: obj.starred === true ? true : undefined,
     checked: obj.checked === true ? true : undefined,
+    pinnedToDock: obj.pinnedToDock === true ? true : undefined,
     product: parseProductMeta(obj.product),
     faviconUrl:
       typeof obj.faviconUrl === 'string' && obj.faviconUrl.trim()
@@ -310,6 +311,10 @@ export function parseSettings(raw: unknown): StashSettings {
       typeof obj.openTabsSidebarVisible === 'boolean'
         ? obj.openTabsSidebarVisible
         : DEFAULT_SETTINGS.openTabsSidebarVisible,
+    quickLaunchVisible:
+      typeof obj.quickLaunchVisible === 'boolean'
+        ? obj.quickLaunchVisible
+        : DEFAULT_SETTINGS.quickLaunchVisible,
     enableOnDeviceAi:
       typeof obj.enableOnDeviceAi === 'boolean'
         ? obj.enableOnDeviceAi

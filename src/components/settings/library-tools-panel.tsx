@@ -1,5 +1,6 @@
 import { HeartPulse, Sparkles, Tag, Wand2 } from 'lucide-react';
 import { useMemo } from 'react';
+import { DuplicateFinderCard } from '@/components/settings/duplicate-finder-card';
 import { SettingsSectionCard } from '@/components/settings/settings-section-card';
 import { InlineProgressPill } from '@/components/ui/ai-activity-panel';
 import { Button } from '@/components/ui/button';
@@ -7,10 +8,11 @@ import { useAutoTagSweep } from '@/hooks/use-auto-tag-sweep';
 import type { NanoAvailabilityStatus } from '@/lib/categorizer/types';
 import { startAutoIconSweep } from '@/lib/jobs/background-sweeps';
 import { filterEligibleLinks } from '@/lib/tagging/auto-tagger';
-import type { Collection, LinkItem } from '@/lib/types/stash';
+import type { Collection, LinkItem, Space } from '@/lib/types/stash';
 import { useBackgroundJobsStore } from '@/store/background-jobs-store';
 
 interface LibraryToolsPanelProps {
+  spaces: readonly Space[];
   collections: readonly Collection[];
   links: readonly LinkItem[];
   nanoStatus: NanoAvailabilityStatus;
@@ -19,6 +21,7 @@ interface LibraryToolsPanelProps {
 }
 
 export function LibraryToolsPanel({
+  spaces,
   collections,
   links,
   nanoStatus,
@@ -181,6 +184,12 @@ export function LibraryToolsPanel({
           </div>
         </SettingsSectionCard>
       </div>
+
+      <DuplicateFinderCard
+        spaces={spaces}
+        collections={collections}
+        links={links}
+      />
 
       <p className="font-mono text-[10px] text-fg-muted">
         Running tasks continue in the bottom-right activity tray if you close

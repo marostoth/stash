@@ -286,6 +286,7 @@ export function SettingsModal({
             />
           ) : activeTab === 'library-tools' ? (
             <LibraryToolsPanel
+              spaces={spaces}
               collections={collections}
               links={links}
               nanoStatus={nanoStatus}

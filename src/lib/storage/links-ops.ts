@@ -19,6 +19,13 @@ import {
   normalizeUrlForComparison,
 } from '@/lib/utils/url';
 
+export {
+  addTagsToLinksInStorage,
+  moveLinksToCollectionInStorage,
+  setLinksCheckedInStorage,
+  setLinksStarredInStorage,
+} from '@/lib/storage/links-batch-ops';
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -64,7 +71,6 @@ function normalizeProductMeta(
       ? Math.round(previous.price * 100) / 100
       : undefined;
 
-  // Automatically record previousPrice whenever price changes to a new value
   let previousPrice: number | undefined;
   if (price !== undefined) {
     if (
@@ -148,6 +154,7 @@ export async function addLinkInStorage(
     ...(input.tagsLocked === true ? { tagsLocked: true } : {}),
     ...(input.starred === true ? { starred: true } : {}),
     ...(input.checked === true ? { checked: true } : {}),
+    ...(input.pinnedToDock === true ? { pinnedToDock: true } : {}),
     ...(product ? { product } : {}),
     faviconUrl: input.faviconUrl?.trim() || undefined,
     order: 0,
@@ -215,6 +222,13 @@ export async function updateLinkInStorage(
         : undefined
       : current.checked;
 
+  const nextPinnedToDock =
+    patch.pinnedToDock !== undefined
+      ? patch.pinnedToDock
+        ? true
+        : undefined
+      : current.pinnedToDock;
+
   const nextProduct =
     patch.product !== undefined
       ? normalizeProductMeta(patch.product, current.product)
@@ -233,6 +247,7 @@ export async function updateLinkInStorage(
     tagsLocked: nextTagsLocked,
     starred: nextStarred,
     checked: nextChecked,
+    pinnedToDock: nextPinnedToDock,
     product: nextProduct,
     faviconUrl:
       patch.faviconUrl !== undefined
@@ -308,67 +323,4 @@ export async function markLinkOpenedInStorage(id: string): Promise<void> {
     return { ...item, lastOpenedAt: timestamp };
   });
   if (changed) await linksStorage.setValue(next);
-}
-
-/**
- * Batch-updates `starred` on multiple links in a single storage write while
- * preserving persistent `product.orderQty` counts.
- */
-export async function setLinksStarredInStorage(
-  ids: readonly string[],
-  starred: boolean,
-): Promise<string[]> {
-  if (ids.length === 0) return [];
-  const idSet = new Set(ids);
-  const existing = await linksStorage.getValue();
-  const changedIds: string[] = [];
-  const timestamp = nowIso();
-
-  const next = existing.map((item) => {
-    if (!idSet.has(item.id)) return item;
-    const currentlyStarred = item.starred === true;
-    if (currentlyStarred === starred) return item;
-    changedIds.push(item.id);
-    return {
-      ...item,
-      starred: starred ? true : undefined,
-      updatedAt: timestamp,
-    };
-  });
-
-  if (changedIds.length > 0) {
-    await linksStorage.setValue(next);
-  }
-  return changedIds;
-}
-
-/**
- * Batch-updates `checked` (Bought / Done) on multiple links in a single write.
- */
-export async function setLinksCheckedInStorage(
-  ids: readonly string[],
-  checked: boolean,
-): Promise<string[]> {
-  if (ids.length === 0) return [];
-  const idSet = new Set(ids);
-  const existing = await linksStorage.getValue();
-  const changedIds: string[] = [];
-  const timestamp = nowIso();
-
-  const next = existing.map((item) => {
-    if (!idSet.has(item.id)) return item;
-    const currentlyChecked = item.checked === true;
-    if (currentlyChecked === checked) return item;
-    changedIds.push(item.id);
-    return {
-      ...item,
-      checked: checked ? true : undefined,
-      updatedAt: timestamp,
-    };
-  });
-
-  if (changedIds.length > 0) {
-    await linksStorage.setValue(next);
-  }
-  return changedIds;
 }

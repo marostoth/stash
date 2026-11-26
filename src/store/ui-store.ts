@@ -5,6 +5,7 @@ import {
   DEFAULT_SPACE_ID,
   type LinkItem,
 } from '@/lib/types/stash';
+import type { SmartFilter } from '@/lib/utils/search';
 
 const ACTIVE_SPACE_LOCAL_KEY = 'stash_active_space_id';
 
@@ -73,6 +74,7 @@ interface UiStoreState {
   activeSpaceId: string;
   searchQuery: string;
   starredOnly: boolean;
+  smartFilter: SmartFilter;
   searchAllSpaces: boolean;
   keyboardFocusedLinkId: string | null;
   collectionModal: CollectionModalState;
@@ -93,6 +95,7 @@ interface UiStoreState {
   setSearchQuery: (query: string) => void;
   setStarredOnly: (starredOnly: boolean) => void;
   toggleStarredOnly: () => void;
+  setSmartFilter: (filter: SmartFilter) => void;
   setSearchAllSpaces: (allSpaces: boolean) => void;
   toggleSearchAllSpaces: () => void;
   setKeyboardFocusedLinkId: (linkId: string | null) => void;
@@ -141,6 +144,7 @@ export const useUiStore = create<UiStoreState>((set) => ({
   activeSpaceId: readInitialActiveSpaceId(),
   searchQuery: '',
   starredOnly: false,
+  smartFilter: 'all',
   searchAllSpaces: false,
   keyboardFocusedLinkId: null,
   collectionModal: null,
@@ -175,6 +179,8 @@ export const useUiStore = create<UiStoreState>((set) => ({
       starredOnly: !state.starredOnly,
       keyboardFocusedLinkId: null,
     })),
+  setSmartFilter: (smartFilter) =>
+    set({ smartFilter, keyboardFocusedLinkId: null }),
   setSearchAllSpaces: (allSpaces) =>
     set({ searchAllSpaces: allSpaces, keyboardFocusedLinkId: null }),
   toggleSearchAllSpaces: () =>

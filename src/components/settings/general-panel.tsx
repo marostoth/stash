@@ -35,6 +35,16 @@ export function GeneralPanel({ settings, settingsOpen }: GeneralPanelProps) {
             }
           />
 
+          <SettingsToggleRow
+            id="settings-quick-launch-bar"
+            label="Show Quick Launch favorites strip"
+            hint="Compact 1-click bar beneath Spaces showing pinned or starred links."
+            checked={settings.quickLaunchVisible !== false}
+            onCheckedChange={(checked) =>
+              void stashRepo.updateSettings({ quickLaunchVisible: checked })
+            }
+          />
+
           <div className="flex items-center justify-between gap-3 py-1">
             <label
               htmlFor="settings-card-density"

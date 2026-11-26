@@ -71,6 +71,7 @@ export interface AddLinkInput {
   tagsLocked?: boolean;
   starred?: boolean;
   checked?: boolean;
+  pinnedToDock?: boolean;
   product?: ProductMeta;
   faviconUrl?: string;
 }
@@ -84,6 +85,7 @@ export interface UpdateLinkInput {
   tagsLocked?: boolean;
   starred?: boolean;
   checked?: boolean;
+  pinnedToDock?: boolean;
   product?: ProductMeta | null;
   faviconUrl?: string;
   order?: number;

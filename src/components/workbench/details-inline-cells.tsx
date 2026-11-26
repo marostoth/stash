@@ -1,4 +1,4 @@
-import { Check, Copy, PenLine } from 'lucide-react';
+import { Check, Copy, Minus, PenLine, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -407,5 +407,51 @@ export function CopyListButton({
       )}
       <span className="hidden sm:inline">{copied ? 'Copied' : label}</span>
     </Button>
+  );
+}
+
+export function InlineQtyCell({
+  linkTitle,
+  hasPrice,
+  displayQty,
+  onChangeQty,
+}: {
+  linkTitle: string;
+  hasPrice: boolean;
+  displayQty: number;
+  onChangeQty: (delta: number) => void;
+}) {
+  return (
+    <div className="flex items-center justify-center">
+      {hasPrice ? (
+        <div
+          className="inline-flex items-center rounded border border-border bg-panel/90 font-mono text-[10px]"
+          title="Order quantity"
+        >
+          <button
+            type="button"
+            onClick={() => onChangeQty(-1)}
+            disabled={displayQty <= 1}
+            aria-label={`Decrease quantity for ${linkTitle}`}
+            className="inline-flex h-5 w-5 items-center justify-center text-fg-muted transition-colors hover:bg-card hover:text-fg disabled:opacity-35 cursor-pointer disabled:cursor-default"
+          >
+            <Minus className="h-2.5 w-2.5" />
+          </button>
+          <span className="min-w-[18px] px-1 text-center text-fg tabular-nums">
+            {displayQty}
+          </span>
+          <button
+            type="button"
+            onClick={() => onChangeQty(1)}
+            aria-label={`Increase quantity for ${linkTitle}`}
+            className="inline-flex h-5 w-5 items-center justify-center text-fg-muted transition-colors hover:bg-card hover:text-fg cursor-pointer"
+          >
+            <Plus className="h-2.5 w-2.5" />
+          </button>
+        </div>
+      ) : (
+        <span className="font-mono text-[11px] text-fg-muted/40">—</span>
+      )}
+    </div>
   );
 }

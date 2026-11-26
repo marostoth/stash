@@ -4,8 +4,14 @@ import {
   type LinkItem,
 } from '@/lib/types/stash';
 
+export type SmartFilter = 'all' | 'recent' | 'frequent' | 'untagged';
+
+const RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
 export interface SearchFilterOptions {
   starredOnly?: boolean;
+  smartFilter?: SmartFilter;
+  nowMs?: number;
   /** When provided, restricts board/search to this Space unless `searchAllSpaces` is active with a query/filter. */
   activeSpaceId?: string;
   /** Opt-in cross-Space search when a query or `starredOnly` filter is active. Defaults to `false`. */
@@ -36,6 +42,27 @@ function parseSearchFilter(
   return { requireStarred, textTerms };
 }
 
+function matchesSmartFilter(
+  link: LinkItem,
+  smartFilter: SmartFilter,
+  nowMs: number,
+): boolean {
+  switch (smartFilter) {
+    case 'recent': {
+      const createdMs = Date.parse(link.createdAt);
+      return (
+        Number.isFinite(createdMs) && nowMs - createdMs <= RECENT_WINDOW_MS
+      );
+    }
+    case 'frequent':
+      return Boolean(link.lastOpenedAt);
+    case 'untagged':
+      return link.tags.length === 0;
+    default:
+      return true;
+  }
+}
+
 export function matchesSearchQuery(
   link: LinkItem,
   collectionName: string,
@@ -43,7 +70,13 @@ export function matchesSearchQuery(
   options?: SearchFilterOptions,
 ): boolean {
   const { requireStarred, textTerms } = parseSearchFilter(rawQuery, options);
+  const smartFilter = options?.smartFilter ?? 'all';
+  const nowMs = options?.nowMs ?? Date.now();
+
   if (requireStarred && !link.starred) return false;
+  if (smartFilter !== 'all' && !matchesSmartFilter(link, smartFilter, nowMs)) {
+    return false;
+  }
   if (textTerms.length === 0) return true;
 
   const haystack = [
@@ -71,7 +104,9 @@ export function groupAndFilterCollections(
   options?: SearchFilterOptions,
 ): FilteredCollectionGroup[] {
   const { requireStarred, textTerms } = parseSearchFilter(rawQuery, options);
-  const hasFilter = requireStarred || textTerms.length > 0;
+  const smartFilter = options?.smartFilter ?? 'all';
+  const hasFilter =
+    requireStarred || smartFilter !== 'all' || textTerms.length > 0;
   const activeSpaceId = options?.activeSpaceId;
   const spanAllSpaces = Boolean(options?.searchAllSpaces) && hasFilter;
 
@@ -108,8 +143,17 @@ export function groupAndFilterCollections(
     const matchingLinks = collectionLinks.filter((link) =>
       matchesSearchQuery(link, collection.name, rawQuery, options),
     );
+    if (smartFilter === 'recent') {
+      matchingLinks.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    } else if (smartFilter === 'frequent') {
+      matchingLinks.sort((a, b) =>
+        (b.lastOpenedAt ?? '').localeCompare(a.lastOpenedAt ?? ''),
+      );
+    }
+
     const collectionMatchesDirectly =
       !requireStarred &&
+      smartFilter === 'all' &&
       normalizedCollectionQuery.length > 0 &&
       collection.name.toLowerCase().includes(normalizedCollectionQuery);
 

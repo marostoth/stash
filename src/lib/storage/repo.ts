@@ -22,9 +22,11 @@ import {
 } from '@/lib/storage/items';
 import {
   addLinkInStorage,
+  addTagsToLinksInStorage,
   applyAutoTagsInStorage,
   findDuplicateLinkInList,
   markLinkOpenedInStorage,
+  moveLinksToCollectionInStorage,
   moveOrReorderLinkInStorage,
   setLinksCheckedInStorage,
   setLinksStarredInStorage,
@@ -314,6 +316,17 @@ export const stashRepo = {
     ids: readonly string[],
     checked: boolean,
   ): Promise<string[]> => setLinksCheckedInStorage(ids, checked),
+
+  moveLinksToCollection: (
+    ids: readonly string[],
+    targetCollectionId: string,
+  ): Promise<{ movedCount: number; skippedDuplicates: number }> =>
+    moveLinksToCollectionInStorage(ids, targetCollectionId),
+
+  addTagsToLinks: (
+    ids: readonly string[],
+    tags: readonly string[],
+  ): Promise<number> => addTagsToLinksInStorage(ids, tags),
 
   deleteLink: (id: string): Promise<boolean> => deleteLinkInStorage(id),
   deleteLinks: (ids: readonly string[]): Promise<LinkItem[]> =>

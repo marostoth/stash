@@ -1,5 +1,8 @@
 import {
   Check,
+  Clock,
+  Filter,
+  Flame,
   Globe,
   Palette,
   PanelRight,
@@ -7,6 +10,7 @@ import {
   Search,
   Settings,
   Star,
+  Tag,
   X,
 } from 'lucide-react';
 import type * as React from 'react';
@@ -22,7 +26,15 @@ import { OdometerCounter } from '@/components/ui/odometer-counter';
 import { stashRepo } from '@/lib/storage/repo';
 import type { StashSettings, ThemeDefinition } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+import type { SmartFilter } from '@/lib/utils/search';
 import { useUiStore } from '@/store/ui-store';
+
+const SMART_FILTER_LABELS: Record<SmartFilter, string> = {
+  all: 'Views',
+  recent: 'Recent 7d',
+  frequent: 'Opened',
+  untagged: 'Untagged',
+};
 
 interface TopBarProps {
   searchInputRef: React.RefObject<HTMLInputElement | null>;
@@ -51,6 +63,8 @@ export function TopBar({
   const setSearchQuery = useUiStore((s) => s.setSearchQuery);
   const starredOnly = useUiStore((s) => s.starredOnly);
   const toggleStarredOnly = useUiStore((s) => s.toggleStarredOnly);
+  const smartFilter = useUiStore((s) => s.smartFilter);
+  const setSmartFilter = useUiStore((s) => s.setSmartFilter);
   const searchAllSpaces = useUiStore((s) => s.searchAllSpaces);
   const toggleSearchAllSpaces = useUiStore((s) => s.toggleSearchAllSpaces);
   const openCreateCollection = useUiStore((s) => s.openCreateCollection);
@@ -197,6 +211,53 @@ export function TopBar({
               )}
             </button>
           )}
+
+          {/* Smart Filter Views Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={`Smart filter view (${SMART_FILTER_LABELS[smartFilter]})`}
+                title="Smart Views: Recently Added, Most Opened, Untagged"
+                className={cn(
+                  'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-control border px-2.5 text-xs font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+                  smartFilter !== 'all'
+                    ? 'border-accent/65 bg-accent/15 text-accent'
+                    : 'border-border bg-canvas text-fg-muted hover:border-accent/45 hover:text-fg',
+                )}
+              >
+                <Filter className="h-3.5 w-3.5" />
+                <span className="hidden lg:inline">
+                  {SMART_FILTER_LABELS[smartFilter]}
+                </span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Smart Views</DropdownMenuLabel>
+              {(
+                [
+                  { id: 'all', label: 'All Links', Icon: Filter },
+                  { id: 'recent', label: 'Recently Added (7d)', Icon: Clock },
+                  { id: 'frequent', label: 'Recently Opened', Icon: Flame },
+                  { id: 'untagged', label: 'Untagged Links', Icon: Tag },
+                ] as const
+              ).map(({ id, label, Icon }) => (
+                <DropdownMenuItem
+                  key={id}
+                  onSelect={() => setSmartFilter(id)}
+                  className="justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <Icon className="h-3.5 w-3.5 text-fg-muted" />
+                    <span>{label}</span>
+                  </span>
+                  {smartFilter === id && (
+                    <Check className="h-3.5 w-3.5 text-accent" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Actions */}

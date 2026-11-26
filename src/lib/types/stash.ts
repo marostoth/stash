@@ -105,6 +105,7 @@ export interface LinkItem {
   tagsLocked?: boolean;
   starred?: boolean;
   checked?: boolean;
+  pinnedToDock?: boolean;
   product?: ProductMeta;
   faviconUrl?: string;
   order: number;
@@ -160,6 +161,7 @@ export interface StashSettings {
   includePinnedInSessions: boolean;
   closeTabOnQuickStash: boolean;
   openTabsSidebarVisible: boolean;
+  quickLaunchVisible: boolean;
   enableOnDeviceAi: boolean;
   autoTagOnSave: boolean;
   motionMode: MotionMode;
@@ -248,6 +250,7 @@ export const DEFAULT_SETTINGS: StashSettings = {
   includePinnedInSessions: false,
   closeTabOnQuickStash: false,
   openTabsSidebarVisible: true,
+  quickLaunchVisible: true,
   enableOnDeviceAi: true,
   autoTagOnSave: true,
   motionMode: 'tactile',

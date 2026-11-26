@@ -6,6 +6,7 @@ import { CoverCardBanner } from '@/components/CoverCardBanner';
 import { LinkFavicon } from '@/components/LinkFavicon';
 import { CardActionDrawer } from '@/components/workbench/card-action-drawer';
 import {
+  CardTagsRow,
   DeleteVaporPuff,
   LinkCardDragPlaceholder,
   resolveLinkCardMotion,
@@ -17,12 +18,10 @@ import { DropSparks } from '@/components/workbench/drop-sparks';
 import { useCardFoilTilt } from '@/hooks/use-card-foil-tilt';
 import { playDelete, playDrop, playTagPop } from '@/lib/audio/foley';
 import {
-  ARCADE_TAG_POP_SPRING,
   FOIL_PERSPECTIVE_PX,
   isArcadeMotion,
   isTactileMotion,
   TACTILE_SPRING,
-  TAG_POP_SPRING,
 } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import type {
@@ -36,6 +35,7 @@ import { cn } from '@/lib/utils/cn';
 import { HighlightText } from '@/lib/utils/highlight-match';
 import { extractDomain } from '@/lib/utils/url';
 import { useFxStore } from '@/store/fx-store';
+import { useSelectionStore } from '@/store/selection-store';
 import { useUiStore } from '@/store/ui-store';
 
 interface LinkCardProps {
@@ -89,6 +89,10 @@ export const LinkCard = memo(function LinkCard({
   const triggerStarFlash = useFxStore((s) => s.triggerStarFlash);
   const isStarFlashing = useFxStore((s) => s.starFlashLinkId === link.id);
   const triggerSettledImpact = useFxStore((s) => s.triggerSettledImpact);
+  const isSelected = useSelectionStore((s) => s.selectedIds.includes(link.id));
+  const selectionMode = useSelectionStore((s) => s.selectedIds.length > 0);
+  const toggleSelect = useSelectionStore((s) => s.toggleSelect);
+  const selectRangeTo = useSelectionStore((s) => s.selectRangeTo);
 
   const [vaporizing, setVaporizing] = useState(false);
   const cardMeasureRef = useRef<HTMLDivElement | null>(null);
@@ -149,7 +153,17 @@ export const LinkCard = memo(function LinkCard({
     openEditLink(link);
   };
 
-  const handleOpen = () => {
+  const handleOpen = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (event.shiftKey) {
+      event.preventDefault();
+      selectRangeTo(link.id);
+      return;
+    }
+    if (event.altKey || selectionMode) {
+      event.preventDefault();
+      toggleSelect(link.id);
+      return;
+    }
     dismissPreview();
     void stashRepo.markLinkOpened(link.id);
   };
@@ -321,6 +335,8 @@ export const LinkCard = memo(function LinkCard({
             className={cn(
               'group relative z-[1] h-full rounded-card border border-border bg-card transition-all hover:border-accent/45 hover:bg-card-hover',
               isStarred && !isChecked && 'stash-card-starred',
+              isSelected &&
+                'border-accent bg-accent/[0.11] ring-2 ring-accent/70',
               isChecked && 'opacity-65 hover:opacity-95',
               !dragDisabled && 'cursor-grab active:cursor-grabbing',
               isDropTarget && 'border-accent ring-2 ring-accent/40',
@@ -444,36 +460,14 @@ export const LinkCard = memo(function LinkCard({
                 )}
 
                 {showTags && (
-                  <div className="mt-auto flex flex-wrap items-center gap-1 pt-0.5">
-                    {visibleTags.map((tag) => {
-                      const isNewlyAdded = !seenTagsRef.current.has(tag);
-                      return (
-                        <motion.span
-                          key={tag}
-                          initial={
-                            isNewlyAdded && tactile
-                              ? { scale: 0.7, opacity: 0 }
-                              : false
-                          }
-                          animate={{ scale: 1, opacity: 1 }}
-                          transition={
-                            arcade ? ARCADE_TAG_POP_SPRING : TAG_POP_SPRING
-                          }
-                          className={cn(
-                            'rounded-pill border border-border bg-panel py-0.5 font-mono text-[10px] text-fg-muted',
-                            isCompact ? 'px-1.5' : 'px-2',
-                          )}
-                        >
-                          #{tag}
-                        </motion.span>
-                      );
-                    })}
-                    {hiddenTagCount > 0 && (
-                      <span className="font-mono text-[10px] text-fg-muted">
-                        +{hiddenTagCount}
-                      </span>
-                    )}
-                  </div>
+                  <CardTagsRow
+                    visibleTags={visibleTags}
+                    hiddenTagCount={hiddenTagCount}
+                    seenTags={seenTagsRef.current}
+                    tactile={tactile}
+                    arcade={arcade}
+                    isCompact={isCompact}
+                  />
                 )}
               </div>
             </a>

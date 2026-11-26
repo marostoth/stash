@@ -128,10 +128,10 @@ Execute **one milestone at a time**. At the end of each milestone, run all four 
 - [x] **Automatic Price Change Badges:** Save `previousPrice` whenever a price is updated or re-captured from the Side Panel and display green `↓ £X.XX` / red `↑ £X.XX` badges.
 - [x] **1-Click Copy Shopping List:** Clean formatted text/Markdown copy button on collections and Space Details footer (items, store, qty, price, subtotals, grand total).
 
-### Milestone C (v1.20.0) — Power Workbench (In Progress)
-- [ ] **Multi-Select Bulk Bar:** `Ctrl/Cmd+Click` or `Shift+Click` cards/rows to select multiple links, springing up a floating bottom bar for Bulk Move, Tag, Star, Check, Open Tabs, and Delete.
-- [ ] **Pinned Quick Launch Strip:** Optional compact favicon dock right below the Space bar for 1-click launch of top daily sites.
-- [ ] **Smart Filter Views & Cross-Space Duplicate Finder:** Quick filters (*Recently Added*, *Most Opened*, *Untagged*) + 1-click cross-Space duplicate URL scanner inside *Settings → Library Tools*.
+### Milestone C (v1.20.0) — Power Workbench (Shipped)
+- [x] **Multi-Select Bulk Bar:** `Alt+Click` / `Shift+Click` cards/rows to select multiple links, springing up a floating bottom bar for Bulk Move, Tag, Star, Done, Open Tabs, and Delete with Undo.
+- [x] **Pinned Quick Launch Strip:** Compact favicon dock right below the Space bar for 1-click launch of pinned or starred daily sites, with inline `+ Pin` search popover and Settings toggle.
+- [x] **Smart Filter Views & Cross-Space Duplicate Finder:** Top Bar **Views** dropdown (*Recently Added 7d*, *Recently Opened*, *Untagged*) + 1-click cross-Space duplicate URL scanner inside *Settings → Library Tools*.
 
-### Future Backlog
-- [ ] **Custom Audio Pack Uploader:** Optional `.mp3` / `.wav` / `.ogg` per-event sound slot in *Settings → Effects* routed through the existing Cinematic DSP bus.
+### Milestone D (v1.21.0) — Custom Audio Pack Uploader (In Progress)
+- [ ] **Custom Audio Pack (`.mp3` / `.wav` / `.ogg` per-event clips):** Upload your own sound files for any of the 7 events (`Drop Slam`, `Pickup`, `Star / Tag`, `Session Lock`, `Hover Riffle`, `Delete`, `Blocked`) stored locally in IndexedDB, routed through the Cinematic DSP bus (Volume + soft limiter + subtle ±4% pitch jitter), with automatic fallback to your chosen base pack for any unfilled slots.

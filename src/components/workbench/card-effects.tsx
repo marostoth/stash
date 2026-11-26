@@ -6,12 +6,14 @@ import {
   ARCADE_HEADSHAKE_TRANSITION,
   ARCADE_SQUASH_KEYFRAMES,
   ARCADE_SQUASH_TRANSITION,
+  ARCADE_TAG_POP_SPRING,
   computeCascadeDelay,
   computeNeighborJolt,
   type NeighborJoltVector,
   TACTILE_SETTLE_KEYFRAMES,
   TACTILE_SETTLE_TRANSITION,
   TACTILE_SPRING,
+  TAG_POP_SPRING,
 } from '@/lib/motion/presets';
 import type { CollectionViewMode } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
@@ -345,6 +347,51 @@ export function LinkCardDragPlaceholder({
             </span>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+export function CardTagsRow({
+  visibleTags,
+  hiddenTagCount,
+  seenTags,
+  tactile,
+  arcade,
+  isCompact,
+}: {
+  visibleTags: readonly string[];
+  hiddenTagCount: number;
+  seenTags: ReadonlySet<string>;
+  tactile: boolean;
+  arcade: boolean;
+  isCompact: boolean;
+}) {
+  return (
+    <div className="mt-auto flex flex-wrap items-center gap-1 pt-0.5">
+      {visibleTags.map((tag) => {
+        const isNewlyAdded = !seenTags.has(tag);
+        return (
+          <motion.span
+            key={tag}
+            initial={
+              isNewlyAdded && tactile ? { scale: 0.7, opacity: 0 } : false
+            }
+            animate={{ scale: 1, opacity: 1 }}
+            transition={arcade ? ARCADE_TAG_POP_SPRING : TAG_POP_SPRING}
+            className={cn(
+              'rounded-pill border border-border bg-panel py-0.5 font-mono text-[10px] text-fg-muted',
+              isCompact ? 'px-1.5' : 'px-2',
+            )}
+          >
+            #{tag}
+          </motion.span>
+        );
+      })}
+      {hiddenTagCount > 0 && (
+        <span className="font-mono text-[10px] text-fg-muted">
+          +{hiddenTagCount}
+        </span>
       )}
     </div>
   );

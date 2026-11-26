@@ -1,14 +1,6 @@
 import { useDraggable } from '@dnd-kit/react';
 import { useSortable } from '@dnd-kit/react/sortable';
-import {
-  Check,
-  GripVertical,
-  Minus,
-  Pencil,
-  Plus,
-  Star,
-  Trash2,
-} from 'lucide-react';
+import { Check, GripVertical, Pencil, Star, Trash2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { memo, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -16,6 +8,7 @@ import { LinkFavicon } from '@/components/LinkFavicon';
 import {
   buildPriceTooltip,
   InlinePriceCell,
+  InlineQtyCell,
   InlineSpecCell,
 } from '@/components/workbench/details-inline-cells';
 import { DropSparks } from '@/components/workbench/drop-sparks';
@@ -35,6 +28,7 @@ import {
 } from '@/lib/utils/coalesce';
 import { normalizeCurrencyCode } from '@/lib/utils/price-math';
 import { normalizeStoreName } from '@/lib/utils/product-url';
+import { useSelectionStore } from '@/store/selection-store';
 import { useUiStore } from '@/store/ui-store';
 
 const QTY_SAVE_DEBOUNCE_MS = 250;
@@ -88,6 +82,10 @@ function DetailsRowView({
     (s) => s.keyboardFocusedLinkId === link.id,
   );
   const isSettling = useUiStore((s) => s.settledLinkId === link.id);
+  const isSelected = useSelectionStore((s) => s.selectedIds.includes(link.id));
+  const selectionMode = useSelectionStore((s) => s.selectedIds.length > 0);
+  const toggleSelect = useSelectionStore((s) => s.toggleSelect);
+  const selectRangeTo = useSelectionStore((s) => s.selectRangeTo);
   const arcade = isArcadeMotion(motionMode);
   const tactile = isTactileMotion(motionMode);
 
@@ -230,6 +228,7 @@ function DetailsRowView({
         'group relative grid min-h-[38px] items-center gap-3.5 border-b border-border/60 px-3 py-1 text-xs transition-all last:border-b-0 hover:bg-card-hover/80',
         gridTemplateClass,
         isStarred && !isChecked && 'bg-accent/[0.06]',
+        isSelected && 'bg-accent/[0.14] ring-1 ring-inset ring-accent/75',
         isChecked && 'opacity-60 hover:opacity-90',
         isDragging && 'opacity-40',
         isDropTarget && 'bg-accent/12 ring-1 ring-inset ring-accent/65',
@@ -318,7 +317,17 @@ function DetailsRowView({
         href={link.url}
         target={openInNewTab ? '_blank' : '_self'}
         rel={openInNewTab ? 'noopener noreferrer' : undefined}
-        onClick={() => {
+        onClick={(event) => {
+          if (event.shiftKey) {
+            event.preventDefault();
+            selectRangeTo(link.id);
+            return;
+          }
+          if (event.altKey || selectionMode) {
+            event.preventDefault();
+            toggleSelect(link.id);
+            return;
+          }
           dismissPreview();
           void stashRepo.markLinkOpened(link.id);
         }}
@@ -370,37 +379,12 @@ function DetailsRowView({
 
       {/* 6. Qty Stepper (before Price so Price updates dynamically beside it) */}
       {showPriceColumn && (
-        <div className="flex items-center justify-center">
-          {hasPrice ? (
-            <div
-              className="inline-flex items-center rounded border border-border bg-panel/90 font-mono text-[10px]"
-              title="Order quantity"
-            >
-              <button
-                type="button"
-                onClick={() => handleChangeQty(-1)}
-                disabled={displayQty <= 1}
-                aria-label={`Decrease quantity for ${link.title}`}
-                className="inline-flex h-5 w-5 items-center justify-center text-fg-muted transition-colors hover:bg-card hover:text-fg disabled:opacity-35 cursor-pointer disabled:cursor-default"
-              >
-                <Minus className="h-2.5 w-2.5" />
-              </button>
-              <span className="min-w-[18px] px-1 text-center text-fg tabular-nums">
-                {displayQty}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleChangeQty(1)}
-                aria-label={`Increase quantity for ${link.title}`}
-                className="inline-flex h-5 w-5 items-center justify-center text-fg-muted transition-colors hover:bg-card hover:text-fg cursor-pointer"
-              >
-                <Plus className="h-2.5 w-2.5" />
-              </button>
-            </div>
-          ) : (
-            <span className="font-mono text-[11px] text-fg-muted/40">—</span>
-          )}
-        </div>
+        <InlineQtyCell
+          linkTitle={link.title}
+          hasPrice={hasPrice}
+          displayQty={displayQty}
+          onChangeQty={handleChangeQty}
+        />
       )}
 
       {/* 7. Price (unitPrice × qty; click to edit unit price inline) */}
