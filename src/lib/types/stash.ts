@@ -174,6 +174,11 @@ export interface StashSettings {
   enableOnDeviceAi: boolean;
   autoTagOnSave: boolean;
   motionMode: MotionMode;
+  /**
+   * @deprecated Legacy single-mode drop VFX selector kept for schemaVersion 1
+   * backup backwards compatibility. Runtime drop effects use independent
+   * `fxDropDust` and `fxDropFissures` toggles.
+   */
   dropEffectStyle: DropEffectStyle;
   fxDropDust: boolean;
   fxDropFissures: boolean;
@@ -191,6 +196,11 @@ export interface StashSettings {
   boardWidth: BoardWidthMode;
   defaultCurrency?: string;
   lastBackupAt?: string;
+  /**
+   * @deprecated Legacy settings-nested theme list kept for schemaVersion 1
+   * backwards compatibility. Authoritative custom themes are stored in
+   * `local:stash_custom_themes` and exported at the top-level bundle key.
+   */
   customThemes?: ThemeDefinition[];
 }
 

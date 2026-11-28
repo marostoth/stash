@@ -30,7 +30,7 @@ KEY FEATURES
   Separate Work, Personal, Research, or Shopping into dedicated Spaces (switch instantly with keys 1–9). Flip between responsive card grids and a structured Details table (grouped by Collection or Retailer) right from the Space bar, sort any collection (Manual, A–Z, Newest, Recently Opened, or Price), and slice Spaces with clickable #tag filters.
 
 • Tab Session Manager & Pocket Side Panel
-  Keep open browser tabs in a dockable right-hand rail. Drag any tab straight into a collection, click Save Session or Save & Close to declutter your window, and click Wake Up to reopen a collection into a named Chrome Tab Group. Open the Side Panel (Alt+Shift+S) from any website to search your library, switch Spaces, or quick-stash the active tab.
+  Keep open browser tabs in a dockable right-hand rail. Drag any tab straight into a collection, click Save Session or Save & Close to declutter your window, and click Wake Up to reopen a collection into a named Chrome Tab Group. Open the Side Panel (Alt+Shift+S) from any website to search your library and switch Spaces, or press Alt+Shift+D to quick-stash the active tab instantly.
 
 • Shopping Lists & Price Tracking
   Check off bought/done items, toggle "Hide done", edit specs, quantities, and unit prices inline, watch live Remaining vs. Total subtotals, see automatic price-drop/increase badges, and copy clean Markdown lists in one click.
@@ -74,8 +74,8 @@ Stash provides a local-first Chrome New Tab and Side Panel workbench for organiz
   > Requested strictly on explicit user click inside the Side Panel ("Extract Product Info") to read visible title, price, and store metadata from the active webpage. Never granted at install time and never runs automatically in the background.
 - **Optional `bookmarks` (`optional_permissions`):**
   > Requested only if the user clicks "Import Chrome Bookmarks" in Settings → Backup & Import to read existing Chrome bookmark folders into Stash collections.
-- **Optional Host Permissions (`http://*/*`, `https://*/*` in `optional_host_permissions`):**
-  > Requested only when the user explicitly opts in to Visual Page Previews, runs a manual Library Health Check, or clicks "Extract Product Info" in the Side Panel. All fetches use `credentials: 'omit'` directly from the browser to the user's saved URLs with no external proxy or developer server.
+- **Optional Host Permissions (`https://*/*`, `http://*/*` in `optional_host_permissions`):**
+  > Requested only when the user explicitly opts in to **Visual Previews**, runs a manual **Library Health Check**, or triggers **Product Extraction** ("Extract Product Info" in the Side Panel). All fetches use `credentials: 'omit'` directly from the browser to the user's saved URLs with no external proxy or developer server.
 - **Remote Code:**
   > **No, I am not using Remote code.** All JavaScript, CSS, Web Audio synthesis, and UI assets are bundled inside the extension package.
 
