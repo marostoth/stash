@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Collection, LinkItem } from '@/lib/types/stash';
 import {
   insertLinkAtIndexInList,
+  mapVisibleIndexToFullIndex,
   moveOrReorderLinkInList,
   reorderCollectionsList,
 } from '@/lib/utils/ordering';
@@ -9,11 +10,16 @@ import {
 const T0 = '2026-11-25T10:00:00.000Z';
 const T1 = '2026-11-25T10:05:00.000Z';
 
-function makeCollection(id: string, order: number): Collection {
+function makeCollection(
+  id: string,
+  order: number,
+  spaceId?: string,
+): Collection {
   return {
     id,
     name: `Col ${id}`,
     color: 'green',
+    ...(spaceId ? { spaceId } : {}),
     order,
     collapsed: false,
     createdAt: T0,
@@ -133,5 +139,65 @@ describe('ordering helpers', () => {
       ['l-new', 1],
       ['l2', 2],
     ]);
+  });
+
+  it('reorders collections strictly within the active Space slice without disturbing other Spaces', () => {
+    const cols = [
+      makeCollection('m1', 0, 'main'),
+      makeCollection('m2', 1, 'main'),
+      makeCollection('w1', 2, 'work'),
+      makeCollection('s1', 3, 'shopping'),
+      makeCollection('w2', 4, 'work'),
+      makeCollection('w3', 5, 'work'),
+    ];
+
+    // In Space 'work', local order is [w1 (0), w2 (1), w3 (2)].
+    // Dragging w3 to Space-local index 0 must move w3 ahead of w1/w2 while keeping
+    // 'main' (slots 0,1) and 'shopping' (slot 3) at their exact global positions.
+    const movedUp = reorderCollectionsList(cols, 'w3', 0, T1, 'work');
+    expect(movedUp.map((c) => [c.id, c.order])).toEqual([
+      ['m1', 0],
+      ['m2', 1],
+      ['w3', 2],
+      ['s1', 3],
+      ['w1', 4],
+      ['w2', 5],
+    ]);
+
+    // Dragging w3 back to Space-local index 2 restores original Space order
+    const movedDown = reorderCollectionsList(movedUp, 'w3', 2, T1, 'work');
+    expect(movedDown.map((c) => [c.id, c.order])).toEqual([
+      ['m1', 0],
+      ['m2', 1],
+      ['w1', 2],
+      ['s1', 3],
+      ['w2', 4],
+      ['w3', 5],
+    ]);
+  });
+
+  it('maps visible drop indices cleanly onto full collection order when hideChecked hides items', () => {
+    const fullLinks: LinkItem[] = [
+      { ...makeLink('c0', 'col', 'https://a.dev', 0), checked: true },
+      makeLink('u1', 'col', 'https://b.dev', 1),
+      { ...makeLink('c2', 'col', 'https://c.dev', 2), checked: true },
+      makeLink('u3', 'col', 'https://d.dev', 3),
+    ];
+    const visibleLinks = fullLinks.filter((l) => l.checked !== true);
+
+    // Dropping before visible[0] ('u1') targets full index 1 (leaving hidden 'c0' at 0)
+    expect(mapVisibleIndexToFullIndex(fullLinks, visibleLinks, 0)).toBe(1);
+    // Dropping before visible[1] ('u3') targets full index 3 (leaving hidden 'c2' at 2)
+    expect(mapVisibleIndexToFullIndex(fullLinks, visibleLinks, 1)).toBe(3);
+    // Dropping past the end appends cleanly at fullLinks.length (4)
+    expect(mapVisibleIndexToFullIndex(fullLinks, visibleLinks, 2)).toBe(4);
+
+    // Inserting at the mapped index preserves hidden checked items at their slots
+    const incoming = makeLink('new', 'col', 'https://new.dev', 0);
+    const fullTarget = mapVisibleIndexToFullIndex(fullLinks, visibleLinks, 1);
+    const inserted = insertLinkAtIndexInList(fullLinks, incoming, fullTarget)
+      .sort((a, b) => a.order - b.order)
+      .map((l) => l.id);
+    expect(inserted).toEqual(['c0', 'u1', 'c2', 'new', 'u3']);
   });
 });

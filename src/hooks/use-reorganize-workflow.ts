@@ -1,11 +1,9 @@
-import {
-  type CSSProperties,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import {
+  showReorganizeUndoToast,
+  upsertReorganizeBackgroundJob,
+} from '@/components/reorganize/reorganize-undo-toast';
 import { playSessionFreeze } from '@/lib/audio/foley';
 import { checkNanoAvailability } from '@/lib/categorizer/nano-engine';
 import {
@@ -27,6 +25,7 @@ import {
   mergeSpaceReorganization,
   type ReorganizeScope,
 } from '@/lib/reorganize/plan';
+import { cloneBoardState } from '@/lib/storage/reorganize-ops';
 import { stashRepo } from '@/lib/storage/repo';
 import {
   type Collection,
@@ -37,6 +36,7 @@ import {
 } from '@/lib/types/stash';
 import { extractDomain } from '@/lib/utils/url';
 import { useBackgroundJobsStore } from '@/store/background-jobs-store';
+import { useFxStore } from '@/store/fx-store';
 import { useUiStore } from '@/store/ui-store';
 
 export type WizardStep = 'scope' | 'checkpoint' | 'sorting' | 'preview';
@@ -239,10 +239,22 @@ export function useReorganizeWorkflow(
     toast.success(`Exported backup: ${filename}`);
   };
 
+  const upsertReorganizeJob = (
+    detail: string,
+    opts: {
+      status: 'running' | 'ready';
+      progress?: { current: number; total: number } | null;
+      onCancel?: () => void;
+    },
+  ) =>
+    upsertReorganizeBackgroundJob(detail, {
+      ...opts,
+      onReopen: openReorganize,
+    });
+
   const runPass1 = async () => {
     if (scopedLinks.length === 0) return;
-    const jobsStore = useBackgroundJobsStore.getState();
-    if (jobsStore.hasActiveNanoJob('reorganize')) {
+    if (useBackgroundJobsStore.getState().hasActiveNanoJob('reorganize')) {
       toast.info('Another on-device AI task is already running.');
       return;
     }
@@ -252,49 +264,42 @@ export function useReorganizeWorkflow(
 
     setProposing(true);
     setErrorMessage(null);
-    jobsStore.upsertJob({
-      id: 'reorganize',
-      title: 'Smart Reorganize',
-      detail: `Proposing categories for ${scopedLinks.length} links...`,
-      status: 'running',
-      progress: null,
-      usesNano: true,
-      onReopen: openReorganize,
-      onCancel: () => controller.abort(),
-    });
+    upsertReorganizeJob(
+      `Proposing categories for ${scopedLinks.length} links...`,
+      { status: 'running', onCancel: () => controller.abort() },
+    );
 
+    let keepReadyJob = false;
     try {
       const result = await proposeCategories(scopedLinks, {
         existingCollectionNames: untouchedCollectionNames,
         signal: controller.signal,
       });
 
-      if (result.status === 'canceled') {
-        useBackgroundJobsStore.getState().removeJob('reorganize');
-        return;
-      }
+      if (result.status === 'canceled') return;
       if (result.status !== 'ok') {
         setErrorMessage(result.reason);
-        useBackgroundJobsStore.getState().removeJob('reorganize');
         return;
       }
 
       setCategories(result.categories);
       setStep('checkpoint');
       if (!openRef.current) {
-        useBackgroundJobsStore.getState().upsertJob({
-          id: 'reorganize',
-          title: 'Smart Reorganize ready',
-          detail: `${result.categories.length} categories proposed · Click to review`,
-          status: 'ready',
-          reopenLabel: 'Review',
-          onReopen: openReorganize,
-        });
-      } else {
-        useBackgroundJobsStore.getState().removeJob('reorganize');
+        keepReadyJob = true;
+        upsertReorganizeJob(
+          `${result.categories.length} categories proposed · Click to review`,
+          { status: 'ready' },
+        );
       }
+    } catch {
+      setErrorMessage(
+        'On-device AI failed to propose categories. Please try again.',
+      );
     } finally {
       setProposing(false);
+      if (!keepReadyJob) {
+        useBackgroundJobsStore.getState().removeJob('reorganize');
+      }
     }
   };
 
@@ -308,8 +313,7 @@ export function useReorganizeWorkflow(
       .filter((c) => c.name.length > 0);
     if (cleanCategories.length === 0) return;
 
-    const jobsStore = useBackgroundJobsStore.getState();
-    if (jobsStore.hasActiveNanoJob('reorganize')) {
+    if (useBackgroundJobsStore.getState().hasActiveNanoJob('reorganize')) {
       toast.info('Another on-device AI task is already running.');
       return;
     }
@@ -343,62 +347,62 @@ export function useReorganizeWorkflow(
       currentTitle: scopedLinks[0]?.title ?? '',
     });
     setStep('sorting');
-    jobsStore.upsertJob({
-      id: 'reorganize',
-      title: 'Smart Reorganize',
-      detail: `Sorting 0 / ${scopedLinks.length} links`,
+    upsertReorganizeJob(`Sorting 0 / ${scopedLinks.length} links`, {
       status: 'running',
       progress: { current: 0, total: scopedLinks.length },
-      usesNano: true,
-      onReopen: openReorganize,
       onCancel: () => controller.abort(),
     });
 
-    const result = await sortLinksIntoCategories(scopedLinks, sortingBuckets, {
-      signal: controller.signal,
-      onProgress: (p) => {
-        setSortProgress(p);
-        useBackgroundJobsStore.getState().upsertJob({
-          id: 'reorganize',
-          title: 'Smart Reorganize',
-          detail: `Sorting ${p.completed} / ${p.total} · ${p.currentTitle}`,
-          status: 'running',
-          progress: { current: p.completed, total: p.total },
-          usesNano: true,
-          onReopen: openReorganize,
-          onCancel: () => controller.abort(),
-        });
-      },
-    });
+    let keepReadyJob = false;
+    try {
+      const result = await sortLinksIntoCategories(
+        scopedLinks,
+        sortingBuckets,
+        {
+          signal: controller.signal,
+          onProgress: (p) => {
+            setSortProgress(p);
+            upsertReorganizeJob(
+              `Sorting ${p.completed} / ${p.total} · ${p.currentTitle}`,
+              {
+                status: 'running',
+                progress: { current: p.completed, total: p.total },
+                onCancel: () => controller.abort(),
+              },
+            );
+          },
+        },
+      );
 
-    if (result.status === 'canceled') {
-      setSortProgress(null);
-      setStep('checkpoint');
-      useBackgroundJobsStore.getState().removeJob('reorganize');
-      return;
-    }
-    if (result.status === 'unavailable' || result.status === 'error') {
-      setErrorMessage(result.reason);
-      setSortProgress(null);
-      setStep('checkpoint');
-      useBackgroundJobsStore.getState().removeJob('reorganize');
-      return;
-    }
+      if (result.status === 'canceled') {
+        setStep('checkpoint');
+        return;
+      }
+      if (result.status === 'unavailable' || result.status === 'error') {
+        setErrorMessage(result.reason);
+        setStep('checkpoint');
+        return;
+      }
 
-    setAssignments(result.assignments);
-    setSortProgress(null);
-    setStep('preview');
-    if (!openRef.current) {
-      useBackgroundJobsStore.getState().upsertJob({
-        id: 'reorganize',
-        title: 'Smart Reorganize ready',
-        detail: `${scopedLinks.length} links sorted · Review & apply`,
-        status: 'ready',
-        reopenLabel: 'Review',
-        onReopen: openReorganize,
-      });
-    } else {
-      useBackgroundJobsStore.getState().removeJob('reorganize');
+      setAssignments(result.assignments);
+      setStep('preview');
+      if (!openRef.current) {
+        keepReadyJob = true;
+        upsertReorganizeJob(
+          `${scopedLinks.length} links sorted · Review & apply`,
+          { status: 'ready' },
+        );
+      }
+    } catch {
+      setErrorMessage(
+        'On-device AI failed while sorting links. Please try again.',
+      );
+      setStep('checkpoint');
+    } finally {
+      setSortProgress(null);
+      if (!keepReadyJob) {
+        useBackgroundJobsStore.getState().removeJob('reorganize');
+      }
     }
   };
 
@@ -406,6 +410,10 @@ export function useReorganizeWorkflow(
     if (applying) return;
     setApplying(true);
     try {
+      const previousSpaceSnapshot = cloneBoardState({
+        collections: [...collections],
+        links: [...links],
+      });
       const plan = buildReorganizationPlan(
         { collections: [...collections], links: [...links] },
         scope,
@@ -420,10 +428,12 @@ export function useReorganizeWorkflow(
         activeSpaceId,
         plan.nextState,
       );
-      const previousSnapshot =
-        await stashRepo.applyReorganization(mergedNextState);
+      await stashRepo.applyReorganization(mergedNextState);
 
       playSessionFreeze(settings.soundEffects, settings.motionMode);
+      if (settings.motionMode === 'arcade' && settings.fxDeskJolt !== false) {
+        useFxStore.getState().triggerContainerShake('heavy');
+      }
       useBackgroundJobsStore.getState().removeJob('reorganize');
       setStep('scope');
       setCategories([]);
@@ -431,23 +441,11 @@ export function useReorganizeWorkflow(
       closeReorganize();
 
       const { movedLinks, targetCollectionsCount } = plan.summary;
-      toast(
-        `Reorganized ${movedLinks} link${movedLinks === 1 ? '' : 's'} into ${targetCollectionsCount} collection${targetCollectionsCount === 1 ? '' : 's'}`,
-        {
-          duration: 10_000,
-          className: 'stash-undo-toast',
-          style: { '--stash-toast-duration': '10000ms' } as CSSProperties,
-          action: {
-            label: 'Undo',
-            onClick: () => {
-              void stashRepo
-                .restoreLibrarySnapshot(previousSnapshot)
-                .then(() => {
-                  toast.success('Restored previous board layout');
-                });
-            },
-          },
-        },
+      showReorganizeUndoToast(
+        movedLinks,
+        targetCollectionsCount,
+        previousSpaceSnapshot,
+        activeSpaceId,
       );
     } finally {
       setApplying(false);

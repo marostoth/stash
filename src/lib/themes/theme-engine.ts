@@ -3,7 +3,18 @@ import {
   OSCILLOSCOPE_THEME,
 } from '@/lib/themes/built-in-themes';
 import { CARD_RADIUS_PRESETS } from '@/lib/themes/presets';
-import type { BackdropOverride, ThemeDefinition } from '@/lib/types/stash';
+import type {
+  BackdropOverride,
+  ThemeDefinition,
+  ThemeMode,
+} from '@/lib/types/stash';
+
+export const WARNING_COLOR_LIGHT = '#B45309';
+export const WARNING_COLOR_DARK = '#FBBF24';
+
+export function resolveWarningColor(mode: ThemeMode): string {
+  return mode === 'light' ? WARNING_COLOR_LIGHT : WARNING_COLOR_DARK;
+}
 
 export function getAllThemes(
   customThemes: readonly ThemeDefinition[] = [],
@@ -45,6 +56,7 @@ export function applyThemeToDocument(
   theme: ThemeDefinition,
   root: HTMLElement = document.documentElement,
   backdropOverride: BackdropOverride = 'theme',
+  options?: { animate?: boolean },
 ): void {
   const backdrop =
     backdropOverride !== 'theme'
@@ -56,7 +68,9 @@ export function applyThemeToDocument(
 
   const prevTheme = root.dataset.theme;
   const prevBackdrop = root.dataset.backdrop;
+  const shouldAnimate = options?.animate !== false;
   if (
+    shouldAnimate &&
     prevTheme &&
     (prevTheme !== theme.id || (prevBackdrop && prevBackdrop !== backdrop))
   ) {
@@ -79,7 +93,9 @@ export function applyThemeToDocument(
     '--stash-card-hover':
       theme.colors.cardHover ||
       `color-mix(in srgb, ${surface} 90%, ${theme.colors.text})`,
+    '--stash-elevated': `color-mix(in srgb, ${surface} 84%, ${theme.colors.text} 10%)`,
     '--stash-border': theme.colors.border,
+    '--stash-hairline': `color-mix(in srgb, ${theme.colors.text} ${theme.mode === 'light' ? '10%' : '7%'}, transparent)`,
     '--stash-accent': theme.colors.accent,
     '--stash-accent-fg': theme.colors.accentFg,
     '--stash-text': theme.colors.text,
@@ -87,6 +103,7 @@ export function applyThemeToDocument(
       theme.colors.textMuted ||
       `color-mix(in srgb, ${theme.colors.text} 58%, ${theme.colors.canvas})`,
     '--stash-danger': theme.colors.danger,
+    '--stash-warning': resolveWarningColor(theme.mode),
     '--stash-badge-bg': `color-mix(in srgb, ${theme.colors.accent} 14%, ${surface})`,
     '--stash-accent-border': `color-mix(in srgb, ${theme.colors.accent} 42%, ${theme.colors.border})`,
     '--stash-glow': `color-mix(in srgb, ${theme.colors.accent} 24%, transparent)`,

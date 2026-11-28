@@ -4,6 +4,7 @@ import {
   type RestorableTabSnapshot,
 } from '@/lib/tabs/clearFilter';
 import {
+  isStashableUrl,
   normalizeRawTabs,
   type OpenTabInfo,
   type RawTabLike,
@@ -88,7 +89,7 @@ export async function executeClearWindowTabs(): Promise<ClearWindowTabsOutcome> 
     await browser.tabs.create({ active: true });
   }
 
-  await browser.tabs.remove(idsToClose);
+  await closeTabs(idsToClose);
 
   return {
     clearedCount: idsToClose.length,
@@ -111,8 +112,9 @@ export async function reopenTabSnapshots(
 
   let reopened = 0;
   for (const snapshot of snapshots) {
+    if (!isStashableUrl(snapshot.url)) continue;
     try {
-      await browser.tabs.create({ url: snapshot.url, active: false });
+      await browser.tabs.create({ url: snapshot.url.trim(), active: false });
       reopened += 1;
     } catch {
       // Skip any URL Chrome rejects (e.g., restricted internal schemes)
@@ -129,7 +131,18 @@ export async function switchToTab(tabId: number): Promise<void> {
 export async function closeTabs(tabIds: readonly number[]): Promise<void> {
   if (tabIds.length === 0) return;
   if (typeof browser === 'undefined' || !browser.tabs?.remove) return;
-  await browser.tabs.remove([...tabIds]);
+  try {
+    await browser.tabs.remove([...tabIds]);
+  } catch {
+    // If any tab was already closed during an animation sweep, close remaining tabs individually
+    for (const id of tabIds) {
+      try {
+        await browser.tabs.remove(id);
+      } catch {
+        // Tab already closed or unavailable; continue closing the rest
+      }
+    }
+  }
 }
 
 export async function openLinksInNamedTabGroup(
@@ -142,12 +155,17 @@ export async function openLinksInNamedTabGroup(
 
   const createdIds: number[] = [];
   for (const link of links) {
-    const created = await browser.tabs.create({
-      url: link.url,
-      active: false,
-    });
-    if (typeof created.id === 'number') {
-      createdIds.push(created.id);
+    if (!isStashableUrl(link.url)) continue;
+    try {
+      const created = await browser.tabs.create({
+        url: link.url.trim(),
+        active: false,
+      });
+      if (typeof created.id === 'number') {
+        createdIds.push(created.id);
+      }
+    } catch {
+      // Skip any URL Chrome rejects so remaining tabs still open and group
     }
   }
 
@@ -183,7 +201,10 @@ export async function wakeUpCollectionInNewWindow(
   if (links.length === 0) return 0;
   if (typeof browser === 'undefined' || !browser.windows?.create) return 0;
 
-  const urls = links.map((link) => link.url);
+  const urls = links
+    .map((link) => link.url.trim())
+    .filter((url) => isStashableUrl(url));
+  if (urls.length === 0) return 0;
   await browser.windows.create({ url: urls, focused: true });
   return urls.length;
 }

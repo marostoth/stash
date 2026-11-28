@@ -7,12 +7,19 @@
   --stash-panel: #15181d;
   --stash-card: #1d2128;
   --stash-card-hover: #242a33;
+  --stash-elevated: color-mix(
+    in srgb,
+    var(--stash-surface) 84%,
+    var(--stash-text) 10%
+  );
   --stash-border: #262b34;
+  --stash-hairline: color-mix(in srgb, var(--stash-text) 7%, transparent);
   --stash-accent: #00d68f;
   --stash-accent-fg: #06150f;
   --stash-text: #eceff4;
   --stash-text-muted: #8b949e;
   --stash-danger: #f87171;
+  --stash-warning: #fbbf24;
   --stash-badge-bg: color-mix(
     in srgb,
     var(--stash-accent) 14%,
@@ -40,12 +47,15 @@
   --color-panel: var(--stash-panel);
   --color-card: var(--stash-card);
   --color-card-hover: var(--stash-card-hover);
+  --color-elevated: var(--stash-elevated);
   --color-border: var(--stash-border);
+  --color-hairline: var(--stash-hairline);
   --color-accent: var(--stash-accent);
   --color-accent-fg: var(--stash-accent-fg);
   --color-fg: var(--stash-text);
   --color-fg-muted: var(--stash-text-muted);
   --color-danger: var(--stash-danger);
+  --color-warning: var(--stash-warning);
 
   --radius-card: var(--stash-radius-card);
   --radius-control: var(--stash-radius-control);
@@ -241,65 +251,11 @@ html[data-theme-mode="dark"][data-backdrop="vignette"] .stash-backdrop {
 .stash-collection-tinted {
   background-color: color-mix(
     in srgb,
-    var(--collection-tint) 10%,
+    var(--collection-tint) 8%,
     var(--stash-surface)
   );
   border: 1px solid
-    color-mix(in srgb, var(--collection-tint) 28%, var(--stash-border));
-  border-top: 3px solid
-    color-mix(in srgb, var(--collection-tint) 76%, transparent);
-}
-
-/* Theme-aware hardware underglow for starred link cards */
-.stash-card-starred {
-  border-color: color-mix(
-    in srgb,
-    var(--stash-accent) 55%,
-    var(--stash-border)
-  );
-  background-color: color-mix(
-    in srgb,
-    var(--stash-accent) 6%,
-    var(--stash-card)
-  );
-  box-shadow: 0 6px 20px -8px
-    color-mix(in srgb, var(--stash-accent) 45%, transparent);
-}
-
-.stash-card-starred:hover {
-  border-color: color-mix(
-    in srgb,
-    var(--stash-accent) 72%,
-    var(--stash-border)
-  );
-  background-color: color-mix(
-    in srgb,
-    var(--stash-accent) 9%,
-    var(--stash-card-hover)
-  );
-}
-
-html[data-theme-mode="light"] .stash-card-starred {
-  box-shadow: 0 6px 18px -9px
-    color-mix(in srgb, var(--stash-accent) 28%, transparent);
-}
-
-.stash-card-underglow-strip {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--stash-accent) 22%, transparent) 0%,
-    color-mix(in srgb, var(--stash-accent) 92%, transparent) 50%,
-    color-mix(in srgb, var(--stash-accent) 22%, transparent) 100%
-  );
-  box-shadow: 0 0 8px color-mix(in srgb, var(--stash-accent) 55%, transparent);
-}
-
-html[data-theme-mode="light"] .stash-card-underglow-strip {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--stash-accent) 18%, transparent) 0%,
-    color-mix(in srgb, var(--stash-accent) 78%, transparent) 50%,
-    color-mix(in srgb, var(--stash-accent) 18%, transparent) 100%
-  );
-  box-shadow: 0 0 6px color-mix(in srgb, var(--stash-accent) 30%, transparent);
+    color-mix(in srgb, var(--collection-tint) 22%, var(--stash-hairline));
+  border-top: 2px solid
+    color-mix(in srgb, var(--collection-tint) 68%, transparent);
 }

@@ -37,7 +37,7 @@ export interface AutoTagProgress {
 }
 
 export interface AutoTagSweepResult {
-  status: 'completed' | 'canceled' | 'unavailable';
+  status: 'completed' | 'canceled' | 'unavailable' | 'error';
   tagged: number;
   skipped: number;
   total: number;
@@ -435,7 +435,7 @@ export async function runBatchAutoTagSweep(
     };
   } catch {
     return {
-      status: signal?.aborted ? 'canceled' : 'completed',
+      status: signal?.aborted ? 'canceled' : 'error',
       tagged,
       skipped,
       total: eligible.length,

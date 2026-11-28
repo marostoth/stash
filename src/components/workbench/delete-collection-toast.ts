@@ -15,6 +15,7 @@ export async function deleteCollectionWithUndo(
   const ok = await stashRepo.deleteCollection(collectionId);
   if (!ok) return false;
   playDelete();
+  let undone = false;
   toast(`Deleted "${collectionName}"`, {
     duration: 6000,
     className: 'stash-undo-toast',
@@ -22,6 +23,8 @@ export async function deleteCollectionWithUndo(
     action: {
       label: 'Undo',
       onClick: () => {
+        if (undone) return;
+        undone = true;
         void stashRepo.getTrash().then((entries) => {
           const match = entries.find(
             (entry) =>

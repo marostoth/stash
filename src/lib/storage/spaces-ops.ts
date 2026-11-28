@@ -1,3 +1,4 @@
+import { storage } from '#imports';
 import {
   activeSpaceIdStorage,
   collectionsStorage,
@@ -195,15 +196,15 @@ export async function deleteSpaceInStorage(
     };
   });
 
-  await Promise.all([
-    spacesStorage.setValue(remainingSpaces),
-    collectionsStorage.setValue(nextCollections),
-  ]);
-
   const currentActive = await activeSpaceIdStorage.getValue();
+  const writes: Parameters<typeof storage.setItems>[0] = [
+    { item: spacesStorage, value: remainingSpaces },
+    { item: collectionsStorage, value: nextCollections },
+  ];
   if (currentActive === id) {
-    await activeSpaceIdStorage.setValue(fallbackSpaceId);
+    writes.push({ item: activeSpaceIdStorage, value: fallbackSpaceId });
   }
+  await storage.setItems(writes);
 
   return {
     deleted: true,

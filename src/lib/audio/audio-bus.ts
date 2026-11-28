@@ -1,3 +1,16 @@
+import {
+  computeJitter,
+  VOICE_CHOKE_FADE_SEC,
+  volumePercentToGain,
+} from '@/lib/audio/audio-math';
+import { resetNoiseBuffers } from '@/lib/audio/audio-synth';
+
+export {
+  scheduleFilteredNoise,
+  scheduleFmClang,
+  scheduleTone,
+} from '@/lib/audio/audio-synth';
+
 type AudioContextCtor = new () => AudioContext;
 
 export interface ReadyAudioBus {
@@ -5,15 +18,25 @@ export interface ReadyAudioBus {
   destination: AudioNode;
   punch: AudioNode;
   reverb: AudioNode;
+  isChoked?: () => boolean;
 }
+
+export interface ChokableVoiceBus {
+  bus: ReadyAudioBus;
+  choke: (nowSec: number) => void;
+  dispose: () => void;
+}
+
+const DEFAULT_VOLUME_PERCENT = 75;
+const SUB_HIGHPASS_HZ = 35;
 
 let sharedContext: AudioContext | null = null;
 let sharedMasterGain: GainNode | null = null;
+let sharedBusInput: AudioNode | null = null;
 let sharedPunchInput: AudioNode | null = null;
 let sharedReverbInput: AudioNode | null = null;
-let sharedWhiteNoise: AudioBuffer | null = null;
-let sharedBrownNoise: AudioBuffer | null = null;
-let masterVolume = 0.75; // Normalized 0..1 (matches DEFAULT_SETTINGS.soundVolume = 75)
+let masterVolume = volumePercentToGain(DEFAULT_VOLUME_PERCENT);
+const pendingGateCleanupTimers = new Set<ReturnType<typeof setTimeout>>();
 
 function getAudioContextConstructor(): AudioContextCtor | undefined {
   const g = globalThis as {
@@ -27,8 +50,8 @@ function getAudioContextConstructor(): AudioContextCtor | undefined {
  * Returns a subtle ±amount pitch/filter multiplier so consecutive impacts
  * sound organic rather than identical.
  */
-export function jitter(amount = 0.045): number {
-  return 1 + (Math.random() * 2 - 1) * amount;
+export function jitter(amount = 0.025): number {
+  return computeJitter(amount);
 }
 
 export function getMasterVolume(): number {
@@ -36,10 +59,7 @@ export function getMasterVolume(): number {
 }
 
 export function setMasterVolumePercent(percent: number): void {
-  const clamped = Number.isFinite(percent)
-    ? Math.max(0, Math.min(100, percent))
-    : 75;
-  masterVolume = clamped / 100;
+  masterVolume = volumePercentToGain(percent);
   if (sharedContext && sharedMasterGain && sharedContext.state !== 'closed') {
     try {
       sharedMasterGain.gain.setValueAtTime(
@@ -53,13 +73,17 @@ export function setMasterVolumePercent(percent: number): void {
 }
 
 export function resetAudioBusForTests(): void {
+  for (const timer of pendingGateCleanupTimers) {
+    clearTimeout(timer);
+  }
+  pendingGateCleanupTimers.clear();
   sharedContext = null;
   sharedMasterGain = null;
+  sharedBusInput = null;
   sharedPunchInput = null;
   sharedReverbInput = null;
-  sharedWhiteNoise = null;
-  sharedBrownNoise = null;
-  masterVolume = 0.75;
+  resetNoiseBuffers();
+  masterVolume = volumePercentToGain(DEFAULT_VOLUME_PERCENT);
 }
 
 function buildSoftClipCurve(drive = 4.6): Float32Array<ArrayBuffer> {
@@ -114,51 +138,62 @@ export function getReadyAudioBus(): ReadyAudioBus | null {
   try {
     if (!sharedContext || sharedContext.state === 'closed') {
       sharedContext = new Ctor();
-      sharedWhiteNoise = null;
-      sharedBrownNoise = null;
+      resetNoiseBuffers();
 
+      const t0 = sharedContext.currentTime;
+
+      // Master bus chain:
+      // all voices -> 35Hz highpass -> soft-limiter compressor -> masterGain -> destination
       sharedMasterGain = sharedContext.createGain();
-      sharedMasterGain.gain.setValueAtTime(
-        masterVolume,
-        sharedContext.currentTime,
-      );
+      sharedMasterGain.gain.setValueAtTime(masterVolume, t0);
+      sharedMasterGain.connect(sharedContext.destination);
 
-      // 14ms compressor attack lets explosive impact transients punch straight through
-      let masterOut: AudioNode = sharedContext.destination;
+      let busEntry: AudioNode = sharedMasterGain;
+
       if (typeof sharedContext.createDynamicsCompressor === 'function') {
-        const comp = sharedContext.createDynamicsCompressor();
-        comp.threshold.setValueAtTime(-7, sharedContext.currentTime);
-        comp.knee.setValueAtTime(10, sharedContext.currentTime);
-        comp.ratio.setValueAtTime(4.5, sharedContext.currentTime);
-        comp.attack.setValueAtTime(0.014, sharedContext.currentTime);
-        comp.release.setValueAtTime(0.11, sharedContext.currentTime);
-        comp.connect(sharedContext.destination);
-        masterOut = comp;
+        const limiter = sharedContext.createDynamicsCompressor();
+        limiter.threshold.setValueAtTime(-6, t0);
+        limiter.knee.setValueAtTime(12, t0);
+        limiter.ratio.setValueAtTime(8, t0);
+        limiter.attack.setValueAtTime(0.003, t0);
+        limiter.release.setValueAtTime(0.12, t0);
+        limiter.connect(busEntry);
+        busEntry = limiter;
       }
-      sharedMasterGain.connect(masterOut);
 
-      // Stereo Dark Stone Hall Convolver reverb bus
+      if (typeof sharedContext.createBiquadFilter === 'function') {
+        const highpass = sharedContext.createBiquadFilter();
+        highpass.type = 'highpass';
+        highpass.frequency.setValueAtTime(SUB_HIGHPASS_HZ, t0);
+        highpass.Q.setValueAtTime(Math.SQRT1_2, t0);
+        highpass.connect(busEntry);
+        busEntry = highpass;
+      }
+
+      sharedBusInput = busEntry;
+
+      // Stereo Dark Stone Hall Convolver reverb bus -> feeds sharedBusInput
       if (typeof sharedContext.createConvolver === 'function') {
         const reverbIn = sharedContext.createGain();
-        reverbIn.gain.setValueAtTime(1.15, sharedContext.currentTime);
+        reverbIn.gain.setValueAtTime(1.15, t0);
         const convolver = sharedContext.createConvolver();
         const ir = buildDarkHallImpulse(sharedContext);
         if (ir) {
           convolver.buffer = ir;
           reverbIn.connect(convolver);
-          convolver.connect(sharedMasterGain);
+          convolver.connect(busEntry);
           sharedReverbInput = reverbIn;
         } else {
-          sharedReverbInput = sharedMasterGain;
+          sharedReverbInput = busEntry;
         }
       } else {
-        sharedReverbInput = sharedMasterGain;
+        sharedReverbInput = busEntry;
       }
 
-      // Punch bus: high-drive WaveShaper saturator + warm low-shelf bass boost
+      // Punch bus: high-drive WaveShaper saturator + warm low-shelf -> feeds sharedBusInput
       if (typeof sharedContext.createWaveShaper === 'function') {
         const punchIn = sharedContext.createGain();
-        punchIn.gain.setValueAtTime(1.45, sharedContext.currentTime);
+        punchIn.gain.setValueAtTime(1.45, t0);
         const shaper = sharedContext.createWaveShaper();
         shaper.curve = buildSoftClipCurve(4.6);
         shaper.oversample = '2x';
@@ -167,16 +202,16 @@ export function getReadyAudioBus(): ReadyAudioBus | null {
         if (typeof sharedContext.createBiquadFilter === 'function') {
           const lowShelf = sharedContext.createBiquadFilter();
           lowShelf.type = 'lowshelf';
-          lowShelf.frequency.setValueAtTime(118, sharedContext.currentTime);
-          lowShelf.gain.setValueAtTime(6.0, sharedContext.currentTime);
+          lowShelf.frequency.setValueAtTime(118, t0);
+          lowShelf.gain.setValueAtTime(6.0, t0);
           shaper.connect(lowShelf);
-          lowShelf.connect(sharedMasterGain);
+          lowShelf.connect(busEntry);
         } else {
-          shaper.connect(sharedMasterGain);
+          shaper.connect(busEntry);
         }
         sharedPunchInput = punchIn;
       } else {
-        sharedPunchInput = sharedMasterGain;
+        sharedPunchInput = busEntry;
       }
     }
 
@@ -186,6 +221,12 @@ export function getReadyAudioBus(): ReadyAudioBus | null {
       });
     }
 
+    // Never queue nodes while suspended (e.g. hovering cards before first user click),
+    // otherwise all queued sounds blast simultaneously at t=0 on first click.
+    if (sharedContext.state !== 'running') {
+      return null;
+    }
+
     if (sharedMasterGain) {
       sharedMasterGain.gain.setValueAtTime(
         masterVolume,
@@ -193,7 +234,7 @@ export function getReadyAudioBus(): ReadyAudioBus | null {
       );
     }
 
-    const dry = sharedMasterGain ?? sharedContext.destination;
+    const dry = sharedBusInput ?? sharedMasterGain ?? sharedContext.destination;
     return {
       ctx: sharedContext,
       destination: dry,
@@ -205,250 +246,118 @@ export function getReadyAudioBus(): ReadyAudioBus | null {
   }
 }
 
-function getNoiseBuffer(
-  ctx: AudioContext,
-  color: 'white' | 'brown' = 'white',
-): AudioBuffer | null {
-  if (color === 'white' && sharedWhiteNoise) return sharedWhiteNoise;
-  if (color === 'brown' && sharedBrownNoise) return sharedBrownNoise;
-  if (typeof ctx.createBuffer !== 'function') return null;
-
-  const sampleRate = ctx.sampleRate || 44_100;
-  const length = Math.floor(sampleRate * (color === 'brown' ? 0.85 : 0.45));
-  const buffer = ctx.createBuffer(1, length, sampleRate);
-  const data = buffer.getChannelData(0);
-
-  if (color === 'brown') {
-    let acc = 0;
-    let peak = 0.001;
-    for (let i = 0; i < length; i++) {
-      const white = Math.random() * 2 - 1;
-      acc = (acc + 0.052 * white) / 1.052;
-      data[i] = acc;
-      const abs = Math.abs(acc);
-      if (abs > peak) peak = abs;
+function fadeOutGainNode(node: GainNode, nowSec: number): void {
+  try {
+    const param = node.gain;
+    if (typeof param.cancelScheduledValues === 'function') {
+      param.cancelScheduledValues(nowSec);
     }
-    const scale = 0.96 / peak;
-    for (let i = 0; i < length; i++) {
-      data[i] = (data[i] ?? 0) * scale;
+    const startVal =
+      typeof param.value === 'number' &&
+      Number.isFinite(param.value) &&
+      param.value > 0.0001
+        ? param.value
+        : 1;
+    param.setValueAtTime(startVal, nowSec);
+    param.linearRampToValueAtTime(0.0001, nowSec + VOICE_CHOKE_FADE_SEC);
+    param.linearRampToValueAtTime(0, nowSec + VOICE_CHOKE_FADE_SEC + 0.003);
+  } catch {
+    // Ignore audio param errors in restricted contexts
+  }
+}
+
+function disconnectNodeSafe(node: AudioNode): void {
+  try {
+    if (typeof node.disconnect === 'function') {
+      node.disconnect();
     }
-    sharedBrownNoise = buffer;
-    return buffer;
+  } catch {
+    // Ignore already-disconnected node errors
   }
-
-  let last = 0;
-  for (let i = 0; i < length; i++) {
-    const white = Math.random() * 2 - 1;
-    last = last * 0.2 + white * 0.8;
-    data[i] = last;
-  }
-  sharedWhiteNoise = buffer;
-  return buffer;
-}
-
-function routeOutput(
-  ctx: AudioContext,
-  source: AudioNode,
-  destination: AudioNode,
-  options: {
-    pan?: number;
-    reverbNode?: AudioNode;
-    reverbSend?: number;
-  },
-): void {
-  let out: AudioNode = source;
-  if (
-    options.pan !== undefined &&
-    options.pan !== 0 &&
-    typeof ctx.createStereoPanner === 'function'
-  ) {
-    const panner = ctx.createStereoPanner();
-    panner.pan.setValueAtTime(
-      Math.max(-1, Math.min(1, options.pan)),
-      ctx.currentTime,
-    );
-    source.connect(panner);
-    out = panner;
-  }
-
-  out.connect(destination);
-
-  if (
-    options.reverbNode &&
-    options.reverbSend &&
-    options.reverbSend > 0 &&
-    options.reverbNode !== destination
-  ) {
-    const sendGain = ctx.createGain();
-    sendGain.gain.setValueAtTime(options.reverbSend, ctx.currentTime);
-    out.connect(sendGain);
-    sendGain.connect(options.reverbNode);
-  }
-}
-
-export function scheduleTone(
-  ctx: AudioContext,
-  destination: AudioNode,
-  options: {
-    type: OscillatorType;
-    startFreq: number;
-    endFreq: number;
-    startOffsetSec: number;
-    durationSec: number;
-    gain: number;
-    attackSec?: number;
-    pan?: number;
-    reverbNode?: AudioNode;
-    reverbSend?: number;
-  },
-): void {
-  const now = ctx.currentTime + options.startOffsetSec;
-  const end = now + options.durationSec;
-  const attack = options.attackSec ?? 0.002;
-
-  const osc = ctx.createOscillator();
-  const amp = ctx.createGain();
-
-  osc.type = options.type;
-  osc.frequency.setValueAtTime(options.startFreq, now);
-  osc.frequency.exponentialRampToValueAtTime(
-    Math.max(18, options.endFreq),
-    end,
-  );
-
-  amp.gain.setValueAtTime(0.0001, now);
-  amp.gain.linearRampToValueAtTime(options.gain, now + attack);
-  amp.gain.exponentialRampToValueAtTime(0.0001, end);
-
-  osc.connect(amp);
-  routeOutput(ctx, amp, destination, options);
-
-  osc.start(now);
-  osc.stop(end + 0.01);
-}
-
-export function scheduleFilteredNoise(
-  ctx: AudioContext,
-  destination: AudioNode,
-  options: {
-    color?: 'white' | 'brown';
-    filterType: BiquadFilterType;
-    startFreq: number;
-    endFreq?: number;
-    q?: number;
-    startOffsetSec: number;
-    durationSec: number;
-    gain: number;
-    attackSec?: number;
-    pan?: number;
-    reverbNode?: AudioNode;
-    reverbSend?: number;
-  },
-): void {
-  if (
-    typeof ctx.createBufferSource !== 'function' ||
-    typeof ctx.createBiquadFilter !== 'function'
-  ) {
-    return;
-  }
-  const buffer = getNoiseBuffer(ctx, options.color ?? 'white');
-  if (!buffer) return;
-
-  const now = ctx.currentTime + options.startOffsetSec;
-  const end = now + options.durationSec;
-  const attack = options.attackSec ?? 0.0015;
-
-  const src = ctx.createBufferSource();
-  src.buffer = buffer;
-
-  const filter = ctx.createBiquadFilter();
-  filter.type = options.filterType;
-  filter.frequency.setValueAtTime(options.startFreq, now);
-  if (options.endFreq !== undefined && options.endFreq !== options.startFreq) {
-    filter.frequency.exponentialRampToValueAtTime(
-      Math.max(35, options.endFreq),
-      end,
-    );
-  }
-  if (options.q !== undefined) {
-    filter.Q.setValueAtTime(options.q, now);
-  }
-
-  const amp = ctx.createGain();
-  amp.gain.setValueAtTime(0.0001, now);
-  amp.gain.linearRampToValueAtTime(options.gain, now + attack);
-  amp.gain.exponentialRampToValueAtTime(0.0001, end);
-
-  src.connect(filter);
-  filter.connect(amp);
-  routeOutput(ctx, amp, destination, options);
-
-  src.start(now);
-  src.stop(end + 0.01);
 }
 
 /**
- * 2-operator inharmonic FM synthesis for metallic iron latches, stone slabs,
- * forged armor clangs, and crystalline gem chimes.
+ * Wraps the shared bus in per-voice gain gates so rapid re-triggers of heavy
+ * tails can smoothly choke the oldest active voice over 18ms without clicking,
+ * and disconnects gates once choked or after natural tail expiry so persistent
+ * master bus nodes never accumulate orphaned GainNodes.
  */
-export function scheduleFmClang(
-  ctx: AudioContext,
-  destination: AudioNode,
-  options: {
-    carrierFreq: number;
-    endCarrierFreq?: number;
-    modRatio: number;
-    modIndex: number;
-    startOffsetSec: number;
-    durationSec: number;
-    gain: number;
-    attackSec?: number;
-    pan?: number;
-    reverbNode?: AudioNode;
-    reverbSend?: number;
-  },
-): void {
-  const now = ctx.currentTime + options.startOffsetSec;
-  const end = now + options.durationSec;
-  const attack = options.attackSec ?? 0.0015;
+export function createChokableVoiceBus(
+  bus: ReadyAudioBus,
+  initialGain = 1,
+  tailSec = 0.65,
+): ChokableVoiceBus {
+  const t0 = bus.ctx.currentTime;
+  const safeGain = Math.max(0.0001, Math.min(2, initialGain));
+  const gates: GainNode[] = [];
+  let choked = false;
+  let disposed = false;
+  let cleanupTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const carrier = ctx.createOscillator();
-  const mod = ctx.createOscillator();
-  const modGain = ctx.createGain();
-  const amp = ctx.createGain();
+  const makeGate = (target: AudioNode): GainNode => {
+    const gate = bus.ctx.createGain();
+    gate.gain.setValueAtTime(safeGain, t0);
+    gate.connect(target);
+    gates.push(gate);
+    return gate;
+  };
 
-  carrier.type = 'sine';
-  mod.type = 'sine';
+  const dryGate = makeGate(bus.destination);
+  const punchGate =
+    bus.punch === bus.destination ? dryGate : makeGate(bus.punch);
+  const reverbGate =
+    bus.reverb === bus.destination ? dryGate : makeGate(bus.reverb);
 
-  carrier.frequency.setValueAtTime(options.carrierFreq, now);
-  if (
-    options.endCarrierFreq !== undefined &&
-    options.endCarrierFreq !== options.carrierFreq
-  ) {
-    carrier.frequency.exponentialRampToValueAtTime(
-      Math.max(24, options.endCarrierFreq),
-      end,
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    choked = true;
+    if (cleanupTimer !== null) {
+      clearTimeout(cleanupTimer);
+      pendingGateCleanupTimers.delete(cleanupTimer);
+      cleanupTimer = null;
+    }
+    for (const gate of gates) {
+      disconnectNodeSafe(gate);
+    }
+  };
+
+  const scheduleDisconnect = (delaySec: number) => {
+    if (cleanupTimer !== null) {
+      clearTimeout(cleanupTimer);
+      pendingGateCleanupTimers.delete(cleanupTimer);
+    }
+    const timer = setTimeout(
+      () => {
+        pendingGateCleanupTimers.delete(timer);
+        cleanupTimer = null;
+        dispose();
+      },
+      Math.max(10, Math.ceil(delaySec * 1000)),
     );
-  }
+    cleanupTimer = timer;
+    pendingGateCleanupTimers.add(timer);
+  };
 
-  mod.frequency.setValueAtTime(options.carrierFreq * options.modRatio, now);
-  modGain.gain.setValueAtTime(options.modIndex, now);
-  modGain.gain.exponentialRampToValueAtTime(
-    Math.max(1, options.modIndex * 0.06),
-    end,
-  );
+  // Auto-disconnect voice gates after the voice's natural tail expires
+  scheduleDisconnect(Math.max(0.05, tailSec) + 0.15);
 
-  amp.gain.setValueAtTime(0.0001, now);
-  amp.gain.linearRampToValueAtTime(options.gain, now + attack);
-  amp.gain.exponentialRampToValueAtTime(0.0001, end);
-
-  mod.connect(modGain);
-  modGain.connect(carrier.frequency);
-  carrier.connect(amp);
-  routeOutput(ctx, amp, destination, options);
-
-  carrier.start(now);
-  mod.start(now);
-  carrier.stop(end + 0.01);
-  mod.stop(end + 0.01);
+  return {
+    bus: {
+      ctx: bus.ctx,
+      destination: dryGate,
+      punch: punchGate,
+      reverb: reverbGate,
+      isChoked: () => choked || disposed,
+    },
+    choke(nowSec: number) {
+      if (choked) return;
+      choked = true;
+      for (const gate of gates) {
+        fadeOutGainNode(gate, nowSec);
+      }
+      scheduleDisconnect(VOICE_CHOKE_FADE_SEC + 0.04);
+    },
+    dispose,
+  };
 }

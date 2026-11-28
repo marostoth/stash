@@ -20,7 +20,10 @@ import {
   type AiAuditPromptMode,
   buildAiAuditPrompt,
 } from '@/lib/import-export/ai-audit-prompt';
-import { getBackupStaleness } from '@/lib/import-export/backup-status';
+import {
+  getBackupStaleness,
+  isLikelyTruncatedBackup,
+} from '@/lib/import-export/backup-status';
 import { parseNetscapeBookmarksHtml } from '@/lib/import-export/bookmarks-html';
 import {
   buildNetscapeBookmarksHtml,
@@ -81,25 +84,33 @@ export function BackupImportPanel({
   const staleness = getBackupStaleness(settings.lastBackupAt, linkCount);
 
   const handleExportJson = async () => {
-    const exportedAt = new Date().toISOString();
-    const snapshot = await stashRepo.getSnapshot();
-    const bundle = buildExportBundle(snapshot, exportedAt);
-    const filename = formatBackupFilename();
-    triggerFileDownload(filename, `${JSON.stringify(bundle, null, 2)}\n`);
-    await stashRepo.updateSettings({ lastBackupAt: exportedAt });
-    toast.success(`Exported ${filename}`);
+    try {
+      const exportedAt = new Date().toISOString();
+      const snapshot = await stashRepo.getSnapshot();
+      const bundle = buildExportBundle(snapshot, exportedAt);
+      const filename = formatBackupFilename();
+      triggerFileDownload(filename, `${JSON.stringify(bundle, null, 2)}\n`);
+      await stashRepo.updateSettings({ lastBackupAt: exportedAt });
+      toast.success(`Exported ${filename}`);
+    } catch {
+      toast.error('Could not export JSON backup. Please try again.');
+    }
   };
 
   const handleExportHtml = async () => {
-    const snapshot = await stashRepo.getSnapshot();
-    const html = buildNetscapeBookmarksHtml(
-      snapshot.spaces,
-      snapshot.collections,
-      snapshot.links,
-    );
-    const filename = formatBookmarksHtmlFilename();
-    triggerFileDownload(filename, html, 'text/html;charset=utf-8');
-    toast.success(`Exported ${filename}`);
+    try {
+      const snapshot = await stashRepo.getSnapshot();
+      const html = buildNetscapeBookmarksHtml(
+        snapshot.spaces,
+        snapshot.collections,
+        snapshot.links,
+      );
+      const filename = formatBookmarksHtmlFilename();
+      triggerFileDownload(filename, html, 'text/html;charset=utf-8');
+      toast.success(`Exported ${filename}`);
+    } catch {
+      toast.error('Could not export HTML bookmarks. Please try again.');
+    }
   };
 
   const handleCopyAuditPrompt = async () => {
@@ -160,6 +171,8 @@ export function BackupImportPanel({
           `Merged +${stats.addedCollections} collections, +${stats.addedLinks} links (${stats.skippedLinks} duplicates skipped).`,
         );
       }
+    } catch {
+      toast.error('Could not restore backup into local storage.');
     } finally {
       setBusyAction(null);
     }
@@ -182,6 +195,8 @@ export function BackupImportPanel({
       toast.success(
         `Imported ${summary.linksAdded} bookmarks across ${summary.collectionsCreated} new collection${summary.collectionsCreated === 1 ? '' : 's'}${summary.linksSkipped > 0 ? ` (${summary.linksSkipped} duplicates skipped)` : ''}.`,
       );
+    } catch {
+      toast.error('Could not import Chrome bookmarks. Please try again.');
     } finally {
       setBusyAction(null);
     }
@@ -206,6 +221,8 @@ export function BackupImportPanel({
       toast.success(
         `Imported ${summary.linksAdded} bookmarks across ${summary.collectionsCreated} new collection${summary.collectionsCreated === 1 ? '' : 's'}${summary.linksSkipped > 0 ? ` (${summary.linksSkipped} duplicates skipped)` : ''}.`,
       );
+    } catch {
+      toast.error('Could not import HTML bookmark file.');
     } finally {
       setBusyAction(null);
     }
@@ -226,7 +243,7 @@ export function BackupImportPanel({
               className={cn(
                 'rounded-pill border px-2 py-0.5 font-mono text-[10px]',
                 staleness.isStale
-                  ? 'border-amber-500/40 bg-amber-500/15 text-amber-400'
+                  ? 'border-warning/40 bg-warning/15 text-warning'
                   : 'border-border bg-panel text-fg-muted',
               )}
             >
@@ -286,6 +303,16 @@ export function BackupImportPanel({
                 {pendingBundle.rules.length} rules ·{' '}
                 {pendingBundle.customThemes.length} custom themes
               </div>
+              {isLikelyTruncatedBackup(
+                linkCount,
+                pendingBundle.links.length,
+              ) && (
+                <p className="rounded-control border border-warning/40 bg-warning/10 px-2.5 py-1.5 text-xs text-warning">
+                  This backup has {pendingBundle.links.length} links vs. your
+                  current {linkCount} links — check that an AI tool didn&apos;t
+                  truncate the file before replacing.
+                </p>
+              )}
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <Button
                   variant="primary"

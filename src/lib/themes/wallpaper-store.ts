@@ -121,18 +121,19 @@ export async function saveStoredWallpaper(
     updatedAt: Date.now(),
   };
 
-  await new Promise<void>((resolve) => {
+  const saved = await new Promise<boolean>((resolve) => {
     try {
       const tx = db.transaction(WALLPAPER_STORE_NAME, 'readwrite');
       tx.objectStore(WALLPAPER_STORE_NAME).put(record);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve();
-      tx.onabort = () => resolve();
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+      tx.onabort = () => resolve(false);
     } catch {
-      resolve();
+      resolve(false);
     }
   });
 
+  if (!saved) return null;
   notifyWallpaperChanged();
   return record;
 }

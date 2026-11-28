@@ -6,17 +6,25 @@ import {
 } from '@/components/settings/settings-section-card';
 import { Button } from '@/components/ui/button';
 import {
+  SOUND_EVENT_GROUPS,
+  SOUND_EVENT_META,
+  type SoundEventId,
+  type SoundModeScope,
+} from '@/lib/audio/custom-sfx-store';
+import {
   playDelete,
   playDrop,
   playError,
+  playHoverRiffle,
   playPickup,
   playSessionFreeze,
   playTagPop,
+  playUncheck,
   setSoundPack,
   setSoundVolume,
 } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
-import type { SoundPack, StashSettings } from '@/lib/types/stash';
+import type { MotionMode, SoundPack, StashSettings } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 import {
   createDebouncedWriter,
@@ -27,6 +35,13 @@ interface EffectsSoundCardProps {
   settings: StashSettings;
   onTriggerTestSlam: () => void;
 }
+
+const MOTION_LABEL: Record<MotionMode, string> = {
+  arcade: 'Arcade',
+  tactile: 'Tactile',
+  reduced: 'Reduced',
+  off: 'Off',
+};
 
 const SOUND_PACK_OPTIONS: ReadonlyArray<{
   id: SoundPack;
@@ -44,12 +59,13 @@ const SOUND_PACK_OPTIONS: ReadonlyArray<{
   {
     id: 'studio-desk',
     label: 'Studio Desk',
-    description: 'Deep matte tile thud, desk knock, and displaced air puff.',
+    description:
+      'Dry anodized hardware clicks, matte desk contact, and clean pentatonic chimes.',
   },
   {
     id: 'mechanical-thock',
     label: 'Mechanical Thock',
-    description: 'Creamy PBT keycap thock, switches, and rotary clicks.',
+    description: 'Creamy PBT keycap thock, switches, and crisp rotary clicks.',
   },
   {
     id: 'retro-synth',
@@ -65,6 +81,22 @@ const SOUND_PACK_OPTIONS: ReadonlyArray<{
 
 const VOLUME_DEBOUNCE_MS = 150;
 
+function ModeScopeTag({ scope }: { scope: SoundModeScope }) {
+  if (scope === 'all') return null;
+  return (
+    <span
+      className={cn(
+        'rounded-pill border px-1.5 py-0.25 font-mono text-[9px]',
+        scope === 'arcade-only'
+          ? 'border-accent/45 bg-accent/10 text-accent'
+          : 'border-hairline bg-panel text-fg-muted',
+      )}
+    >
+      {scope === 'arcade-only' ? 'Arcade only' : 'Arcade+'}
+    </span>
+  );
+}
+
 export function EffectsSoundCard({
   settings,
   onTriggerTestSlam,
@@ -72,6 +104,7 @@ export function EffectsSoundCard({
   const [volumeDraft, setVolumeDraft] = useState(settings.soundVolume ?? 75);
   const volumeWriterRef = useRef<DebouncedWriter<number> | null>(null);
   const activePack: SoundPack = settings.soundPack ?? 'studio-desk';
+  const modeLabel = MOTION_LABEL[settings.motionMode] ?? 'Tactile';
 
   useEffect(() => {
     setVolumeDraft(settings.soundVolume ?? 75);
@@ -96,6 +129,40 @@ export function EffectsSoundCard({
     }
   };
 
+  const auditionSound = (eventId: SoundEventId) => {
+    switch (eventId) {
+      case 'drop':
+        onTriggerTestSlam();
+        return;
+      case 'pickup':
+        playPickup(true);
+        return;
+      case 'hoverRiffle':
+        playHoverRiffle(true, 'arcade', Date.now() + 5000);
+        return;
+      case 'tagPop':
+        playTagPop(
+          true,
+          settings.motionMode === 'off' ? 'tactile' : settings.motionMode,
+        );
+        return;
+      case 'uncheck':
+        playUncheck(true);
+        return;
+      case 'sessionFreeze':
+        playSessionFreeze(true, settings.motionMode);
+        return;
+      case 'delete':
+        playDelete(true);
+        return;
+      case 'error':
+        playError(true);
+        return;
+    }
+  };
+
+  const disabledAudio = !settings.soundEffects || volumeDraft === 0;
+
   return (
     <SettingsSectionCard
       icon={
@@ -107,7 +174,9 @@ export function EffectsSoundCard({
       }
       title="Mechanical Foley & Sound Packs"
       badge={{
-        label: settings.soundEffects ? `${volumeDraft}%` : 'Muted',
+        label: settings.soundEffects
+          ? `${modeLabel} · ${volumeDraft}%`
+          : 'Muted',
         tone: settings.soundEffects && volumeDraft > 0 ? 'accent' : 'neutral',
       }}
     >
@@ -128,7 +197,7 @@ export function EffectsSoundCard({
         {/* Sound Pack Selector */}
         <div
           className={cn(
-            'space-y-2 border-t border-border/60 pt-4',
+            'space-y-2 border-t border-hairline pt-4',
             !settings.soundEffects && 'pointer-events-none opacity-50',
           )}
         >
@@ -145,27 +214,35 @@ export function EffectsSoundCard({
                   aria-pressed={active}
                   onClick={() => handleSelectPack(pack.id)}
                   className={cn(
-                    'rounded-control border p-3 text-left transition-colors cursor-pointer',
+                    'relative rounded-control border p-3 text-left transition-colors cursor-pointer',
                     pack.id === 'arpg-heavy' && 'sm:col-span-2',
                     active
-                      ? 'border-accent/70 bg-accent/12'
-                      : 'border-border/80 bg-panel/60 hover:border-border hover:bg-card',
+                      ? 'border-border bg-elevated text-fg'
+                      : 'border-hairline bg-panel/60 hover:border-border hover:bg-card',
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={cn(
-                        'text-[13px] font-semibold',
-                        active ? 'text-accent' : 'text-fg',
+                    <span className="flex items-center gap-2 text-[13px] font-semibold text-fg">
+                      {active && (
+                        <span
+                          aria-hidden="true"
+                          className="h-1.5 w-1.5 rounded-full bg-accent"
+                        />
                       )}
-                    >
                       {pack.label}
                     </span>
-                    {pack.badge ? (
-                      <span className="rounded-pill border border-accent/40 bg-accent/10 px-1.5 py-0.25 font-mono text-[9px] text-accent">
-                        {pack.badge}
-                      </span>
-                    ) : null}
+                    <div className="flex items-center gap-1.5">
+                      {pack.badge ? (
+                        <span className="rounded-pill border border-hairline bg-panel px-1.5 py-0.25 font-mono text-[9px] text-fg-muted">
+                          {pack.badge}
+                        </span>
+                      ) : null}
+                      {active ? (
+                        <span className="rounded-pill border border-accent/40 bg-accent/10 px-1.5 py-0.25 font-mono text-[9px] text-accent">
+                          Active
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                   <p className="mt-1 text-xs leading-relaxed text-fg-muted">
                     {pack.description}
@@ -179,7 +256,7 @@ export function EffectsSoundCard({
         {/* Volume Slider */}
         <label
           className={cn(
-            'block space-y-2 border-t border-border/60 pt-4 text-xs',
+            'block space-y-2 border-t border-hairline pt-4 text-xs',
             !settings.soundEffects && 'opacity-50',
           )}
         >
@@ -213,66 +290,51 @@ export function EffectsSoundCard({
           />
         </label>
 
-        {/* Foley Soundboard */}
-        <div className="border-t border-border/60 pt-4">
-          <div className="mb-2.5 font-mono text-[10px] font-medium uppercase tracking-widest text-fg-muted">
-            Audition Active Pack
+        {/* Grouped Foley Soundboard (All 8 Sounds) */}
+        <div className="space-y-3 border-t border-hairline pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="font-mono text-[10px] font-medium uppercase tracking-widest text-fg-muted">
+              Audition Active Pack (8 Sounds)
+            </div>
+            <div className="flex items-center gap-2 font-mono text-[10px] text-fg-muted">
+              <span>Previewing in {modeLabel}</span>
+              <span>·</span>
+              <span>Arcade+ = boosted in Arcade</span>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!settings.soundEffects || volumeDraft === 0}
-              onClick={onTriggerTestSlam}
-              className="h-7 px-2.5 text-[11px]"
-            >
-              Drop Slam
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!settings.soundEffects || volumeDraft === 0}
-              onClick={() => playPickup(true)}
-              className="h-7 px-2.5 text-[11px]"
-            >
-              Pickup
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!settings.soundEffects || volumeDraft === 0}
-              onClick={() => playTagPop(true, 'arcade')}
-              className="h-7 px-2.5 text-[11px]"
-            >
-              Star / Tag
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!settings.soundEffects || volumeDraft === 0}
-              onClick={() => playSessionFreeze(true, settings.motionMode)}
-              className="h-7 px-2.5 text-[11px]"
-            >
-              Session Lock
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!settings.soundEffects || volumeDraft === 0}
-              onClick={() => playDelete(true)}
-              className="h-7 px-2.5 text-[11px]"
-            >
-              Delete
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!settings.soundEffects || volumeDraft === 0}
-              onClick={() => playError(true)}
-              className="h-7 px-2.5 text-[11px]"
-            >
-              Blocked
-            </Button>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            {SOUND_EVENT_GROUPS.map((group) => {
+              const items = SOUND_EVENT_META.filter(
+                (item) => item.category === group.id,
+              );
+              return (
+                <div
+                  key={group.id}
+                  className="space-y-2 rounded-control border border-hairline bg-panel/45 p-2.5"
+                >
+                  <div className="font-mono text-[10px] font-medium uppercase tracking-wider text-fg-muted">
+                    {group.title}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {items.map((slot) => (
+                      <Button
+                        key={slot.id}
+                        variant="secondary"
+                        size="sm"
+                        disabled={disabledAudio}
+                        onClick={() => auditionSound(slot.id)}
+                        title={slot.hint}
+                        className="h-7 w-full justify-between px-2.5 text-[11px]"
+                      >
+                        <span className="truncate">{slot.label}</span>
+                        <ModeScopeTag scope={slot.modeScope} />
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   BUILT_IN_THEMES,
   OSCILLOSCOPE_THEME,
@@ -8,6 +8,9 @@ import {
   applyThemeToDocument,
   getAllThemes,
   resolveTheme,
+  resolveWarningColor,
+  WARNING_COLOR_DARK,
+  WARNING_COLOR_LIGHT,
 } from '@/lib/themes/theme-engine';
 import type { ThemeDefinition } from '@/lib/types/stash';
 
@@ -90,5 +93,48 @@ describe('theme-engine', () => {
     ]);
     expect(resolveTheme('oscilloscope', [collision]).name).toBe('Oscilloscope');
     expect(resolveTheme('amber-crt', [custom]).name).toBe('Amber CRT');
+  });
+
+  it('derives mode-aware --stash-warning tokens and skips transition fade on cold-boot hydration', () => {
+    expect(resolveWarningColor('light')).toBe(WARNING_COLOR_LIGHT);
+    expect(resolveWarningColor('dark')).toBe(WARNING_COLOR_DARK);
+
+    const lightTheme = resolveTheme('clean-light');
+    expect(
+      getContrastRatio(WARNING_COLOR_LIGHT, lightTheme.colors.card),
+    ).toBeGreaterThanOrEqual(4.5);
+
+    const props = new Map<string, string>();
+    const fakeRoot = {
+      dataset: {} as Record<string, string>,
+      style: {
+        colorScheme: '',
+        setProperty: (key: string, value: string) => {
+          props.set(key, value);
+        },
+      },
+    } as unknown as HTMLElement;
+
+    vi.stubGlobal('window', {});
+    try {
+      // Initial dark theme hydration
+      applyThemeToDocument(OSCILLOSCOPE_THEME, fakeRoot, 'theme', {
+        animate: false,
+      });
+      expect(props.get('--stash-warning')).toBe(WARNING_COLOR_DARK);
+      expect(fakeRoot.dataset.themeTransition).toBeUndefined();
+
+      // Hydrating to a stored light theme with animate: false must NOT pulse a cold-boot fade
+      applyThemeToDocument(lightTheme, fakeRoot, 'theme', { animate: false });
+      expect(props.get('--stash-warning')).toBe(WARNING_COLOR_LIGHT);
+      expect(fakeRoot.dataset.themeTransition).toBeUndefined();
+
+      // Interactive switch (default animate: true) arms the smooth transition flag
+      applyThemeToDocument(OSCILLOSCOPE_THEME, fakeRoot, 'theme');
+      expect(props.get('--stash-warning')).toBe(WARNING_COLOR_DARK);
+      expect(fakeRoot.dataset.themeTransition).toBe('true');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

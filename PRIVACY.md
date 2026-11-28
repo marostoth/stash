@@ -1,6 +1,6 @@
 # Privacy Policy — Stash
 
-**Last updated:** November 26, 2026
+**Last updated:** November 28, 2026
 
 Stash is a local-first visual bookmark, tab-session, and link-collection workbench for Chrome.
 

@@ -110,6 +110,8 @@ export async function startAutoIconSweep(
     } else {
       toast.info('No new collection icons were assigned.');
     }
+  } catch {
+    toast.error('Auto-Icon failed unexpectedly. Please try again.');
   } finally {
     autoIconAbort = null;
     useBackgroundJobsStore.getState().removeJob('auto-icon');
@@ -193,6 +195,13 @@ export async function startAutoTagSweep(collectionId?: string): Promise<void> {
       return;
     }
 
+    if (result.status === 'error') {
+      toast.error(
+        'On-device AI encountered an error during Auto-Tag. Please try again.',
+      );
+      return;
+    }
+
     if (result.tagged > 0) {
       const latestSettings = await stashRepo.getSettings();
       playSessionFreeze(latestSettings.soundEffects, latestSettings.motionMode);
@@ -202,6 +211,8 @@ export async function startAutoTagSweep(collectionId?: string): Promise<void> {
     } else {
       toast.info('No new tags were added.');
     }
+  } catch {
+    toast.error('Auto-Tag failed unexpectedly. Please try again.');
   } finally {
     autoTagAbort = null;
     useBackgroundJobsStore.getState().removeJob('auto-tag');
@@ -240,6 +251,8 @@ export async function startNanoModelDownload(
         'Could not enable On-Device AI. Falling back cleanly to Tier 1 rules.',
       );
     }
+  } catch {
+    toast.error('Could not download On-Device AI model. Please try again.');
   } finally {
     nanoDownloadRunning = false;
     useBackgroundJobsStore.getState().removeJob('nano-download');

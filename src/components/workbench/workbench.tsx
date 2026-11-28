@@ -1,18 +1,16 @@
-import {
-  DragDropProvider,
-  DragOverlay,
-  KeyboardSensor,
-  PointerSensor,
-} from '@dnd-kit/react';
+import { DragDropProvider, DragOverlay } from '@dnd-kit/react';
 import { MotionConfig, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Toaster } from 'sonner';
+import { VfxCanvas } from '@/components/vfx-canvas';
 import { BackgroundJobsTray } from '@/components/workbench/background-jobs-tray';
 import { BulkActionBar } from '@/components/workbench/bulk-action-bar';
 import { CollectionSection } from '@/components/workbench/collection-section';
 import { DetailsView } from '@/components/workbench/details-view';
+import { DndBlurGuard } from '@/components/workbench/dnd-blur-guard';
 import { DragGhost } from '@/components/workbench/drag-ghost';
 import { EmptyState } from '@/components/workbench/empty-state';
+import { OpenTabsBridge } from '@/components/workbench/open-tabs-bridge';
 import { OpenTabsSidebar } from '@/components/workbench/open-tabs-sidebar';
 import { QuickLaunchBar } from '@/components/workbench/quick-launch-bar';
 import { SpaceBar } from '@/components/workbench/space-bar';
@@ -22,12 +20,17 @@ import { WallpaperLayer } from '@/components/workbench/wallpaper-layer';
 import {
   EmptySpaceNotice,
   NoFilterMatchesNotice,
+  WORKBENCH_TOASTER_STYLE,
 } from '@/components/workbench/workbench-empty-states';
 import { WorkbenchModals } from '@/components/workbench/workbench-modals';
-import { useOpenTabs } from '@/hooks/use-open-tabs';
+import { WorkbenchSkeleton } from '@/components/workbench/workbench-skeleton';
+import { useContainerShake } from '@/hooks/use-container-shake';
 import { useStashData } from '@/hooks/use-stash-data';
-import { useWorkbenchDnd } from '@/hooks/use-workbench-dnd';
-import { useWorkbenchShortcuts } from '@/hooks/use-workbench-shortcuts';
+import { useWorkbenchDnd, WORKBENCH_SENSORS } from '@/hooks/use-workbench-dnd';
+import {
+  useOmniboxSearchHydration,
+  useWorkbenchShortcuts,
+} from '@/hooks/use-workbench-shortcuts';
 import { isDragItemData } from '@/lib/dnd/types';
 import {
   computeSpaceSlideDirection,
@@ -45,23 +48,8 @@ import { useFxStore } from '@/store/fx-store';
 import { useSelectionStore } from '@/store/selection-store';
 import { useUiStore } from '@/store/ui-store';
 
-const WORKBENCH_SENSORS = [
-  PointerSensor.configure({
-    preventActivation: (event, source) => {
-      const { target } = event;
-      if (!(target instanceof Element)) return false;
-      if (target.closest('[data-dnd-no-drag="true"]')) return true;
-      if (target.closest('input, textarea, select')) return true;
-      if (source.handle?.contains(target)) return false;
-      return false;
-    },
-  }),
-  KeyboardSensor,
-];
-
 export function Workbench() {
   const {
-    loading,
     spaces,
     collections,
     links,
@@ -69,23 +57,19 @@ export function Workbench() {
     settings,
     allThemes,
     activeTheme,
+    loading,
+    setOptimisticCollections,
+    setOptimisticLinks,
   } = useStashData();
-  const { tabs, pinnedTabs, regularTabs, clearableCount } = useOpenTabs();
   const activeSpaceId = useUiStore((s) => s.activeSpaceId);
-  const setActiveSpaceId = useUiStore((s) => s.setActiveSpaceId);
   const searchQuery = useUiStore((s) => s.searchQuery);
-  const setSearchQuery = useUiStore((s) => s.setSearchQuery);
   const starredOnly = useUiStore((s) => s.starredOnly);
-  const setStarredOnly = useUiStore((s) => s.setStarredOnly);
   const smartFilter = useUiStore((s) => s.smartFilter);
-  const setSmartFilter = useUiStore((s) => s.setSmartFilter);
   const selectedTags = useUiStore((s) => s.selectedTags);
-  const clearSelectedTags = useUiStore((s) => s.clearSelectedTags);
   const searchAllSpaces = useUiStore((s) => s.searchAllSpaces);
-  const openCreateCollection = useUiStore((s) => s.openCreateCollection);
-  const dismissPreview = useUiStore((s) => s.dismissPreview);
+  const uiActions = useUiStore.getState();
   const spaceSlideDirection = useFxStore((s) => s.spaceSlideDirection);
-  const setSpaceSlideDirection = useFxStore((s) => s.setSpaceSlideDirection);
+  const { setSpaceSlideDirection } = useFxStore.getState();
   const trayHeightPx = useBackgroundJobsStore((s) => s.trayHeightPx);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -103,9 +87,9 @@ export function Workbench() {
         nextSpaceId,
       );
       setSpaceSlideDirection(dir);
-      setActiveSpaceId(nextSpaceId);
+      uiActions.setActiveSpaceId(nextSpaceId);
     },
-    [resolvedSpaceId, setActiveSpaceId, setSpaceSlideDirection, spaces],
+    [resolvedSpaceId, setSpaceSlideDirection, spaces, uiActions],
   );
 
   const {
@@ -116,21 +100,13 @@ export function Workbench() {
   } = useWorkbenchDnd({
     soundEffects: settings.soundEffects,
     motionMode: settings.motionMode,
+    fxDeskJolt: settings.fxDeskJolt ?? true,
     onSwitchSpace: handleSelectSpace,
+    onOptimisticCollections: setOptimisticCollections,
+    onOptimisticLinks: setOptimisticLinks,
   });
 
-  // Hydrate initial search query when opened from Chrome's `s <query>` omnibox
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const initialQuery = params.get('q')?.trim();
-    if (!initialQuery) return;
-    setSearchQuery(initialQuery);
-    params.delete('q');
-    const cleanSearch = params.toString();
-    const nextUrl = `${window.location.pathname}${cleanSearch ? `?${cleanSearch}` : ''}${window.location.hash}`;
-    window.history.replaceState(null, '', nextUrl);
-    searchInputRef.current?.focus();
-  }, [setSearchQuery]);
+  useOmniboxSearchHydration(searchInputRef);
 
   const spaceById = useMemo(
     () => new Map(spaces.map((s) => [s.id, s])),
@@ -243,14 +219,26 @@ export function Workbench() {
   const fxDragTilt = settings.fxDragTilt ?? true;
   const fxHoverSheen = settings.fxHoverSheen ?? true;
   const fxAmbientWaves = settings.fxAmbientWaves ?? true;
+  const handleClearFilters = () => {
+    uiActions.setSearchQuery('');
+    uiActions.setStarredOnly(false);
+    uiActions.setSmartFilter('all');
+    uiActions.clearSelectedTags();
+  };
+
   const spaceSlideActive =
     isTactileMotion(settings.motionMode) &&
     fxAmbientWaves &&
     spaceSlideDirection !== 0;
 
+  const shakeScopeRef = useContainerShake(
+    settings.motionMode === 'arcade' && fxDeskJolt,
+  );
+
   return (
     <MotionConfig
       reducedMotion={resolveReducedMotionPolicy(settings.motionMode)}
+      transition={settings.motionMode === 'off' ? { duration: 0 } : undefined}
     >
       <DragDropProvider
         sensors={WORKBENCH_SENSORS}
@@ -258,10 +246,15 @@ export function Workbench() {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
+        <DndBlurGuard />
+        <OpenTabsBridge />
         <div className="stash-backdrop relative flex h-screen flex-col overflow-hidden text-fg">
           <WallpaperLayer settings={settings} />
 
-          <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div
+            ref={shakeScopeRef}
+            className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden"
+          >
             <TopBar
               searchInputRef={searchInputRef}
               allThemes={allThemes}
@@ -271,164 +264,167 @@ export function Workbench() {
               starredCount={starredCount}
               starredSubtotal={starredSubtotal || undefined}
               spacesCount={spaces.length}
-              openTabsCount={tabs.length}
-            />
-
-            <SpaceBar
-              spaces={spaces}
-              collections={collections}
-              activeSpaceId={resolvedSpaceId}
-              checkedCountInSpace={checkedCountInSpace}
-              wideBoard={wideBoard}
-              motionMode={settings.motionMode}
-              fxAmbientWaves={fxAmbientWaves}
-              onSelectSpace={handleSelectSpace}
             />
 
             <div className="flex min-h-0 flex-1 overflow-hidden">
               <main
-                onScroll={dismissPreview}
-                className="min-w-0 flex-1 overflow-y-auto px-5 py-7 sm:px-8 sm:py-8"
+                onScroll={uiActions.dismissPreview}
+                className="min-w-0 flex-1 overflow-y-auto"
               >
-                <div
-                  className={
-                    wideBoard
-                      ? 'mx-auto max-w-[1720px]'
-                      : 'mx-auto max-w-[1320px]'
-                  }
-                >
-                  {(settings.quickLaunchVisible !== false ||
-                    settings.tagBarVisible !== false) && (
-                    <div className="mb-7 space-y-2.5 empty:mb-0">
-                      {settings.quickLaunchVisible !== false && (
-                        <QuickLaunchBar
-                          links={links}
-                          activeSpaceCollectionIds={activeSpaceCollectionIds}
-                          openInNewTab={settings.openLinkInNewTab}
-                          wideBoard={wideBoard}
-                        />
-                      )}
+                <SpaceBar
+                  spaces={spaces}
+                  collections={collections}
+                  activeSpaceId={resolvedSpaceId}
+                  checkedCountInSpace={checkedCountInSpace}
+                  wideBoard={wideBoard}
+                  motionMode={settings.motionMode}
+                  fxAmbientWaves={fxAmbientWaves}
+                  onSelectSpace={handleSelectSpace}
+                />
 
-                      {settings.tagBarVisible !== false && (
-                        <TagFilterBar
-                          links={links}
-                          activeSpaceCollectionIds={activeSpaceCollectionIds}
-                          searchAllSpaces={searchAllSpaces}
-                          wideBoard={wideBoard}
-                        />
-                      )}
-                    </div>
-                  )}
-
-                  <motion.div
-                    key={resolvedSpaceId}
-                    initial={
-                      spaceSlideActive
-                        ? { x: spaceSlideDirection * 42, opacity: 0.45 }
-                        : false
+                <div className="px-5 py-7 sm:px-8 sm:py-8">
+                  <div
+                    className={
+                      wideBoard
+                        ? 'mx-auto max-w-[1720px]'
+                        : 'mx-auto max-w-[1320px]'
                     }
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ duration: 0.36, ease: [0.22, 0.88, 0.32, 1] }}
                   >
-                    {loading ? (
-                      <div className="py-20 text-center font-mono text-xs text-fg-muted">
-                        Loading workspace...
-                      </div>
-                    ) : collections.length === 0 ? (
-                      <EmptyState />
-                    ) : !isFiltering && activeSpaceCollections.length === 0 ? (
-                      <EmptySpaceNotice
-                        spaceName={activeSpace?.name ?? 'this Space'}
-                        onCreateCollection={openCreateCollection}
-                      />
-                    ) : groups.length === 0 ? (
-                      <NoFilterMatchesNotice
-                        starredOnly={starredOnly}
-                        searchQuery={searchQuery}
-                        searchAllSpaces={searchAllSpaces}
-                        spacesCount={spaces.length}
-                        onClear={() => {
-                          setSearchQuery('');
-                          setStarredOnly(false);
-                          setSmartFilter('all');
-                          clearSelectedTags();
-                        }}
-                      />
-                    ) : activeViewMode === 'details' ? (
-                      <DetailsView
-                        activeSpace={activeSpace}
-                        groups={groups}
-                        spaces={spaces}
-                        isFiltering={isFiltering}
-                        hideChecked={hideCheckedInSpace}
-                        searchAllSpaces={searchAllSpaces}
-                        openInNewTab={settings.openLinkInNewTab}
-                        defaultCurrency={defaultCurrency}
-                        motionMode={settings.motionMode}
-                        dropEffectStyle={settings.dropEffectStyle}
-                        fxAmbientWaves={fxAmbientWaves}
-                        soundEffects={settings.soundEffects}
-                        hoverPreviews={settings.hoverPreviews}
-                        onSwitchSpace={handleSelectSpace}
-                      />
-                    ) : (
-                      <div className="space-y-10">
-                        {groups.map(
-                          (
-                            { collection, links: collectionLinks },
-                            colIndex,
-                          ) => {
-                            const colSpaceId =
-                              collection.spaceId ?? DEFAULT_SPACE_ID;
-                            const outsideActiveSpace =
-                              isFiltering &&
-                              searchAllSpaces &&
-                              colSpaceId !== resolvedSpaceId
-                                ? spaceById.get(colSpaceId)
-                                : undefined;
-                            const displayedLinks = hideCheckedInSpace
-                              ? collectionLinks.filter(
-                                  (l) => l.checked !== true,
-                                )
-                              : collectionLinks;
-                            return (
-                              <CollectionSection
-                                key={collection.id}
-                                collection={collection}
-                                index={colIndex}
-                                links={displayedLinks}
-                                spaces={spaces}
-                                spaceBadge={outsideActiveSpace}
-                                onSwitchSpace={handleSelectSpace}
-                                openInNewTab={settings.openLinkInNewTab}
-                                defaultCurrency={defaultCurrency}
-                                density={effectiveDensity}
-                                wideBoard={wideBoard}
-                                forceExpanded={isFiltering}
-                                dragDisabled={isFiltering}
-                                motionMode={settings.motionMode}
-                                dropEffectStyle={settings.dropEffectStyle}
-                                fxDeskJolt={fxDeskJolt}
-                                fxHoverSheen={fxHoverSheen}
-                                fxAmbientWaves={fxAmbientWaves}
-                                soundEffects={settings.soundEffects}
-                                hoverPreviews={settings.hoverPreviews}
-                              />
-                            );
-                          },
+                    {(settings.quickLaunchVisible === true ||
+                      settings.tagBarVisible === true) && (
+                      <div className="mb-7 space-y-2.5 empty:mb-0">
+                        {settings.quickLaunchVisible === true && (
+                          <QuickLaunchBar
+                            links={links}
+                            activeSpaceCollectionIds={activeSpaceCollectionIds}
+                            openInNewTab={settings.openLinkInNewTab}
+                            wideBoard={wideBoard}
+                          />
+                        )}
+
+                        {settings.tagBarVisible === true && (
+                          <TagFilterBar
+                            links={links}
+                            activeSpaceCollectionIds={activeSpaceCollectionIds}
+                            searchAllSpaces={searchAllSpaces}
+                            wideBoard={wideBoard}
+                          />
                         )}
                       </div>
                     )}
-                  </motion.div>
+
+                    <motion.div
+                      key={`${resolvedSpaceId}:${activeViewMode}:${activeSpace?.groupBy ?? 'collection'}`}
+                      initial={
+                        settings.motionMode === 'off'
+                          ? false
+                          : spaceSlideActive
+                            ? { x: spaceSlideDirection * 24, opacity: 0 }
+                            : { opacity: 0 }
+                      }
+                      animate={{ x: 0, opacity: 1 }}
+                      transition={
+                        settings.motionMode === 'off'
+                          ? { duration: 0 }
+                          : { duration: 0.14, ease: [0.22, 1, 0.36, 1] }
+                      }
+                    >
+                      {loading ? (
+                        <WorkbenchSkeleton
+                          density={effectiveDensity}
+                          wideBoard={wideBoard}
+                        />
+                      ) : collections.length === 0 ? (
+                        <EmptyState />
+                      ) : !isFiltering &&
+                        activeSpaceCollections.length === 0 ? (
+                        <EmptySpaceNotice
+                          spaceName={activeSpace?.name ?? 'this Space'}
+                          onCreateCollection={uiActions.openCreateCollection}
+                        />
+                      ) : groups.length === 0 ? (
+                        <NoFilterMatchesNotice
+                          starredOnly={starredOnly}
+                          searchQuery={searchQuery}
+                          searchAllSpaces={searchAllSpaces}
+                          spacesCount={spaces.length}
+                          onClear={handleClearFilters}
+                        />
+                      ) : activeViewMode === 'details' ? (
+                        <DetailsView
+                          activeSpace={activeSpace}
+                          groups={groups}
+                          spaces={spaces}
+                          isFiltering={isFiltering}
+                          hideChecked={hideCheckedInSpace}
+                          searchAllSpaces={searchAllSpaces}
+                          openInNewTab={settings.openLinkInNewTab}
+                          defaultCurrency={defaultCurrency}
+                          motionMode={settings.motionMode}
+                          fxAmbientWaves={fxAmbientWaves}
+                          soundEffects={settings.soundEffects}
+                          hoverPreviews={settings.hoverPreviews}
+                          onSwitchSpace={handleSelectSpace}
+                        />
+                      ) : (
+                        <div className="space-y-10">
+                          {groups.map(
+                            (
+                              { collection, links: collectionLinks },
+                              colIndex,
+                            ) => {
+                              const colSpaceId =
+                                collection.spaceId ?? DEFAULT_SPACE_ID;
+                              const outsideActiveSpace =
+                                isFiltering &&
+                                searchAllSpaces &&
+                                colSpaceId !== resolvedSpaceId
+                                  ? spaceById.get(colSpaceId)
+                                  : undefined;
+                              const displayedLinks = hideCheckedInSpace
+                                ? collectionLinks.filter(
+                                    (l) => l.checked !== true,
+                                  )
+                                : collectionLinks;
+                              return (
+                                <CollectionSection
+                                  key={collection.id}
+                                  collection={collection}
+                                  index={colIndex}
+                                  links={displayedLinks}
+                                  spaces={spaces}
+                                  spaceBadge={outsideActiveSpace}
+                                  onSwitchSpace={handleSelectSpace}
+                                  openInNewTab={settings.openLinkInNewTab}
+                                  defaultCurrency={defaultCurrency}
+                                  density={effectiveDensity}
+                                  wideBoard={wideBoard}
+                                  forceExpanded={isFiltering}
+                                  dragDisabled={isFiltering}
+                                  hasHiddenChecked={
+                                    hideCheckedInSpace &&
+                                    displayedLinks.length <
+                                      collectionLinks.length
+                                  }
+                                  motionMode={settings.motionMode}
+                                  fxDeskJolt={fxDeskJolt}
+                                  fxHoverSheen={fxHoverSheen}
+                                  fxAmbientWaves={fxAmbientWaves}
+                                  soundEffects={settings.soundEffects}
+                                  hoverPreviews={settings.hoverPreviews}
+                                />
+                              );
+                            },
+                          )}
+                        </div>
+                      )}
+                    </motion.div>
+                  </div>
                 </div>
               </main>
 
               {settings.openTabsSidebarVisible && (
                 <OpenTabsSidebar
-                  tabs={tabs}
-                  pinnedTabs={pinnedTabs}
-                  regularTabs={regularTabs}
-                  clearableCount={clearableCount}
                   collections={activeSpaceCollections}
                   activeSpaceId={resolvedSpaceId}
                   settings={settings}
@@ -469,11 +465,16 @@ export function Workbench() {
             collections={collections}
             spaces={spaces}
             motionMode={settings.motionMode}
+            fxDeskJolt={fxDeskJolt}
             soundEffects={settings.soundEffects}
           />
 
           <BackgroundJobsTray motionMode={settings.motionMode} />
-
+          <VfxCanvas
+            motionMode={settings.motionMode}
+            dropDust={settings.fxDropDust ?? true}
+            dropFissures={settings.fxDropFissures ?? true}
+          />
           <Toaster
             position="bottom-right"
             offset={{
@@ -481,14 +482,7 @@ export function Workbench() {
               right: 16,
             }}
             theme={activeTheme.mode}
-            toastOptions={{
-              style: {
-                background: 'var(--stash-panel)',
-                color: 'var(--stash-text)',
-                border: '1px solid var(--stash-border)',
-                borderRadius: 'var(--stash-radius-card)',
-              },
-            }}
+            toastOptions={{ style: WORKBENCH_TOASTER_STYLE }}
           />
         </div>
       </DragDropProvider>

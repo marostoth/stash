@@ -321,7 +321,7 @@ export function InlinePriceCell({
                 className={cn(
                   'hidden shrink-0 items-center rounded px-1 py-0.25 font-mono text-[9px] font-semibold leading-none sm:inline-flex',
                   priceDelta.direction === 'down'
-                    ? 'border border-emerald-500/35 bg-emerald-500/15 text-emerald-400'
+                    ? 'border border-accent/35 bg-accent/15 text-accent'
                     : 'border border-danger/35 bg-danger/15 text-danger',
                 )}
               >

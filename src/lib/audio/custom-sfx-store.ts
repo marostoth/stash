@@ -1,51 +1,89 @@
 import { storage } from '#imports';
 
 export type SoundEventId =
-  | 'drop'
   | 'pickup'
-  | 'tagPop'
-  | 'sessionFreeze'
+  | 'drop'
   | 'hoverRiffle'
+  | 'tagPop'
+  | 'uncheck'
+  | 'sessionFreeze'
   | 'delete'
   | 'error';
 
-export const SOUND_EVENT_META: ReadonlyArray<{
+export type SoundEventCategory = 'drag' | 'progress' | 'alerts';
+export type SoundModeScope = 'all' | 'arcade-boost' | 'arcade-only';
+
+export interface SoundEventMeta {
   id: SoundEventId;
+  category: SoundEventCategory;
+  modeScope: SoundModeScope;
   label: string;
   hint: string;
+}
+
+export const SOUND_EVENT_GROUPS: ReadonlyArray<{
+  id: SoundEventCategory;
+  title: string;
 }> = [
-  {
-    id: 'drop',
-    label: 'Drop Slam',
-    hint: 'Dropping a card, tab, or row onto a collection or Space',
-  },
+  { id: 'drag', title: 'Drag & Movement' },
+  { id: 'progress', title: 'Progress & Milestones' },
+  { id: 'alerts', title: 'Destructive & Alerts' },
+];
+
+export const SOUND_EVENT_META: readonly SoundEventMeta[] = [
   {
     id: 'pickup',
+    category: 'drag',
+    modeScope: 'all',
     label: 'Pickup',
     hint: 'Grabbing a card, tab, or collection to drag',
   },
   {
-    id: 'tagPop',
-    label: 'Star / Tag / Done',
-    hint: 'Starring, checking off an item, or landing AI tags',
-  },
-  {
-    id: 'sessionFreeze',
-    label: 'Session Lock',
-    hint: 'Saving an open-tabs session',
+    id: 'drop',
+    category: 'drag',
+    modeScope: 'arcade-boost',
+    label: 'Drop Slam',
+    hint: 'Dropping a card or tab (combo pitch + 5x shimmer in Arcade)',
   },
   {
     id: 'hoverRiffle',
+    category: 'drag',
+    modeScope: 'arcade-only',
     label: 'Hover Detent',
-    hint: 'Subtle brush when hovering cards in Arcade mode',
+    hint: 'Whisper-quiet brush when sweeping across cards (Arcade only)',
+  },
+  {
+    id: 'tagPop',
+    category: 'progress',
+    modeScope: 'arcade-boost',
+    label: 'Check Off / Star / Tag',
+    hint: 'Checking an item done, starring, or landing tags (5x shimmer in Arcade)',
+  },
+  {
+    id: 'uncheck',
+    category: 'progress',
+    modeScope: 'all',
+    label: 'Uncheck',
+    hint: 'Soft mechanical release tick when unchecking an item',
+  },
+  {
+    id: 'sessionFreeze',
+    category: 'progress',
+    modeScope: 'arcade-boost',
+    label: 'Session Lock',
+    hint: 'Saving a tab session or applying Smart Reorganize (fuller chord in Arcade)',
   },
   {
     id: 'delete',
+    category: 'alerts',
+    modeScope: 'all',
     label: 'Delete',
-    hint: 'Removing a link or bulk-deleting items',
+    hint: 'Removing cards, deleting collections, or clearing open tabs',
   },
   {
     id: 'error',
+    category: 'alerts',
+    modeScope: 'all',
     label: 'Blocked',
     hint: 'Duplicate URL guard or invalid action',
   },

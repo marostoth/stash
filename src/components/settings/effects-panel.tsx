@@ -15,12 +15,9 @@ import {
   TACTILE_SPRING,
 } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
-import type {
-  DropEffectStyle,
-  MotionMode,
-  StashSettings,
-} from '@/lib/types/stash';
+import type { MotionMode, StashSettings } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+import { spawnSlamForElement, vfxEngine } from '@/lib/vfx/engine';
 
 interface EffectsPanelProps {
   settings: StashSettings;
@@ -57,29 +54,39 @@ const MOTION_OPTIONS: ReadonlyArray<{
   },
 ];
 
-const DROP_STYLE_OPTIONS: ReadonlyArray<{
-  id: DropEffectStyle;
+type DropLayerKey = 'fxDropDust' | 'fxDropFissures';
+
+const DROP_LAYER_OPTIONS: ReadonlyArray<{
+  key: DropLayerKey;
   label: string;
   description: string;
 }> = [
   {
-    id: 'dust',
-    label: 'Neutral Dust + Accent Ring',
+    key: 'fxDropDust',
+    label: 'Impact Shockwave',
     description:
-      'Smoky matte desk dust with a crisp theme-accent pressure ring.',
+      'Expanding kinetic ring, braking ash dust, and warm ember sparks.',
   },
   {
-    id: 'accent',
-    label: 'Full Accent Glow',
+    key: 'fxDropFissures',
+    label: 'Ground Fracture',
     description:
-      'Luminous theme-accent plasma dust and double glowing shockwaves.',
+      'Branching surface cracks radiating from the card edge with cooling theme seams.',
   },
 ];
+
+function describeDropLayers(dropDust: boolean, dropFissures: boolean): string {
+  if (dropDust && dropFissures) return 'shockwave + ground fracture';
+  if (dropDust) return 'impact shockwave & ember dust';
+  if (dropFissures) return 'ground fracture & stone dust';
+  return 'clean physical slam';
+}
 
 export function EffectsPanel({ settings }: EffectsPanelProps) {
   const [slamActive, setSlamActive] = useState(false);
   const [slamKey, setSlamKey] = useState(0);
   const slamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewCardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     return () => {
@@ -88,23 +95,51 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
   }, []);
 
   const arcade = isArcadeMotion(settings.motionMode);
-  const dropStyle: DropEffectStyle = settings.dropEffectStyle ?? 'dust';
+  const dropDust = settings.fxDropDust ?? true;
+  const dropFissures = settings.fxDropFissures ?? true;
+  const activeLayerCount = Number(dropDust) + Number(dropFissures);
 
-  const triggerTestSlam = (overrideStyle?: DropEffectStyle) => {
-    if (overrideStyle && overrideStyle !== dropStyle) {
-      void stashRepo.updateSettings({ dropEffectStyle: overrideStyle });
-    }
+  const triggerTestSlam = (overrides?: {
+    dropDust?: boolean;
+    dropFissures?: boolean;
+  }) => {
+    const nextDust = overrides?.dropDust ?? dropDust;
+    const nextFissures = overrides?.dropFissures ?? dropFissures;
     if (slamTimerRef.current) clearTimeout(slamTimerRef.current);
+
+    // Sync VFX config immediately so toggling a layer previews it on the first click
+    vfxEngine.setConfig({
+      motionMode: settings.motionMode,
+      dropDust: nextDust,
+      dropFissures: nextFissures,
+    });
+
     setSlamActive(false);
     setSlamKey((prev) => prev + 1);
     requestAnimationFrame(() => {
       setSlamActive(true);
       playDrop(settings.soundEffects, settings.motionMode);
+      if (arcade) {
+        spawnSlamForElement(previewCardRef.current);
+      }
       slamTimerRef.current = setTimeout(() => {
         setSlamActive(false);
         slamTimerRef.current = null;
-      }, 720);
+      }, 420);
     });
+  };
+
+  const handleToggleLayer = (key: DropLayerKey) => {
+    const nextDust = key === 'fxDropDust' ? !dropDust : dropDust;
+    const nextFissures =
+      key === 'fxDropFissures' ? !dropFissures : dropFissures;
+    void stashRepo.updateSettings({
+      [key]: key === 'fxDropDust' ? nextDust : nextFissures,
+    });
+    const enabledThisLayer = key === 'fxDropDust' ? nextDust : nextFissures;
+    if (arcade && enabledThisLayer) {
+      triggerTestSlam({ dropDust: nextDust, dropFissures: nextFissures });
+    }
   };
 
   return (
@@ -163,28 +198,30 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
         </div>
       </SettingsSectionCard>
 
-      {/* 2. Drop Impact Shockwave & Live Stage */}
+      {/* 2. Drop Impact Effects & Live Stage */}
       <SettingsSectionCard
         icon={<Flame className="h-4 w-4" />}
-        title="Drop Impact Shockwave"
-        subtitle="Customize the shockwave and edge-dust burst that fires when cards land on the board."
+        title="Drop Impact Effects"
+        subtitle="Combine or toggle the kinetic layers that fire when cards land on the board."
         badge={{
-          label: arcade ? 'Active (Arcade)' : 'Arcade Only',
-          tone: arcade ? 'accent' : 'neutral',
+          label: arcade
+            ? activeLayerCount > 0
+              ? `${activeLayerCount} / 2 on`
+              : 'Off'
+            : 'Arcade Only',
+          tone: arcade && activeLayerCount > 0 ? 'accent' : 'neutral',
         }}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          {DROP_STYLE_OPTIONS.map((opt) => {
-            const active = dropStyle === opt.id;
+          {DROP_LAYER_OPTIONS.map((opt) => {
+            const active = opt.key === 'fxDropDust' ? dropDust : dropFissures;
             return (
               <button
-                key={opt.id}
+                key={opt.key}
                 type="button"
-                aria-pressed={active}
-                onClick={() => {
-                  void stashRepo.updateSettings({ dropEffectStyle: opt.id });
-                  if (arcade) triggerTestSlam(opt.id);
-                }}
+                role="switch"
+                aria-checked={active}
+                onClick={() => handleToggleLayer(opt.key)}
                 className={cn(
                   'rounded-control border p-3.5 text-left transition-colors cursor-pointer',
                   active
@@ -192,13 +229,31 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
                     : 'border-border/80 bg-panel/60 hover:border-border hover:bg-card',
                 )}
               >
-                <div
-                  className={cn(
-                    'text-[13px] font-semibold',
-                    active ? 'text-accent' : 'text-fg',
-                  )}
-                >
-                  {opt.label}
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={cn(
+                      'text-[13px] font-semibold',
+                      active ? 'text-accent' : 'text-fg',
+                    )}
+                  >
+                    {opt.label}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'relative inline-flex h-4.5 w-8 shrink-0 items-center rounded-full border transition-colors',
+                      active
+                        ? 'border-accent bg-accent'
+                        : 'border-border bg-panel',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'block h-3 w-3 rounded-full bg-canvas shadow-sm transition-transform',
+                        active ? 'translate-x-3.5' : 'translate-x-0.5',
+                      )}
+                    />
+                  </span>
                 </div>
                 <p className="mt-1 text-xs leading-relaxed text-fg-muted">
                   {opt.description}
@@ -209,13 +264,29 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
         </div>
 
         {/* Interactive Mini Slam Preview Stage */}
-        <div className="flex flex-col items-center justify-between gap-4 rounded-card border border-border/80 bg-panel/45 px-5 py-7 sm:flex-row">
+        <motion.div
+          animate={
+            slamActive && arcade && (settings.fxDeskJolt ?? true)
+              ? { y: [0, 4, -1.8, 0.6, 0], x: [0, 0.35, -0.25, 0, 0] }
+              : { x: 0, y: 0 }
+          }
+          transition={{
+            duration: 0.135,
+            times: [0, 0.24, 0.58, 0.82, 1],
+            ease: 'easeOut',
+          }}
+          className="flex flex-col items-center justify-between gap-4 rounded-card border border-border/80 bg-panel/45 px-5 py-7 sm:flex-row"
+        >
           <div className="flex items-center gap-3">
-            <div className="relative w-48 sm:w-52">
+            <div
+              ref={previewCardRef}
+              data-vfx-occluder="true"
+              className="relative w-48 sm:w-52"
+            >
               <DropSparks
                 key={slamKey}
-                active={arcade && slamActive}
-                variant={dropStyle}
+                active={settings.motionMode !== 'off' && slamActive}
+                arcade={arcade}
               />
               <motion.div
                 animate={
@@ -239,13 +310,11 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-xs font-medium text-fg">
-                    Heavy Impact Preview
+                    Impact Preview
                   </div>
                   <div className="truncate font-mono text-[10px] text-fg-muted">
                     {arcade
-                      ? dropStyle === 'dust'
-                        ? 'dust + accent shockwave'
-                        : 'full accent plasma'
+                      ? describeDropLayers(dropDust, dropFissures)
                       : `${settings.motionMode} mode`}
                   </div>
                 </div>
@@ -253,6 +322,7 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
             </div>
 
             <motion.div
+              data-vfx-occluder="true"
               animate={
                 slamActive && arcade && (settings.fxDeskJolt ?? true)
                   ? { x: [0, 8, -1.5, 0], scale: [1, 0.98, 1.005, 1] }
@@ -280,15 +350,23 @@ export function EffectsPanel({ settings }: EffectsPanelProps) {
               className="gap-1.5"
             >
               <Sparkles className="h-3.5 w-3.5" />
-              Test Drop Slam
+              Preview Impact
             </Button>
-            {!arcade && (
+            {arcade ? (
+              <span className="font-mono text-[10px] text-fg-muted">
+                {activeLayerCount === 2
+                  ? 'Shockwave, ember dust & ground fracture layered on every drop'
+                  : activeLayerCount === 1
+                    ? 'Toggle both layers above to combine shockwave & fracture'
+                    : 'Enable either layer above to add canvas drop effects'}
+              </span>
+            ) : (
               <span className="text-[10px] text-fg-muted">
-                Switch to Arcade above for full dust shockwave
+                Switch to Arcade above for full impact effects
               </span>
             )}
           </div>
-        </div>
+        </motion.div>
       </SettingsSectionCard>
 
       {/* 3. Fine-Tune Physics & Waves */}

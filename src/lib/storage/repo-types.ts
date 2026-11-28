@@ -96,11 +96,13 @@ export interface UpdateLinkInput {
 
 export type AddLinkResult =
   | { ok: true; link: LinkItem }
+  | { ok: false; reason: 'invalid_url' }
   | { ok: false; reason: 'duplicate'; existingLink: LinkItem };
 
 export type UpdateLinkResult =
   | { ok: true; link: LinkItem }
   | { ok: false; reason: 'not_found' }
+  | { ok: false; reason: 'invalid_url' }
   | { ok: false; reason: 'duplicate'; existingLink: LinkItem };
 
 export type MoveLinkResult =

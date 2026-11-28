@@ -319,7 +319,7 @@ export function HealthCheckModal({
           ) : null}
 
           {hasScanned && wasCanceled ? (
-            <div className="rounded-control border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+            <div className="rounded-control border border-warning/35 bg-warning/10 px-3 py-2 text-xs text-warning">
               Scan canceled early — showing partial results collected so far.
             </div>
           ) : null}
@@ -337,7 +337,7 @@ export function HealthCheckModal({
               </span>
               <span>·</span>
               <span
-                className={reviewRows.length > 0 ? 'text-amber-400' : undefined}
+                className={reviewRows.length > 0 ? 'text-warning' : undefined}
               >
                 {reviewRows.length} review
               </span>
@@ -376,7 +376,7 @@ export function HealthCheckModal({
                 title="Needs a Quick Look"
                 description="Bot-walls (403/429), auth gates (401), server errors, timeouts, or deep paths redirected to a homepage. Unchecked by default."
                 tone="warning"
-                icon={<AlertTriangle className="h-3.5 w-3.5 text-amber-400" />}
+                icon={<AlertTriangle className="h-3.5 w-3.5 text-warning" />}
                 rows={reviewRows}
                 selectedIds={selectedIds}
                 defaultExpanded

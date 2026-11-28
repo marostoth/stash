@@ -2,6 +2,7 @@ import type * as React from 'react';
 import { useEffect } from 'react';
 import { stashRepo } from '@/lib/storage/repo';
 import type { LinkItem, Space } from '@/lib/types/stash';
+import { toSafeHref } from '@/lib/utils/url';
 import { useUiStore } from '@/store/ui-store';
 
 function isEditableElement(target: EventTarget | null): boolean {
@@ -15,7 +16,7 @@ function isEditableElement(target: EventTarget | null): boolean {
   );
 }
 
-function isAnyModalOpen(): boolean {
+export function isAnyModalOpen(): boolean {
   const ui = useUiStore.getState();
   return (
     ui.collectionModal !== null ||
@@ -27,13 +28,47 @@ function isAnyModalOpen(): boolean {
   );
 }
 
+export function getPreferredScrollBehavior(): ScrollBehavior {
+  if (typeof document !== 'undefined') {
+    const mode = document.documentElement.dataset.motion;
+    if (mode === 'off' || mode === 'reduced') return 'auto';
+  }
+  if (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    return 'auto';
+  }
+  return 'smooth';
+}
+
 function scrollLinkCardIntoView(linkId: string): void {
   requestAnimationFrame(() => {
     const el = document.querySelector<HTMLElement>(
       `[data-link-id="${CSS.escape(linkId)}"]`,
     );
-    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    el?.scrollIntoView({
+      behavior: getPreferredScrollBehavior(),
+      block: 'nearest',
+    });
   });
+}
+
+export function useOmniboxSearchHydration(
+  searchInputRef: React.RefObject<HTMLInputElement | null>,
+): void {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const initialQuery = params.get('q')?.trim();
+    if (!initialQuery) return;
+    useUiStore.getState().setSearchQuery(initialQuery);
+    params.delete('q');
+    const cleanSearch = params.toString();
+    const nextUrl = `${window.location.pathname}${cleanSearch ? `?${cleanSearch}` : ''}${window.location.hash}`;
+    window.history.replaceState(null, '', nextUrl);
+    searchInputRef.current?.focus();
+  }, [searchInputRef]);
 }
 
 interface UseWorkbenchShortcutsOptions {
@@ -65,7 +100,12 @@ export function useWorkbenchShortcuts({
 }: UseWorkbenchShortcutsOptions): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // Respect capture-phase Escape handlers (popovers, drags, Clear Tabs) and
+      // @dnd-kit keyboard sensor keys that already handled this keydown event.
+      if (event.defaultPrevented) return;
+
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        if (isAnyModalOpen()) return;
         event.preventDefault();
         searchInputRef.current?.focus();
         searchInputRef.current?.select();
@@ -106,7 +146,8 @@ export function useWorkbenchShortcuts({
         !event.ctrlKey &&
         !event.metaKey &&
         !event.altKey &&
-        !isEditableElement(event.target)
+        !isEditableElement(event.target) &&
+        !isAnyModalOpen()
       ) {
         event.preventDefault();
         searchInputRef.current?.focus();
@@ -186,12 +227,14 @@ export function useWorkbenchShortcuts({
           );
           if (targetLink) {
             event.preventDefault();
+            const safeUrl = toSafeHref(targetLink.url);
+            if (!safeUrl) return;
             ui.dismissPreview();
             void stashRepo.markLinkOpened(targetLink.id);
             if (openLinkInNewTab) {
-              window.open(targetLink.url, '_blank', 'noopener,noreferrer');
+              window.open(safeUrl, '_blank', 'noopener,noreferrer');
             } else {
-              window.location.assign(targetLink.url);
+              window.location.assign(safeUrl);
             }
             return;
           }

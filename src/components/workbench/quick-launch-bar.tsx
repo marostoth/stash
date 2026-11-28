@@ -4,7 +4,7 @@ import { LinkFavicon } from '@/components/LinkFavicon';
 import { stashRepo } from '@/lib/storage/repo';
 import type { LinkItem } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
-import { extractDomain } from '@/lib/utils/url';
+import { extractDomain, toSafeHref } from '@/lib/utils/url';
 
 interface QuickLaunchBarProps {
   links: readonly LinkItem[];
@@ -63,13 +63,17 @@ export function QuickLaunchBar({
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPickerOpen(false);
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        setPickerOpen(false);
+      }
     };
     window.addEventListener('mousedown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, { capture: true });
     return () => {
       window.removeEventListener('mousedown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, { capture: true });
     };
   }, [pickerOpen]);
 
@@ -126,7 +130,7 @@ export function QuickLaunchBar({
               className="group/pill relative inline-flex shrink-0 items-center rounded-pill border border-border/75 bg-panel/85 transition-colors hover:border-accent/55 hover:bg-card"
             >
               <a
-                href={link.url}
+                href={toSafeHref(link.url)}
                 target={openInNewTab ? '_blank' : '_self'}
                 rel={openInNewTab ? 'noopener noreferrer' : undefined}
                 onClick={() => void stashRepo.markLinkOpened(link.id)}

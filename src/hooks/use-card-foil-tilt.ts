@@ -1,6 +1,6 @@
 import { useMotionTemplate, useMotionValue, useSpring } from 'motion/react';
 import type * as React from 'react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { playHoverRiffle } from '@/lib/audio/foley';
 import {
   computeFoilTilt,
@@ -12,14 +12,15 @@ const TACTILE_MICRO_TILT_DEGREES = 2.4;
 
 /**
  * 3D micro-tilt + cursor-following specular sheen MotionValues with zero React
- * re-renders on pointer move. Arcade gets full 7deg foil tilt + accent glare;
- * Tactile gets a refined 2.4deg matte sheen when hover sheen is enabled.
+ * re-renders on pointer move. Caches the card DOMRect on `pointerenter` to
+ * avoid layout thrashing on every pointermove pixel.
  */
 export function useCardFoilTilt(
   enabled: boolean,
   arcade: boolean,
   isDragging: boolean,
 ) {
+  const rectRef = useRef<DOMRect | null>(null);
   const rawRotateX = useMotionValue(0);
   const rawRotateY = useMotionValue(0);
   const glareX = useMotionValue(50);
@@ -36,14 +37,16 @@ export function useCardFoilTilt(
 
   useEffect(() => {
     if (!enabled || isDragging) {
+      rectRef.current = null;
       rawRotateX.set(0);
       rawRotateY.set(0);
       glareOpacity.set(0);
     }
   }, [enabled, isDragging, rawRotateX, rawRotateY, glareOpacity]);
 
-  const handlePointerEnter = () => {
+  const handlePointerEnter = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!enabled || isDragging) return;
+    rectRef.current = event.currentTarget.getBoundingClientRect();
     glareOpacity.set(1);
     if (arcade) {
       playHoverRiffle();
@@ -52,7 +55,8 @@ export function useCardFoilTilt(
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!enabled || isDragging) return;
-    const rect = event.currentTarget.getBoundingClientRect();
+    const rect = rectRef.current ?? event.currentTarget.getBoundingClientRect();
+    rectRef.current = rect;
     if (rect.width <= 0 || rect.height <= 0) return;
     const relX = (event.clientX - rect.left) / rect.width;
     const relY = (event.clientY - rect.top) / rect.height;
@@ -65,6 +69,7 @@ export function useCardFoilTilt(
   };
 
   const handlePointerLeave = () => {
+    rectRef.current = null;
     if (!enabled) return;
     rawRotateX.set(0);
     rawRotateY.set(0);

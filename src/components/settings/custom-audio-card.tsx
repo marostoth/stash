@@ -12,6 +12,7 @@ import {
   customSfxStore,
   dataUrlToArrayBuffer,
   readFileAsDataUrl,
+  SOUND_EVENT_GROUPS,
   SOUND_EVENT_META,
   type SoundEventId,
   validateCustomAudioFile,
@@ -24,6 +25,7 @@ import {
   playPickup,
   playSessionFreeze,
   playTagPop,
+  playUncheck,
   setCustomSfxClips,
 } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
@@ -69,7 +71,13 @@ export function CustomAudioCard({
         playPickup(true);
         return;
       case 'tagPop':
-        playTagPop(true, 'arcade');
+        playTagPop(
+          true,
+          settings.motionMode === 'off' ? 'tactile' : settings.motionMode,
+        );
+        return;
+      case 'uncheck':
+        playUncheck(true);
         return;
       case 'sessionFreeze':
         playSessionFreeze(true, settings.motionMode);
@@ -163,7 +171,10 @@ export function CustomAudioCard({
       title="Custom Audio Clips (.mp3 / .wav / .ogg)"
       subtitle="Drop in your own recorded sound effects for any slot (up to 512 KB each). Unfilled slots automatically use your active Sound Pack above. Clips stay local on this device and are not included in JSON backups."
       badge={{
-        label: uploadedCount > 0 ? `${uploadedCount} / 7 custom` : 'Optional',
+        label:
+          uploadedCount > 0
+            ? `${uploadedCount} / ${SOUND_EVENT_META.length} custom`
+            : 'Optional',
         tone: uploadedCount > 0 && overridesEnabled ? 'accent' : 'neutral',
       }}
     >
@@ -190,72 +201,101 @@ export function CustomAudioCard({
 
         <div
           className={cn(
-            'divide-y divide-border/60 rounded-control border border-border/80 bg-panel/45',
+            'space-y-3',
             (!settings.soundEffects || !overridesEnabled) &&
               uploadedCount > 0 &&
               'opacity-65',
           )}
         >
-          {SOUND_EVENT_META.map((slot) => {
-            const clip = clips[slot.id];
+          {SOUND_EVENT_GROUPS.map((group) => {
+            const groupSlots = SOUND_EVENT_META.filter(
+              (slot) => slot.category === group.id,
+            );
             return (
-              <div
-                key={slot.id}
-                className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[13px] font-medium text-fg">
-                      {slot.label}
-                    </span>
-                    {clip && (
-                      <span className="truncate rounded-pill border border-accent/40 bg-accent/10 px-2 py-0.25 font-mono text-[10px] text-accent">
-                        {clip.name} ·{' '}
-                        {Math.max(1, Math.round(clip.sizeBytes / 1024))} KB
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-0.5 truncate text-[11px] text-fg-muted">
-                    {slot.hint}
-                  </div>
+              <div key={group.id} className="space-y-1.5">
+                <div className="px-0.5 font-mono text-[10px] font-medium uppercase tracking-widest text-fg-muted/85">
+                  {group.title}
                 </div>
+                <div className="divide-y divide-hairline rounded-control border border-hairline bg-panel/45">
+                  {groupSlots.map((slot) => {
+                    const clip = clips[slot.id];
+                    return (
+                      <div
+                        key={slot.id}
+                        className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[13px] font-medium text-fg">
+                              {slot.label}
+                            </span>
+                            {slot.modeScope !== 'all' && (
+                              <span
+                                className={cn(
+                                  'rounded-pill border px-1.5 py-0.25 font-mono text-[9px]',
+                                  slot.modeScope === 'arcade-only'
+                                    ? 'border-accent/45 bg-accent/10 text-accent'
+                                    : 'border-hairline bg-panel text-fg-muted',
+                                )}
+                              >
+                                {slot.modeScope === 'arcade-only'
+                                  ? 'Arcade only'
+                                  : 'Arcade+'}
+                              </span>
+                            )}
+                            {clip && (
+                              <span className="truncate rounded-pill border border-accent/40 bg-accent/10 px-2 py-0.25 font-mono text-[10px] text-accent">
+                                {clip.name} ·{' '}
+                                {Math.max(1, Math.round(clip.sizeBytes / 1024))}{' '}
+                                KB
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-0.5 truncate text-[11px] text-fg-muted">
+                            {slot.hint}
+                          </div>
+                        </div>
 
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    disabled={!settings.soundEffects}
-                    onClick={() => auditionSlot(slot.id)}
-                    aria-label={`Play ${slot.label}`}
-                    title={`Play ${slot.label}`}
-                    className="h-7 w-7 text-fg-muted hover:text-accent"
-                  >
-                    <Play className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => handleOpenPicker(slot.id)}
-                    className="h-7 gap-1 px-2 text-[11px]"
-                  >
-                    <Upload className="h-3 w-3" />
-                    <span>{clip ? 'Replace' : 'Upload'}</span>
-                  </Button>
-                  {clip && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => void handleRemoveClip(slot.id)}
-                      aria-label={`Remove custom ${slot.label} sound`}
-                      title="Revert to built-in Sound Pack"
-                      className="h-7 w-7 text-fg-muted hover:text-danger"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  )}
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={!settings.soundEffects}
+                            onClick={() => auditionSlot(slot.id)}
+                            aria-label={`Play ${slot.label}`}
+                            title={`Play ${slot.label}`}
+                            className="h-7 w-7 text-fg-muted hover:text-accent"
+                          >
+                            <Play className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleOpenPicker(slot.id)}
+                            className="h-7 gap-1 px-2 text-[11px]"
+                          >
+                            <Upload className="h-3 w-3" />
+                            <span>{clip ? 'Replace' : 'Upload'}</span>
+                          </Button>
+                          {clip && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => void handleRemoveClip(slot.id)}
+                              aria-label={`Remove custom ${slot.label} sound`}
+                              title="Revert to built-in Sound Pack"
+                              className="h-7 w-7 text-fg-muted hover:text-danger"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

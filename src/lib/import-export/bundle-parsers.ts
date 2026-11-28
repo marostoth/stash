@@ -1,3 +1,4 @@
+import { isStashableUrl } from '@/lib/tabs/session-filter';
 import { normalizeHexColor } from '@/lib/themes/contrast';
 import { VALID_BACKDROP_STYLE_SET } from '@/lib/themes/presets';
 import {
@@ -15,7 +16,7 @@ import {
   TAB_GROUP_COLORS,
   type TabGroupColor,
 } from '@/lib/types/stash';
-import { normalizeTags } from '@/lib/utils/url';
+import { normalizeTags, sanitizeFaviconUrl } from '@/lib/utils/url';
 
 const VALID_COLORS = new Set<string>(TAB_GROUP_COLORS);
 
@@ -193,8 +194,9 @@ export function parseLink(
   if (typeof obj.collectionId !== 'string' || !obj.collectionId.trim()) {
     return null;
   }
-  if (typeof obj.url !== 'string' || !obj.url.trim()) return null;
+  if (typeof obj.url !== 'string' || !isStashableUrl(obj.url)) return null;
 
+  const trimmedUrl = obj.url.trim();
   const now = new Date().toISOString();
   const rawTags = Array.isArray(obj.tags)
     ? obj.tags.filter((t): t is string => typeof t === 'string')
@@ -203,11 +205,11 @@ export function parseLink(
   return {
     id: obj.id.trim(),
     collectionId: obj.collectionId.trim(),
-    url: obj.url.trim(),
+    url: trimmedUrl,
     title:
       typeof obj.title === 'string' && obj.title.trim()
         ? obj.title.trim()
-        : obj.url.trim(),
+        : trimmedUrl,
     note: typeof obj.note === 'string' ? obj.note : '',
     tags: normalizeTags(rawTags),
     tagsLocked: obj.tagsLocked === true ? true : undefined,
@@ -216,8 +218,8 @@ export function parseLink(
     pinnedToDock: obj.pinnedToDock === true ? true : undefined,
     product: parseProductMeta(obj.product),
     faviconUrl:
-      typeof obj.faviconUrl === 'string' && obj.faviconUrl.trim()
-        ? obj.faviconUrl.trim()
+      typeof obj.faviconUrl === 'string'
+        ? sanitizeFaviconUrl(obj.faviconUrl)
         : undefined,
     order: typeof obj.order === 'number' ? obj.order : fallbackOrder,
     createdAt: typeof obj.createdAt === 'string' ? obj.createdAt : now,
@@ -348,6 +350,14 @@ export function parseSettings(raw: unknown): StashSettings {
       obj.dropEffectStyle === 'dust' || obj.dropEffectStyle === 'accent'
         ? obj.dropEffectStyle
         : DEFAULT_SETTINGS.dropEffectStyle,
+    fxDropDust:
+      typeof obj.fxDropDust === 'boolean'
+        ? obj.fxDropDust
+        : DEFAULT_SETTINGS.fxDropDust,
+    fxDropFissures:
+      typeof obj.fxDropFissures === 'boolean'
+        ? obj.fxDropFissures
+        : DEFAULT_SETTINGS.fxDropFissures,
     fxDeskJolt:
       typeof obj.fxDeskJolt === 'boolean'
         ? obj.fxDeskJolt

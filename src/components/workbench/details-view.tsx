@@ -12,6 +12,7 @@ import {
   type StoreGroupSummary,
   sortDetailsLinks,
 } from '@/components/workbench/details-store-section';
+import { playSessionFreeze } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
 import {
   openLinksInNamedTabGroup,
@@ -20,7 +21,6 @@ import {
 import {
   type Collection,
   DEFAULT_SPACE_ID,
-  type DropEffectStyle,
   type LinkItem,
   type MotionMode,
   type Space,
@@ -47,7 +47,6 @@ interface DetailsViewProps {
   openInNewTab: boolean;
   defaultCurrency: string;
   motionMode: MotionMode;
-  dropEffectStyle?: DropEffectStyle;
   fxAmbientWaves?: boolean;
   soundEffects: boolean;
   hoverPreviews: boolean;
@@ -64,7 +63,6 @@ export function DetailsView({
   openInNewTab,
   defaultCurrency,
   motionMode,
-  dropEffectStyle = 'dust',
   fxAmbientWaves = true,
   soundEffects,
   hoverPreviews,
@@ -269,6 +267,7 @@ export function DetailsView({
     storeName: string,
     starredItems: readonly LinkItem[],
   ) => {
+    if (starredItems.length > 0) playSessionFreeze(soundEffects, motionMode);
     const opened = await openLinksInNamedTabGroup(storeName, starredItems);
     if (opened > 0) {
       toast.success(
@@ -281,6 +280,7 @@ export function DetailsView({
     collection: Collection,
     items: readonly LinkItem[],
   ) => {
+    if (items.length > 0) playSessionFreeze(soundEffects, motionMode);
     const opened = await wakeUpCollectionInTabGroup(collection, items);
     if (opened > 0) {
       toast.success(`Opened ${opened} tabs in "${collection.name}"`);
@@ -319,7 +319,6 @@ export function DetailsView({
                 defaultCurrency={defaultCurrency}
                 openInNewTab={openInNewTab}
                 motionMode={motionMode}
-                dropEffectStyle={dropEffectStyle}
                 fxAmbientWaves={fxAmbientWaves}
                 soundEffects={soundEffects}
                 hoverPreviews={hoverPreviews}
@@ -353,7 +352,6 @@ export function DetailsView({
                 defaultCurrency={defaultCurrency}
                 openInNewTab={openInNewTab}
                 motionMode={motionMode}
-                dropEffectStyle={dropEffectStyle}
                 fxAmbientWaves={fxAmbientWaves}
                 soundEffects={soundEffects}
                 hoverPreviews={hoverPreviews}

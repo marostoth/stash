@@ -1,4 +1,4 @@
-import { Layers, Star } from 'lucide-react';
+import { Layers, Plus, Star } from 'lucide-react';
 import { OdometerCounter } from '@/components/ui/odometer-counter';
 import { RollingCurrency } from '@/components/ui/rolling-currency';
 import type {
@@ -109,5 +109,54 @@ export function CollectionHeaderBadges({
         </button>
       )}
     </>
+  );
+}
+
+/**
+ * Recessed matte insertion placeholder shown inside a collection grid at the
+ * exact target index while dragging an Open Tab or cross-collection link.
+ */
+export function EmptyCollectionDropButton({
+  collectionName,
+  isDropTarget,
+  onAddLink,
+}: {
+  collectionName: string;
+  isDropTarget: boolean;
+  onAddLink: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onAddLink}
+      className={cn(
+        'flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-border bg-panel/40 px-4 py-5 text-xs text-fg-muted transition-colors hover:border-accent/50 hover:bg-panel hover:text-fg cursor-pointer',
+        isDropTarget && 'border-accent bg-accent/10 text-accent',
+      )}
+    >
+      <Plus className="h-3.5 w-3.5 text-accent" />
+      <span>
+        {isDropTarget
+          ? `Drop to stash into ${collectionName}`
+          : `Drop an open tab here or add your first link to ${collectionName}`}
+      </span>
+    </button>
+  );
+}
+
+export function DropSlotPlaceholder({ density }: { density: CardDensity }) {
+  const heightClass =
+    density === 'micro'
+      ? 'min-h-[54px]'
+      : density === 'compact'
+        ? 'min-h-[82px]'
+        : 'min-h-[104px]';
+  return (
+    <div
+      aria-hidden="true"
+      className={`flex items-center justify-center rounded-card border border-dashed border-accent/45 bg-panel/65 font-mono text-[10px] text-fg-muted shadow-inner ${heightClass}`}
+    >
+      Drop here
+    </div>
   );
 }

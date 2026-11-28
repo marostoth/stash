@@ -124,14 +124,20 @@ export const MODAL_SPRING = {
 };
 
 export const ARCADE_SQUASH_KEYFRAMES = {
-  scale: [1.08, 0.952, 1.01, 1],
-  y: [-7, 3, -0.8, 0],
+  scale: [1.08, 0.94, 1],
+  y: [-4, 2.5, 0],
 };
 
 export const ARCADE_SQUASH_TRANSITION = {
-  duration: 0.37,
-  times: [0, 0.22, 0.62, 1],
-  ease: [0.22, 1, 0.36, 1] as const,
+  duration: 0.16,
+  times: [0, 0.3125, 1],
+  ease: [
+    [0.7, 0, 1, 1],
+    [0.18, 0.89, 0.32, 1],
+  ] as [
+    readonly [number, number, number, number],
+    readonly [number, number, number, number],
+  ],
 };
 
 export const TACTILE_SETTLE_KEYFRAMES = {

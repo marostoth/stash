@@ -29,6 +29,7 @@ import { applyThemeToDocument } from '@/lib/themes/theme-engine';
 import type { StashSettings, ThemeDefinition } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 import type { SmartFilter } from '@/lib/utils/search';
+import { useOpenTabsStore } from '@/store/open-tabs-store';
 import { useUiStore } from '@/store/ui-store';
 
 const SMART_FILTER_LABELS: Record<SmartFilter, string> = {
@@ -47,7 +48,6 @@ interface TopBarProps {
   starredCount: number;
   starredSubtotal?: string;
   spacesCount: number;
-  openTabsCount: number;
 }
 
 export function TopBar({
@@ -59,8 +59,8 @@ export function TopBar({
   starredCount,
   starredSubtotal,
   spacesCount,
-  openTabsCount,
 }: TopBarProps) {
+  const openTabsCount = useOpenTabsStore((s) => s.tabs.length);
   const searchQuery = useUiStore((s) => s.searchQuery);
   const setSearchQuery = useUiStore((s) => s.setSearchQuery);
   const starredOnly = useUiStore((s) => s.starredOnly);
@@ -111,7 +111,7 @@ export function TopBar({
   };
 
   return (
-    <header className="sticky top-0 z-30 h-14 border-b border-border/75 bg-panel/95 backdrop-blur-sm">
+    <header className="sticky top-0 z-30 h-14 border-b border-hairline bg-panel/95 backdrop-blur-sm">
       <div className="flex h-full items-center justify-between gap-3 px-5 sm:px-7">
         {/* Brand */}
         <div className="flex shrink-0 items-center gap-2.5">

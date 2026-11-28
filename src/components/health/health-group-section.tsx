@@ -3,7 +3,7 @@ import { type ReactNode, useState } from 'react';
 import { LinkFavicon } from '@/components/LinkFavicon';
 import type { LinkItem } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
-import { extractDomain } from '@/lib/utils/url';
+import { extractDomain, toSafeHref } from '@/lib/utils/url';
 
 export interface HealthTriageRow {
   link: LinkItem;
@@ -58,14 +58,14 @@ export function HealthGroupSection({
     tone === 'danger'
       ? 'border-danger/40 bg-danger/15 text-danger'
       : tone === 'warning'
-        ? 'border-amber-500/40 bg-amber-500/15 text-amber-400'
+        ? 'border-warning/40 bg-warning/15 text-warning'
         : 'border-border bg-panel text-fg-muted';
 
   const reasonPillClass =
     tone === 'danger'
       ? 'border-danger/35 bg-danger/10 text-danger'
       : tone === 'warning'
-        ? 'border-amber-500/35 bg-amber-500/10 text-amber-400'
+        ? 'border-warning/35 bg-warning/10 text-warning'
         : 'border-border bg-panel text-fg-muted';
 
   return (
@@ -167,7 +167,7 @@ export function HealthGroupSection({
                   </span>
 
                   <a
-                    href={link.url}
+                    href={toSafeHref(link.url)}
                     target="_blank"
                     rel="noreferrer"
                     title={`Open ${link.url} in new tab`}

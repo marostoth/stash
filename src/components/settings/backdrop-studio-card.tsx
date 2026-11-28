@@ -144,9 +144,13 @@ export function BackdropStudioCard({
   };
 
   const handleRemoveWallpaper = async () => {
-    await clearStoredWallpaper();
-    await stashRepo.updateSettings({ wallpaperEnabled: false });
-    toast.success('Removed local wallpaper');
+    try {
+      await clearStoredWallpaper();
+      await stashRepo.updateSettings({ wallpaperEnabled: false });
+      toast.success('Removed local wallpaper');
+    } catch {
+      toast.error('Could not remove local wallpaper.');
+    }
   };
 
   return (

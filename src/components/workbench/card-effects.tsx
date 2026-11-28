@@ -1,6 +1,8 @@
 import { Star } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type RefObject, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { playDrop } from '@/lib/audio/foley';
 import {
   ARCADE_HEADSHAKE_KEYFRAMES,
   ARCADE_HEADSHAKE_TRANSITION,
@@ -15,9 +17,16 @@ import {
   TACTILE_SPRING,
   TAG_POP_SPRING,
 } from '@/lib/motion/presets';
-import type { CollectionViewMode } from '@/lib/types/stash';
+import { stashRepo } from '@/lib/storage/repo';
+import type {
+  CollectionViewMode,
+  LinkItem,
+  MotionMode,
+} from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+import { spawnSlamForElement } from '@/lib/vfx/engine';
 import { useFxStore } from '@/store/fx-store';
+import { useUiStore } from '@/store/ui-store';
 
 export function StarredCardAccents({
   viewMode,
@@ -25,23 +34,15 @@ export function StarredCardAccents({
   viewMode: CollectionViewMode;
 }) {
   return (
-    <>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-[2] overflow-hidden rounded-card"
-      >
-        <div className="stash-card-underglow-strip absolute inset-x-0 bottom-0 h-[2px]" />
-      </div>
-      <span
-        aria-hidden="true"
-        className={cn(
-          'pointer-events-none absolute right-1.5 top-1.5 z-[12] flex h-7 w-7 items-center justify-center text-accent opacity-90 transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0',
-          viewMode === 'cover' && 'rounded-control bg-panel/95',
-        )}
-      >
-        <Star className="h-3.5 w-3.5 fill-accent text-accent" />
-      </span>
-    </>
+    <span
+      aria-hidden="true"
+      className={cn(
+        'pointer-events-none absolute right-1.5 top-1.5 z-[12] flex h-7 w-7 items-center justify-center text-accent opacity-90 transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0',
+        viewMode === 'cover' && 'rounded-control bg-panel/95',
+      )}
+    >
+      <Star className="h-3.5 w-3.5 fill-accent text-accent" />
+    </span>
   );
 }
 
@@ -55,6 +56,7 @@ export function resolveLinkCardMotion(params: {
   isSettling: boolean;
   arcade: boolean;
   tactile: boolean;
+  reduced: boolean;
   cascadeActive: boolean;
   index: number;
   neighborJolt: ActiveNeighborJolt | null;
@@ -65,27 +67,18 @@ export function resolveLinkCardMotion(params: {
     isSettling,
     arcade,
     tactile,
+    reduced,
     cascadeActive,
     index,
     neighborJolt,
   } = params;
 
   const animate = vaporizing
-    ? arcade
-      ? {
-          opacity: [1, 0.92, 0],
-          scale: [1, 1.03, 0.24],
-          rotate: 0,
-          y: 0,
-          x: 0,
-        }
-      : {
-          opacity: 0,
-          scale: 0.88,
-          rotate: 0,
-          y: 0,
-          x: 0,
-        }
+    ? reduced
+      ? { opacity: 0, scale: 1, rotate: 0, y: 0, x: 0 }
+      : arcade
+        ? { opacity: 0, scale: 0.92, rotate: 0, y: 0, x: 0 }
+        : { opacity: 0, scale: 0.96, rotate: 0, y: 0, x: 0 }
     : isHighlighted && arcade
       ? {
           ...ARCADE_HEADSHAKE_KEYFRAMES,
@@ -119,13 +112,9 @@ export function resolveLinkCardMotion(params: {
             : { opacity: 1, x: 0, y: 0, rotate: 0, scale: 1 };
 
   const transition = vaporizing
-    ? arcade
-      ? {
-          duration: 0.27,
-          times: [0, 0.24, 1],
-          ease: [0.55, 0, 1, 0.45] as const,
-        }
-      : { duration: 0.16, ease: 'easeIn' as const }
+    ? reduced
+      ? { duration: 0.12, ease: 'easeOut' as const }
+      : { duration: 0.15, ease: [0.32, 0, 0.67, 0] as const }
     : isHighlighted && arcade
       ? ARCADE_HEADSHAKE_TRANSITION
       : isSettling && arcade
@@ -134,9 +123,9 @@ export function resolveLinkCardMotion(params: {
           ? TACTILE_SETTLE_TRANSITION
           : neighborJolt
             ? {
-                duration: 0.38,
+                duration: 0.24,
                 delay: neighborJolt.delaySec,
-                times: [0, 0.28, 0.66, 1],
+                times: [0, 0.3, 0.7, 1],
                 ease: [0.22, 0.85, 0.34, 1] as const,
               }
             : tactile && cascadeActive
@@ -159,7 +148,14 @@ export function useNeighborJolt(
   collectionId: string,
   enabled: boolean,
 ): ActiveNeighborJolt | null {
-  const settledImpact = useFxStore((s) => s.settledImpact);
+  const settledImpact = useFxStore((s) =>
+    enabled &&
+    s.settledImpact &&
+    s.settledImpact.collectionId === collectionId &&
+    s.settledImpact.linkId !== linkId
+      ? s.settledImpact
+      : null,
+  );
   const [jolt, setJolt] = useState<ActiveNeighborJolt | null>(null);
 
   useEffect(() => {
@@ -264,79 +260,39 @@ export function StarShimmerOverlay({
   );
 }
 
-const VAPOR_MOTES = [
-  { x: -34, y: -16, size: 7 },
-  { x: 0, y: -22, size: 6 },
-  { x: 34, y: -14, size: 7 },
-  { x: -42, y: 8, size: 6 },
-  { x: 40, y: 10, size: 6 },
-  { x: -18, y: 20, size: 5 },
-  { x: 20, y: 18, size: 5 },
-] as const;
-
 /**
- * Vacuum implosion collapse when a card vanishes on quick delete (Arcade):
- * a radial distortion ring collapses inward while surrounding particles rush
- * toward the center void.
+ * Clipped delete contact rim flash (Arcade cinder shards & falling ash render
+ * on the fixed 2D `<VfxCanvas />`).
  */
-export function DeleteVaporPuff({ active }: { active: boolean }) {
+export function DeleteVaporPuff({
+  active,
+  arcade = false,
+}: {
+  active: boolean;
+  arcade?: boolean;
+}) {
   return (
     <AnimatePresence>
       {active && (
-        <div
+        <motion.div
+          key="delete-rim"
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center overflow-visible"
-        >
-          {/* Inward-collapsing vacuum ring */}
-          <motion.div
-            initial={{ scale: 1.42, opacity: 0 }}
-            animate={{ scale: 0.2, opacity: [0, 0.78, 0] }}
-            transition={{
-              duration: 0.3,
-              opacity: { duration: 0.3, times: [0, 0.35, 1] },
-              ease: [0.5, 0, 0.9, 0.5],
-            }}
-            style={{
-              background:
-                'radial-gradient(ellipse at center, transparent 52%, color-mix(in srgb, var(--stash-accent) 45%, transparent) 66%, color-mix(in srgb, var(--stash-danger) 40%, transparent) 72%, transparent 82%)',
-              filter: 'blur(1.5px)',
-            }}
-            className="absolute -inset-x-6 -inset-y-5 rounded-full will-change-transform"
-          />
-
-          {/* Particles sucked inward into the collapsing void */}
-          {VAPOR_MOTES.map((mote, i) => (
-            <motion.span
-              key={`${mote.x}-${mote.y}`}
-              initial={{
-                x: mote.x * 1.45,
-                y: mote.y * 1.45,
-                scale: 0.85,
-                opacity: 0.85,
-              }}
-              animate={{
-                x: 0,
-                y: 0,
-                scale: 0.1,
-                opacity: 0,
-              }}
-              transition={{
-                duration: 0.28,
-                delay: i * 0.012,
-                ease: [0.55, 0, 1, 0.45],
-              }}
-              style={{
-                width: mote.size,
-                height: mote.size,
-                backgroundColor:
-                  i % 2 === 0
-                    ? 'var(--stash-accent)'
-                    : 'var(--stash-text-muted)',
-              }}
-              className="absolute rounded-full blur-[1px]"
-            />
-          ))}
-        </div>
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 0.92, 0] }}
+          exit={{ opacity: 0 }}
+          transition={{
+            duration: 0.14,
+            times: [0, 0.22, 1],
+            ease: 'easeOut',
+          }}
+          style={{
+            backgroundColor: arcade ? 'rgba(255, 255, 255, 0.24)' : undefined,
+            boxShadow: arcade
+              ? 'inset 0 0 0 1px #FFFFFF'
+              : 'inset 0 0 0 1px color-mix(in srgb, var(--stash-text) 42%, transparent)',
+          }}
+          className="pointer-events-none absolute inset-0 z-20 overflow-hidden rounded-card"
+        />
       )}
     </AnimatePresence>
   );
@@ -414,7 +370,6 @@ export function CardTagsRow({
   seenTags,
   tactile,
   arcade,
-  isCompact,
 }: {
   visibleTags: readonly string[];
   hiddenTagCount: number;
@@ -424,31 +379,110 @@ export function CardTagsRow({
   isCompact: boolean;
 }) {
   return (
-    <div className="mt-auto flex flex-wrap items-center gap-1 pt-0.5">
-      {visibleTags.map((tag) => {
+    <div className="mt-auto flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-1 font-mono text-[10.5px] text-fg-muted/75">
+      {visibleTags.map((tag, idx) => {
         const isNewlyAdded = !seenTags.has(tag);
         return (
           <motion.span
             key={tag}
             initial={
-              isNewlyAdded && tactile ? { scale: 0.7, opacity: 0 } : false
+              isNewlyAdded && tactile ? { scale: 0.85, opacity: 0 } : false
             }
             animate={{ scale: 1, opacity: 1 }}
             transition={arcade ? ARCADE_TAG_POP_SPRING : TAG_POP_SPRING}
-            className={cn(
-              'rounded-pill border border-border bg-panel py-0.5 font-mono text-[10px] text-fg-muted',
-              isCompact ? 'px-1.5' : 'px-2',
-            )}
+            className="inline-flex items-center gap-1.5"
           >
-            #{tag}
+            {idx > 0 && (
+              <span aria-hidden="true" className="opacity-45">
+                ·
+              </span>
+            )}
+            <span>{tag}</span>
           </motion.span>
         );
       })}
       {hiddenTagCount > 0 && (
-        <span className="font-mono text-[10px] text-fg-muted">
-          +{hiddenTagCount}
-        </span>
+        <span className="opacity-65">+{hiddenTagCount}</span>
       )}
     </div>
   );
+}
+
+function fireRestoredLinkImpact(
+  restored: LinkItem,
+  options: {
+    soundEffects: boolean;
+    motionMode: MotionMode;
+    fxDeskJolt: boolean;
+  },
+): void {
+  const { soundEffects, motionMode, fxDeskJolt } = options;
+  const triggerImpact = (el: Element | null) => {
+    playDrop(soundEffects, motionMode);
+    if (motionMode === 'off') return;
+    useUiStore.getState().settleLink(restored.id);
+    const fx = useFxStore.getState();
+    fx.triggerSettledImpact(restored.id, restored.collectionId);
+    if (motionMode === 'arcade') {
+      if (fxDeskJolt) fx.triggerContainerShake('combo');
+      spawnSlamForElement(el);
+    }
+  };
+
+  if (
+    typeof document === 'undefined' ||
+    typeof requestAnimationFrame !== 'function'
+  ) {
+    triggerImpact(null);
+    return;
+  }
+
+  const selector = `[data-link-id="${CSS.escape(restored.id)}"]`;
+  let attempts = 0;
+  const waitForMount = () => {
+    const el = document.querySelector(selector);
+    if (el && el.getBoundingClientRect().width > 0) {
+      // Wait 1 extra frame so Motion's initial={false} card mounts at rest first
+      requestAnimationFrame(() => triggerImpact(el));
+      return;
+    }
+    attempts += 1;
+    if (attempts < 15) {
+      requestAnimationFrame(waitForMount);
+    } else {
+      triggerImpact(null);
+    }
+  };
+  requestAnimationFrame(waitForMount);
+}
+
+export function showDeletedLinkToast(
+  snapshot: LinkItem,
+  options: {
+    soundEffects: boolean;
+    motionMode: MotionMode;
+    fxDeskJolt?: boolean;
+  },
+): void {
+  let undone = false;
+  toast('Link removed', {
+    duration: 5000,
+    className: 'stash-undo-toast',
+    action: {
+      label: 'Undo',
+      onClick: () => {
+        if (undone) return;
+        undone = true;
+        void stashRepo.restoreLink(snapshot).then((restored) => {
+          if (restored) {
+            fireRestoredLinkImpact(restored, {
+              soundEffects: options.soundEffects,
+              motionMode: options.motionMode,
+              fxDeskJolt: options.fxDeskJolt ?? true,
+            });
+          }
+        });
+      },
+    },
+  });
 }

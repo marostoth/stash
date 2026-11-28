@@ -1,3 +1,4 @@
+import { storage } from '#imports';
 import {
   collectionsStorage,
   linksStorage,
@@ -31,6 +32,60 @@ export function pruneExpiredTrashEntries(
     .slice(0, MAX_TRASH_ENTRIES);
 }
 
+export function buildTrashWithDeletedLinks(
+  existingRaw: readonly TrashEntry[],
+  links: readonly LinkItem[],
+  collectionNameById: ReadonlyMap<string, string>,
+  deletedAt: string = new Date().toISOString(),
+): TrashEntry[] {
+  const existing = pruneExpiredTrashEntries(existingRaw);
+  if (links.length === 0) return existing;
+  const additions: TrashEntry[] = links.map((link) => ({
+    id: `trash-link:${link.id}:${crypto.randomUUID().slice(0, 6)}`,
+    kind: 'link',
+    deletedAt,
+    collectionName: collectionNameById.get(link.collectionId),
+    link: {
+      ...link,
+      tags: [...link.tags],
+      ...(link.product ? { product: { ...link.product } } : {}),
+    },
+  }));
+  return [...additions, ...existing].slice(0, MAX_TRASH_ENTRIES);
+}
+
+export function buildTrashWithDeletedCollection(
+  existingRaw: readonly TrashEntry[],
+  collection: Collection,
+  links: readonly LinkItem[],
+  deletedAt: string = new Date().toISOString(),
+): TrashEntry[] {
+  const existing = pruneExpiredTrashEntries(existingRaw);
+  const entry: TrashEntry = {
+    id: `trash-col:${collection.id}:${crypto.randomUUID().slice(0, 6)}`,
+    kind: 'collection',
+    deletedAt,
+    collection: { ...collection },
+    links: sortByOrder(links).map((link) => ({
+      ...link,
+      tags: [...link.tags],
+      ...(link.product ? { product: { ...link.product } } : {}),
+    })),
+  };
+  return [entry, ...existing].slice(0, MAX_TRASH_ENTRIES);
+}
+
+export function buildTrashWithoutRestoredLinks(
+  existingRaw: readonly TrashEntry[],
+  linkIds: readonly string[],
+): TrashEntry[] {
+  if (linkIds.length === 0) return [...existingRaw];
+  const idSet = new Set(linkIds);
+  return existingRaw.filter(
+    (entry) => !(entry.kind === 'link' && idSet.has(entry.link.id)),
+  );
+}
+
 export async function getTrashEntriesInStorage(
   nowMs: number = Date.now(),
 ): Promise<TrashEntry[]> {
@@ -46,63 +101,6 @@ export function watchTrashEntriesInStorage(
   cb: (entries: TrashEntry[]) => void,
 ): () => void {
   return trashStorage.watch((next) => cb(pruneExpiredTrashEntries(next)));
-}
-
-export async function recordDeletedLinksInTrash(
-  links: readonly LinkItem[],
-  collectionNameById: ReadonlyMap<string, string>,
-  deletedAt: string = new Date().toISOString(),
-): Promise<void> {
-  if (links.length === 0) return;
-  const existing = pruneExpiredTrashEntries(await trashStorage.getValue());
-  const additions: TrashEntry[] = links.map((link) => ({
-    id: `trash-link:${link.id}:${crypto.randomUUID().slice(0, 6)}`,
-    kind: 'link',
-    deletedAt,
-    collectionName: collectionNameById.get(link.collectionId),
-    link: {
-      ...link,
-      tags: [...link.tags],
-      ...(link.product ? { product: { ...link.product } } : {}),
-    },
-  }));
-  await trashStorage.setValue(
-    [...additions, ...existing].slice(0, MAX_TRASH_ENTRIES),
-  );
-}
-
-export async function recordDeletedCollectionInTrash(
-  collection: Collection,
-  links: readonly LinkItem[],
-  deletedAt: string = new Date().toISOString(),
-): Promise<void> {
-  const existing = pruneExpiredTrashEntries(await trashStorage.getValue());
-  const entry: TrashEntry = {
-    id: `trash-col:${collection.id}:${crypto.randomUUID().slice(0, 6)}`,
-    kind: 'collection',
-    deletedAt,
-    collection: { ...collection },
-    links: sortByOrder(links).map((link) => ({
-      ...link,
-      tags: [...link.tags],
-      ...(link.product ? { product: { ...link.product } } : {}),
-    })),
-  };
-  await trashStorage.setValue([entry, ...existing].slice(0, MAX_TRASH_ENTRIES));
-}
-
-export async function removeRestoredLinksFromTrash(
-  linkIds: readonly string[],
-): Promise<void> {
-  if (linkIds.length === 0) return;
-  const idSet = new Set(linkIds);
-  const existing = await trashStorage.getValue();
-  const next = existing.filter(
-    (entry) => !(entry.kind === 'link' && idSet.has(entry.link.id)),
-  );
-  if (next.length !== existing.length) {
-    await trashStorage.setValue(next);
-  }
 }
 
 export interface TrashRestoreResult {
@@ -129,6 +127,7 @@ export async function restoreTrashEntryInStorage(
 
   if (target.kind === 'link') {
     let collections = [...existingCollections];
+    let collectionsChanged = false;
     let targetCollectionId = target.link.collectionId;
     if (!collections.some((c) => c.id === targetCollectionId)) {
       const fallback = sortByOrder(collections)[0];
@@ -146,8 +145,8 @@ export async function restoreTrashEntryInStorage(
           updatedAt: now,
         };
         collections = [created];
+        collectionsChanged = true;
         targetCollectionId = created.id;
-        await collectionsStorage.setValue(collections);
       }
     }
 
@@ -158,6 +157,12 @@ export async function restoreTrashEntryInStorage(
         normalizeUrlForComparison(item.url) === normalized,
     );
 
+    const writes: Parameters<typeof storage.setItems>[0] = [
+      { item: trashStorage, value: remainingTrash },
+    ];
+    if (collectionsChanged) {
+      writes.push({ item: collectionsStorage, value: collections });
+    }
     if (!duplicate) {
       const nextLink: LinkItem = {
         ...target.link,
@@ -172,10 +177,10 @@ export async function restoreTrashEntryInStorage(
         nextLink,
         nextLink.order,
       );
-      await linksStorage.setValue(nextLinks);
+      writes.push({ item: linksStorage, value: nextLinks });
     }
 
-    await trashStorage.setValue(remainingTrash);
+    await storage.setItems(writes);
     return {
       restoredKind: 'link',
       restoredCount: duplicate ? 0 : 1,
@@ -183,7 +188,7 @@ export async function restoreTrashEntryInStorage(
     };
   }
 
-  // Restore entire collection + its links
+  // Restore entire collection + its links atomically
   const spaceIds = new Set(spaces.map((s) => s.id));
   const resolvedSpaceId =
     target.collection.spaceId && spaceIds.has(target.collection.spaceId)
@@ -217,10 +222,13 @@ export async function restoreTrashEntryInStorage(
     }),
   );
 
-  await Promise.all([
-    collectionsStorage.setValue([...existingCollections, restoredCollection]),
-    linksStorage.setValue([...existingLinks, ...restoredLinks]),
-    trashStorage.setValue(remainingTrash),
+  await storage.setItems([
+    {
+      item: collectionsStorage,
+      value: [...existingCollections, restoredCollection],
+    },
+    { item: linksStorage, value: [...existingLinks, ...restoredLinks] },
+    { item: trashStorage, value: remainingTrash },
   ]);
 
   return {

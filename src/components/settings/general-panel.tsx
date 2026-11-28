@@ -76,8 +76,8 @@ export function GeneralPanel({ settings, settingsOpen }: GeneralPanelProps) {
           <SettingsToggleRow
             id="settings-quick-launch-bar"
             label="Show Quick Links strip"
-            hint="Compact 1-click Quick Launch row at the top of the board for pinned or starred sites."
-            checked={settings.quickLaunchVisible !== false}
+            hint="Optional 1-click Quick Launch row at the top of the board for pinned or starred sites."
+            checked={settings.quickLaunchVisible === true}
             onCheckedChange={(checked) =>
               void stashRepo.updateSettings({ quickLaunchVisible: checked })
             }
@@ -86,8 +86,8 @@ export function GeneralPanel({ settings, settingsOpen }: GeneralPanelProps) {
           <SettingsToggleRow
             id="settings-tag-filter-bar"
             label="Show Quick Tag filter bar"
-            hint="Clickable #tag chips above your collections (and in the Side Panel) for 1-click slicing."
-            checked={settings.tagBarVisible !== false}
+            hint="Optional clickable #tag chips above your collections (and in the Side Panel) for 1-click slicing."
+            checked={settings.tagBarVisible === true}
             onCheckedChange={(checked) => {
               if (!checked) {
                 useUiStore.getState().clearSelectedTags();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { customSfxStore } from '@/lib/audio/custom-sfx-store';
 import {
   setCustomSfxClips,
@@ -38,6 +38,10 @@ export interface StashDataState {
   customThemes: ThemeDefinition[];
   allThemes: ThemeDefinition[];
   activeTheme: ThemeDefinition;
+  setOptimisticCollections: (
+    updater: (prev: Collection[]) => Collection[],
+  ) => void;
+  setOptimisticLinks: (updater: (prev: LinkItem[]) => LinkItem[]) => void;
 }
 
 export function useStashData(): StashDataState {
@@ -109,16 +113,28 @@ export function useStashData(): StashDataState {
     };
   }, []);
 
-  const allThemes = getAllThemes(customThemes);
-  const activeTheme = resolveTheme(settings.activeThemeId, customThemes);
+  const allThemes = useMemo(() => getAllThemes(customThemes), [customThemes]);
+  const activeTheme = useMemo(
+    () => resolveTheme(settings.activeThemeId, customThemes),
+    [settings.activeThemeId, customThemes],
+  );
+
+  const hasAppliedHydratedThemeRef = useRef(false);
 
   useEffect(() => {
+    // Skip the 320ms theme cross-fade on initial New Tab hydration so a
+    // non-default theme paints immediately without a cold-boot fade flash.
+    const animate = !loading && hasAppliedHydratedThemeRef.current;
     applyThemeToDocument(
       activeTheme,
       document.documentElement,
       settings.backdropOverride,
+      { animate },
     );
-  }, [activeTheme, settings.backdropOverride]);
+    if (!loading) {
+      hasAppliedHydratedThemeRef.current = true;
+    }
+  }, [activeTheme, loading, settings.backdropOverride]);
 
   useEffect(() => {
     if (!storagePersistRequested) {
@@ -174,5 +190,7 @@ export function useStashData(): StashDataState {
     customThemes,
     allThemes,
     activeTheme,
+    setOptimisticCollections: setCollections,
+    setOptimisticLinks: setLinks,
   };
 }

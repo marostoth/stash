@@ -1,6 +1,13 @@
 import { FolderPlus, SearchX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+export const WORKBENCH_TOASTER_STYLE = {
+  background: 'var(--stash-panel)',
+  color: 'var(--stash-text)',
+  border: '1px solid var(--stash-border)',
+  borderRadius: 'var(--stash-radius-card)',
+} as const;
+
 export function EmptySpaceNotice({
   spaceName,
   onCreateCollection,

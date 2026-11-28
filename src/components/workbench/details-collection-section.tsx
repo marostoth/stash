@@ -15,12 +15,11 @@ import { RollingCurrency } from '@/components/ui/rolling-currency';
 import { CollectionSortMenu } from '@/components/workbench/collection-sort-menu';
 import { CopyListButton } from '@/components/workbench/details-inline-cells';
 import { DetailsRow } from '@/components/workbench/details-row';
-import { isTactileMotion } from '@/lib/motion/presets';
+import { SmoothCollapse } from '@/components/workbench/smooth-collapse';
 import { stashRepo } from '@/lib/storage/repo';
 import { getCuratedCollectionIcon } from '@/lib/themes/collection-icons';
 import {
   type Collection,
-  type DropEffectStyle,
   type LinkItem,
   type MotionMode,
   type Space,
@@ -48,7 +47,6 @@ interface DetailsCollectionSectionProps {
   defaultCurrency: string;
   openInNewTab: boolean;
   motionMode: MotionMode;
-  dropEffectStyle?: DropEffectStyle;
   fxAmbientWaves?: boolean;
   soundEffects: boolean;
   hoverPreviews: boolean;
@@ -75,7 +73,6 @@ export function DetailsCollectionSection({
   defaultCurrency,
   openInNewTab,
   motionMode,
-  dropEffectStyle = 'dust',
   fxAmbientWaves = true,
   soundEffects,
   hoverPreviews,
@@ -133,13 +130,12 @@ export function DetailsCollectionSection({
   const hasCollectionSort = Boolean(
     collection.sortMode && collection.sortMode !== 'manual',
   );
+  const hasHiddenChecked = hideChecked && checkedCount > 0;
   const rowDragMode = dragDisabled
     ? 'none'
-    : sortActive || hasCollectionSort
+    : sortActive || hasCollectionSort || hasHiddenChecked
       ? 'cross-only'
       : 'collection';
-
-  const tactile = isTactileMotion(motionMode);
 
   return (
     <section
@@ -152,15 +148,11 @@ export function DetailsCollectionSection({
       <div
         ref={dropRef}
         className={cn(
-          'overflow-hidden rounded-card border border-border bg-card transition-colors',
-          isDropTarget &&
-            cn(
-              'border-accent ring-2 ring-accent/55',
-              tactile && 'stash-dropzone-breathe',
-            ),
+          'overflow-hidden rounded-card border border-hairline bg-card transition-colors',
+          isDropTarget && 'border-accent/45 ring-1 ring-accent/35',
         )}
       >
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-panel/70 px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline bg-panel/70 px-3 py-2">
           <div className="flex min-w-0 items-center gap-1.5">
             {!dragDisabled && (
               <button
@@ -278,7 +270,7 @@ export function DetailsCollectionSection({
           </div>
         </div>
 
-        {!isCollapsed && (
+        <SmoothCollapse open={!isCollapsed} motionMode={motionMode}>
           <div>
             {sortedLinks.length > 0 ? (
               <>
@@ -295,7 +287,6 @@ export function DetailsCollectionSection({
                         defaultCurrency={defaultCurrency}
                         openInNewTab={openInNewTab}
                         motionMode={motionMode}
-                        dropEffectStyle={dropEffectStyle}
                         soundEffects={soundEffects}
                         hoverPreviews={hoverPreviews}
                         gridTemplateClass={gridTemplateClass}
@@ -311,7 +302,7 @@ export function DetailsCollectionSection({
                 {showPriceColumn && totalText && (
                   <div
                     className={cn(
-                      'grid items-center gap-3.5 border-t border-border/80 bg-panel/45 px-3 py-1.5 font-mono text-[11px]',
+                      'grid items-center gap-3.5 border-t border-hairline bg-panel/45 px-3 py-1.5 font-mono text-[11px]',
                       gridTemplateClass,
                     )}
                   >
@@ -350,7 +341,7 @@ export function DetailsCollectionSection({
               </div>
             )}
           </div>
-        )}
+        </SmoothCollapse>
       </div>
     </section>
   );

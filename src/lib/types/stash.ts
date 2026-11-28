@@ -175,6 +175,8 @@ export interface StashSettings {
   autoTagOnSave: boolean;
   motionMode: MotionMode;
   dropEffectStyle: DropEffectStyle;
+  fxDropDust: boolean;
+  fxDropFissures: boolean;
   fxDeskJolt: boolean;
   fxDragTilt: boolean;
   fxHoverSheen: boolean;
@@ -276,12 +278,14 @@ export const DEFAULT_SETTINGS: StashSettings = {
   includePinnedInSessions: false,
   closeTabOnQuickStash: false,
   openTabsSidebarVisible: true,
-  quickLaunchVisible: true,
-  tagBarVisible: true,
+  quickLaunchVisible: false,
+  tagBarVisible: false,
   enableOnDeviceAi: true,
   autoTagOnSave: true,
   motionMode: 'tactile',
   dropEffectStyle: 'dust',
+  fxDropDust: true,
+  fxDropFissures: true,
   fxDeskJolt: true,
   fxDragTilt: true,
   fxHoverSheen: true,

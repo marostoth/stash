@@ -1,3 +1,57 @@
+const SAFE_RASTER_DATA_IMAGE_RE =
+  /^data:image\/(png|jpeg|jpg|webp|gif|x-icon|vnd\.microsoft\.icon);base64,[A-Za-z0-9+/=]+$/i;
+const MAX_DATA_FAVICON_LENGTH = 32_768;
+
+/**
+ * Returns true strictly for valid `http:` or `https:` URLs with a non-empty host.
+ */
+export function isSafeHttpUrl(raw: string | undefined): boolean {
+  if (!raw) return false;
+  const trimmed = raw.trim();
+  if (!trimmed) return false;
+  try {
+    const parsed = new URL(trimmed);
+    return (
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+      Boolean(parsed.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Returns a trimmed `http:` / `https:` URL safe for `<a href>` and navigation
+ * sinks, or `undefined` if the URL uses an unsafe/malformed scheme (e.g.
+ * `javascript:`, `data:`, `file:`, `chrome:`).
+ */
+export function toSafeHref(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const trimmed = raw.trim();
+  return isSafeHttpUrl(trimmed) ? trimmed : undefined;
+}
+
+/**
+ * Restricts favicon URLs to valid `http:` / `https:` URLs or bounded raster
+ * `data:image/(png|jpeg|webp|gif|x-icon);base64,` URIs (blocking SVG scripts,
+ * `javascript:`, `chrome-extension:`, `chrome:`, and `file:` schemes).
+ */
+export function sanitizeFaviconUrl(
+  raw: string | undefined,
+): string | undefined {
+  if (!raw) return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (isSafeHttpUrl(trimmed)) return trimmed;
+  if (
+    trimmed.length <= MAX_DATA_FAVICON_LENGTH &&
+    SAFE_RASTER_DATA_IMAGE_RE.test(trimmed)
+  ) {
+    return trimmed;
+  }
+  return undefined;
+}
+
 /**
  * Ensures a user-entered URL has an explicit scheme (defaults to https://).
  * Returns null if the resulting string is not a valid http(s) URL.

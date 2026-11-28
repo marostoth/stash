@@ -181,6 +181,7 @@ export function SidePanelApp() {
   return (
     <MotionConfig
       reducedMotion={resolveReducedMotionPolicy(settings.motionMode)}
+      transition={settings.motionMode === 'off' ? { duration: 0 } : undefined}
     >
       <div className="stash-backdrop flex h-screen flex-col overflow-hidden text-fg">
         {/* Compact Header */}
@@ -322,7 +323,7 @@ export function SidePanelApp() {
             </button>
           </div>
 
-          {settings.tagBarVisible !== false && topTags.length > 0 && (
+          {settings.tagBarVisible === true && topTags.length > 0 && (
             <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
               {topTags.map(({ tag }) => {
                 const active = selectedTag === tag;

@@ -102,9 +102,10 @@ describe('stashRepo', () => {
       title: 'Duplicate WXT',
     });
     expect(dupTrailing.ok).toBe(false);
-    if (!dupTrailing.ok) {
-      expect(dupTrailing.reason).toBe('duplicate');
+    if (!dupTrailing.ok && dupTrailing.reason === 'duplicate') {
       expect(dupTrailing.existingLink.id).toBe(first.link.id);
+    } else {
+      throw new Error('Expected duplicate result');
     }
 
     // Same URL in a DIFFERENT collection must succeed

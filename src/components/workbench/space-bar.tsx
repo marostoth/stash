@@ -1,18 +1,9 @@
 import { useDroppable } from '@dnd-kit/react';
-import {
-  Check,
-  ChevronsDownUp,
-  ChevronsUpDown,
-  EyeOff,
-  Layers,
-  LayoutGrid,
-  List,
-  Plus,
-  SlidersHorizontal,
-} from 'lucide-react';
+import { Layers, Plus, SlidersHorizontal } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { SpaceBarControls } from '@/components/workbench/space-bar-controls';
 import {
   CreateSpacePopover,
   EditSpacePopover,
@@ -114,13 +105,10 @@ function DroppableSpacePill({
         className={cn(
           'group relative inline-flex shrink-0 items-center rounded-control border transition-colors',
           isDropTarget
-            ? cn(
-                'border-accent bg-accent/20 text-fg ring-2 ring-accent/65',
-                tactile && 'stash-dropzone-breathe',
-              )
+            ? 'border-accent/65 bg-elevated text-fg ring-1 ring-accent/40'
             : isActive
-              ? 'border-accent/55 bg-accent/12 text-fg'
-              : 'border-transparent text-fg-muted hover:border-border hover:bg-card/60 hover:text-fg',
+              ? 'border-hairline bg-elevated text-fg'
+              : 'border-transparent text-fg-muted hover:border-hairline hover:bg-card/60 hover:text-fg',
         )}
       >
         <button
@@ -140,7 +128,11 @@ function DroppableSpacePill({
           <SpaceIcon
             className={cn(
               'h-3.5 w-3.5 shrink-0',
-              isActive || isDropTarget ? 'text-accent' : 'text-fg-muted',
+              isDropTarget
+                ? 'text-accent'
+                : isActive
+                  ? 'text-fg'
+                  : 'text-fg-muted',
             )}
             aria-hidden="true"
           />
@@ -156,7 +148,7 @@ function DroppableSpacePill({
             onClick={onToggleEdit}
             aria-label={`Edit ${space.name} space`}
             title="Rename, icon, density, or delete Space"
-            className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded text-fg-muted transition-colors hover:bg-panel hover:text-accent cursor-pointer"
+            className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded text-fg-muted transition-colors hover:bg-panel hover:text-fg cursor-pointer"
           >
             <SlidersHorizontal className="h-3 w-3" />
           </button>
@@ -165,7 +157,7 @@ function DroppableSpacePill({
         {isActive && (
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-2 -bottom-[7px] h-[2px] rounded-full bg-accent"
+            className="pointer-events-none absolute inset-x-2.5 -bottom-[8px] h-[2px] rounded-full bg-accent/90"
           />
         )}
       </motion.div>
@@ -226,15 +218,17 @@ export function SpaceBar({
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
         setCreating(false);
         setEditingSpaceId(null);
       }
     };
     window.addEventListener('mousedown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, { capture: true });
     return () => {
       window.removeEventListener('mousedown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, { capture: true });
     };
   }, [creating, editingSpaceId]);
 
@@ -280,23 +274,19 @@ export function SpaceBar({
     );
   };
 
-  const collapseActionLabel = allSpaceCollectionsCollapsed
-    ? 'Expand all'
-    : 'Collapse all';
-
   return (
     <div
       ref={popoverRef}
-      className="relative z-20 border-b border-border/70 bg-panel/75 backdrop-blur-xs"
+      className="sticky top-0 z-20 border-b border-hairline bg-panel/85 backdrop-blur-sm"
     >
-      <div className="px-5 sm:px-7">
+      <div className="px-5 sm:px-8">
         <div
           className={cn(
-            'mx-auto flex items-center justify-between gap-2 py-2',
+            'mx-auto flex items-center justify-between gap-2',
             wideBoard ? 'max-w-[1720px]' : 'max-w-[1320px]',
           )}
         >
-          <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
+          <div className="flex min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden py-2.5">
             {spaces.map((space, idx) => (
               <DroppableSpacePill
                 key={space.id}
@@ -325,8 +315,8 @@ export function SpaceBar({
               className={cn(
                 'ml-1 inline-flex h-7 shrink-0 items-center gap-1 rounded-control border border-dashed px-2 text-[11px] font-medium transition-colors cursor-pointer',
                 creating
-                  ? 'border-accent/60 bg-accent/10 text-accent'
-                  : 'border-border text-fg-muted hover:border-accent/50 hover:text-fg',
+                  ? 'border-border bg-elevated text-fg'
+                  : 'border-hairline text-fg-muted hover:border-border hover:text-fg',
               )}
             >
               <Plus className="h-3 w-3" />
@@ -334,128 +324,18 @@ export function SpaceBar({
             </button>
           </div>
 
-          {/* Per-Space View & Group Controls */}
-          <div className="flex shrink-0 items-center gap-1.5">
-            {activeSpaceCollections.length >= 2 && (
-              <button
-                type="button"
-                onClick={handleToggleAllCollapsed}
-                title={`${collapseActionLabel} collections in this Space`}
-                aria-label={`${collapseActionLabel} collections`}
-                className="inline-flex h-6 items-center gap-1 rounded-control border border-border bg-canvas/80 px-2 font-mono text-[10px] font-medium text-fg-muted transition-colors hover:border-accent/45 hover:text-fg cursor-pointer"
-              >
-                {allSpaceCollectionsCollapsed ? (
-                  <ChevronsUpDown className="h-3 w-3 text-accent" />
-                ) : (
-                  <ChevronsDownUp className="h-3 w-3" />
-                )}
-                <span className="hidden md:inline">{collapseActionLabel}</span>
-              </button>
-            )}
-
-            {checkedCountInSpace > 0 && (
-              <button
-                type="button"
-                aria-pressed={hideChecked}
-                onClick={handleToggleHideChecked}
-                title={
-                  hideChecked
-                    ? `Showing unchecked items only (${checkedCountInSpace} hidden) — click to show all`
-                    : `Hide ${checkedCountInSpace} checked item${checkedCountInSpace === 1 ? '' : 's'}`
-                }
-                className={cn(
-                  'inline-flex h-6 items-center gap-1 rounded-control border px-2 font-mono text-[10px] font-medium transition-colors cursor-pointer',
-                  hideChecked
-                    ? 'border-accent/60 bg-accent/15 text-accent'
-                    : 'border-border bg-canvas/80 text-fg-muted hover:border-accent/45 hover:text-fg',
-                )}
-              >
-                {hideChecked ? (
-                  <EyeOff className="h-3 w-3" />
-                ) : (
-                  <Check className="h-3 w-3 text-accent" />
-                )}
-                <span>
-                  {hideChecked
-                    ? `${checkedCountInSpace} hidden`
-                    : `Hide ${checkedCountInSpace} done`}
-                </span>
-              </button>
-            )}
-
-            {activeViewMode === 'details' && (
-              <fieldset
-                aria-label="Details grouping"
-                className="inline-flex items-center rounded-control border border-border bg-canvas/80 p-0.5"
-              >
-                <span className="hidden px-1.5 font-mono text-[10px] text-fg-muted sm:inline">
-                  Group
-                </span>
-                <button
-                  type="button"
-                  aria-pressed={activeGroupBy === 'collection'}
-                  onClick={() => handleSetGroupBy('collection')}
-                  className={cn(
-                    'rounded-[calc(var(--stash-radius-control)-2px)] px-2 py-0.5 text-[11px] font-medium transition-colors cursor-pointer',
-                    activeGroupBy === 'collection'
-                      ? 'bg-accent text-accent-fg'
-                      : 'text-fg-muted hover:text-fg',
-                  )}
-                >
-                  Collection
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={activeGroupBy === 'store'}
-                  onClick={() => handleSetGroupBy('store')}
-                  className={cn(
-                    'rounded-[calc(var(--stash-radius-control)-2px)] px-2 py-0.5 text-[11px] font-medium transition-colors cursor-pointer',
-                    activeGroupBy === 'store'
-                      ? 'bg-accent text-accent-fg'
-                      : 'text-fg-muted hover:text-fg',
-                  )}
-                >
-                  Store
-                </button>
-              </fieldset>
-            )}
-
-            <fieldset
-              aria-label="Space view mode"
-              className="inline-flex items-center rounded-control border border-border bg-canvas/80 p-0.5"
-            >
-              <button
-                type="button"
-                aria-pressed={activeViewMode === 'grid'}
-                onClick={() => handleSetViewMode('grid')}
-                title="Grid card view"
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-[calc(var(--stash-radius-control)-2px)] px-2 py-0.5 text-[11px] font-medium transition-colors cursor-pointer',
-                  activeViewMode === 'grid'
-                    ? 'bg-accent text-accent-fg'
-                    : 'text-fg-muted hover:text-fg',
-                )}
-              >
-                <LayoutGrid className="h-3 w-3" />
-                <span className="hidden sm:inline">Grid</span>
-              </button>
-              <button
-                type="button"
-                aria-pressed={activeViewMode === 'details'}
-                onClick={() => handleSetViewMode('details')}
-                title="Details table view"
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-[calc(var(--stash-radius-control)-2px)] px-2 py-0.5 text-[11px] font-medium transition-colors cursor-pointer',
-                  activeViewMode === 'details'
-                    ? 'bg-accent text-accent-fg'
-                    : 'text-fg-muted hover:text-fg',
-                )}
-              >
-                <List className="h-3 w-3" />
-                <span className="hidden sm:inline">Details</span>
-              </button>
-            </fieldset>
-          </div>
+          <SpaceBarControls
+            activeViewMode={activeViewMode}
+            activeGroupBy={activeGroupBy}
+            hideChecked={hideChecked}
+            checkedCountInSpace={checkedCountInSpace}
+            collectionCount={activeSpaceCollections.length}
+            allCollapsed={allSpaceCollectionsCollapsed}
+            onSetViewMode={handleSetViewMode}
+            onSetGroupBy={handleSetGroupBy}
+            onToggleHideChecked={handleToggleHideChecked}
+            onToggleAllCollapsed={handleToggleAllCollapsed}
+          />
         </div>
       </div>
 

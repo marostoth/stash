@@ -106,6 +106,21 @@ describe('custom audio pack validation & storage', () => {
           stop: vi.fn(),
         };
       }
+      createBuffer(_channels: number, length: number) {
+        const data = new Float32Array(length);
+        return { getChannelData: () => data };
+      }
+      createBiquadFilter() {
+        return {
+          type: 'bandpass',
+          frequency: {
+            setValueAtTime: vi.fn(),
+            exponentialRampToValueAtTime: vi.fn(),
+          },
+          Q: { setValueAtTime: vi.fn() },
+          connect: vi.fn(),
+        };
+      }
       createBufferSource() {
         return {
           buffer: null,
@@ -137,8 +152,77 @@ describe('custom audio pack validation & storage', () => {
     expect(bufferStartSpy).toHaveBeenCalledTimes(1);
     expect(oscStartSpy).not.toHaveBeenCalled();
 
-    // Pickup is unfilled -> falls back cleanly to built-in pack oscillator
+    // Pickup is unfilled -> falls back cleanly to built-in pack dry micro-transients
     playPickup(true);
-    expect(oscStartSpy).toHaveBeenCalledTimes(1);
+    expect(bufferStartSpy.mock.calls.length).toBeGreaterThan(1);
+    expect(oscStartSpy).not.toHaveBeenCalled();
+  });
+
+  it('deduplicates concurrent cold decodes and skips playing into an already-choked voice gate', async () => {
+    let resolveDecode!: (buf: AudioBuffer) => void;
+    const decodePromise = new Promise<AudioBuffer>((resolve) => {
+      resolveDecode = resolve;
+    });
+    const decodeSpy = vi.fn(() => decodePromise);
+    const bufferStartSpy = vi.fn();
+
+    class MockAudioCtx {
+      state: AudioContextState = 'running';
+      currentTime = 1.0;
+      sampleRate = 44_100;
+      destination = {};
+      resume = vi.fn().mockResolvedValue(undefined);
+      decodeAudioData = decodeSpy;
+      createGain() {
+        return {
+          gain: {
+            value: 1,
+            cancelScheduledValues: vi.fn(),
+            setValueAtTime: vi.fn(),
+            linearRampToValueAtTime: vi.fn(),
+            exponentialRampToValueAtTime: vi.fn(),
+          },
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+        };
+      }
+      createBufferSource() {
+        return {
+          buffer: null,
+          playbackRate: { setValueAtTime: vi.fn() },
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+          onended: null as (() => void) | null,
+          start: bufferStartSpy,
+          stop: vi.fn(),
+        };
+      }
+    }
+
+    globalWithAudio.AudioContext = MockAudioCtx;
+    setCustomSoundsEnabled(true);
+    setCustomSfxClips({
+      drop: {
+        name: 'slow-boom.wav',
+        mimeType: 'audio/wav',
+        sizeBytes: 2048,
+        dataUrl: 'data:audio/wav;base64,UklGRg==',
+        updatedAt: '2026-11-26T00:00:00.000Z',
+      },
+    });
+
+    // 3 rapid drops on a cold clip: drop policy maxConcurrent=2 chokes voice #1 immediately,
+    // and all 3 triggers must share ONE deduplicated decodeAudioData call.
+    playDrop(true, 'arcade');
+    playDrop(true, 'arcade');
+    playDrop(true, 'arcade');
+    expect(decodeSpy).toHaveBeenCalledTimes(1);
+
+    resolveDecode({ duration: 0.4 } as unknown as AudioBuffer);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Only the 2 un-choked voices play; the choked 1st voice is skipped
+    expect(bufferStartSpy).toHaveBeenCalledTimes(2);
   });
 });

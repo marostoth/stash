@@ -1,3 +1,4 @@
+import { storage } from '#imports';
 import type { ImportedBookmarkFolder } from '@/lib/import-export/bookmarks-html';
 import {
   mergeBundleIntoSnapshot,
@@ -16,12 +17,6 @@ import type {
   SaveSessionResult,
   StashSnapshot,
 } from '@/lib/storage/repo-types';
-import { pruneEmptyAutoInboxesInStorage } from '@/lib/storage/spaces-ops';
-import {
-  recordDeletedCollectionInTrash,
-  recordDeletedLinksInTrash,
-  removeRestoredLinksFromTrash,
-} from '@/lib/storage/trash-ops';
 import {
   formatSessionName,
   type OpenTabInfo,
@@ -36,8 +31,20 @@ import {
   TAB_GROUP_COLORS,
   type ThemeDefinition,
 } from '@/lib/types/stash';
-import { insertLinkAtIndexInList, sortByOrder } from '@/lib/utils/ordering';
-import { extractDomain, normalizeUrlForComparison } from '@/lib/utils/url';
+import { sortByOrder } from '@/lib/utils/ordering';
+import {
+  extractDomain,
+  normalizeUrlForComparison,
+  sanitizeFaviconUrl,
+} from '@/lib/utils/url';
+
+export {
+  deleteCollectionInStorage,
+  deleteLinkInStorage,
+  deleteLinksInStorage,
+  restoreLinkInStorage,
+  restoreLinksInStorage,
+} from '@/lib/storage/delete-undo-ops';
 
 export interface BookmarkImportSummary {
   collectionsCreated: number;
@@ -56,13 +63,13 @@ export async function restoreBundleInStorage(
       ? prepareReplaceSnapshot(bundle)
       : mergeBundleIntoSnapshot(current, bundle);
 
-  await Promise.all([
-    spacesStorage.setValue(snapshot.spaces),
-    collectionsStorage.setValue(snapshot.collections),
-    linksStorage.setValue(snapshot.links),
-    rulesStorage.setValue(snapshot.rules),
-    settingsStorage.setValue(snapshot.settings),
-    customThemesStorage.setValue(snapshot.customThemes),
+  await storage.setItems([
+    { item: spacesStorage, value: snapshot.spaces },
+    { item: collectionsStorage, value: snapshot.collections },
+    { item: linksStorage, value: snapshot.links },
+    { item: rulesStorage, value: snapshot.rules },
+    { item: settingsStorage, value: snapshot.settings },
+    { item: customThemesStorage, value: snapshot.customThemes },
   ]);
 
   return stats;
@@ -145,7 +152,7 @@ export async function importBookmarkFoldersInStorage(
         title: item.title,
         note: '',
         tags: [],
-        faviconUrl: item.faviconUrl,
+        faviconUrl: sanitizeFaviconUrl(item.faviconUrl),
         order,
         createdAt: now,
         updatedAt: now,
@@ -154,9 +161,9 @@ export async function importBookmarkFoldersInStorage(
     }
   }
 
-  await Promise.all([
-    collectionsStorage.setValue(collections),
-    linksStorage.setValue(nextLinks),
+  await storage.setItems([
+    { item: collectionsStorage, value: collections },
+    { item: linksStorage, value: nextLinks },
   ]);
 
   return {
@@ -235,15 +242,15 @@ export async function saveSessionCollectionInStorage(
     title: tab.title || extractDomain(tab.url),
     note: '',
     tags: [],
-    faviconUrl: tab.favIconUrl,
+    faviconUrl: sanitizeFaviconUrl(tab.favIconUrl),
     order: idx,
     createdAt: timestamp,
     updatedAt: timestamp,
   }));
 
-  await Promise.all([
-    collectionsStorage.setValue(shiftedCollections),
-    linksStorage.setValue([...existingLinks, ...sessionLinks]),
+  await storage.setItems([
+    { item: collectionsStorage, value: shiftedCollections },
+    { item: linksStorage, value: [...existingLinks, ...sessionLinks] },
   ]);
 
   return {
@@ -252,194 +259,4 @@ export async function saveSessionCollectionInStorage(
     savedTabs,
     closableTabs,
   };
-}
-
-export async function deleteCollectionInStorage(id: string): Promise<boolean> {
-  const [existingCollections, existingLinks] = await Promise.all([
-    collectionsStorage.getValue(),
-    linksStorage.getValue(),
-  ]);
-  const targetCollection = existingCollections.find((item) => item.id === id);
-  if (!targetCollection) return false;
-
-  const remaining = existingCollections.filter((item) => item.id !== id);
-  const reindexed = sortByOrder(remaining).map((item, index) => ({
-    ...item,
-    order: index,
-  }));
-  const removedLinks = existingLinks.filter((link) => link.collectionId === id);
-  const remainingLinks = existingLinks.filter(
-    (link) => link.collectionId !== id,
-  );
-
-  await Promise.all([
-    collectionsStorage.setValue(reindexed),
-    linksStorage.setValue(remainingLinks),
-    recordDeletedCollectionInTrash(targetCollection, removedLinks),
-  ]);
-  return true;
-}
-
-export async function deleteLinkInStorage(id: string): Promise<boolean> {
-  const [collections, existing] = await Promise.all([
-    collectionsStorage.getValue(),
-    linksStorage.getValue(),
-  ]);
-  const target = existing.find((item) => item.id === id);
-  if (!target) return false;
-
-  const remaining = existing.filter((item) => item.id !== id);
-  const sameColSorted = sortByOrder(
-    remaining.filter((item) => item.collectionId === target.collectionId),
-  );
-  const orderById = new Map(sameColSorted.map((item, idx) => [item.id, idx]));
-  const finalLinks = remaining.map((item) => {
-    const nextOrder = orderById.get(item.id);
-    return nextOrder !== undefined ? { ...item, order: nextOrder } : item;
-  });
-  const colNames = new Map(collections.map((c) => [c.id, c.name]));
-
-  await Promise.all([
-    linksStorage.setValue(finalLinks),
-    recordDeletedLinksInTrash([target], colNames),
-  ]);
-  await pruneEmptyAutoInboxesInStorage([target.collectionId], finalLinks);
-  return true;
-}
-
-/**
- * Restores a previously deleted LinkItem with its exact ID, metadata, tags,
- * tagsLocked state, and original collection order position (for 5-second Undo).
- */
-export async function restoreLinkInStorage(
-  link: LinkItem,
-): Promise<LinkItem | null> {
-  const [collections, existingLinks] = await Promise.all([
-    collectionsStorage.getValue(),
-    linksStorage.getValue(),
-  ]);
-
-  if (!collections.some((c) => c.id === link.collectionId)) {
-    return null;
-  }
-
-  const normalized = normalizeUrlForComparison(link.url);
-  const duplicate = existingLinks.find(
-    (item) =>
-      item.id === link.id ||
-      (item.collectionId === link.collectionId &&
-        normalizeUrlForComparison(item.url) === normalized),
-  );
-  if (duplicate) return null;
-
-  const nextLinks = insertLinkAtIndexInList(existingLinks, link, link.order);
-  await Promise.all([
-    linksStorage.setValue(nextLinks),
-    removeRestoredLinksFromTrash([link.id]),
-  ]);
-  return nextLinks.find((item) => item.id === link.id) ?? link;
-}
-
-/**
- * Batch-deletes multiple links in a single storage write, re-indexing orders
- * cleanly per affected collection and returning the removed snapshots for Undo.
- */
-export async function deleteLinksInStorage(
-  ids: readonly string[],
-): Promise<LinkItem[]> {
-  if (ids.length === 0) return [];
-  const idSet = new Set(ids);
-  const [collections, existing] = await Promise.all([
-    collectionsStorage.getValue(),
-    linksStorage.getValue(),
-  ]);
-
-  const removed: LinkItem[] = [];
-  const remaining: LinkItem[] = [];
-  const affectedCollections = new Set<string>();
-
-  for (const item of existing) {
-    if (idSet.has(item.id)) {
-      removed.push(item);
-      affectedCollections.add(item.collectionId);
-    } else {
-      remaining.push(item);
-    }
-  }
-
-  if (removed.length === 0) return [];
-
-  const orderById = new Map<string, number>();
-  for (const colId of affectedCollections) {
-    const colSorted = sortByOrder(
-      remaining.filter((item) => item.collectionId === colId),
-    );
-    for (let idx = 0; idx < colSorted.length; idx++) {
-      const link = colSorted[idx];
-      if (link) orderById.set(link.id, idx);
-    }
-  }
-
-  const finalLinks = remaining.map((item) => {
-    const nextOrder = orderById.get(item.id);
-    return nextOrder !== undefined ? { ...item, order: nextOrder } : item;
-  });
-  const colNames = new Map(collections.map((c) => [c.id, c.name]));
-
-  await Promise.all([
-    linksStorage.setValue(finalLinks),
-    recordDeletedLinksInTrash(sortByOrder(removed), colNames),
-  ]);
-  await pruneEmptyAutoInboxesInStorage(
-    Array.from(affectedCollections),
-    finalLinks,
-  );
-  return sortByOrder(removed);
-}
-
-/**
- * Restores a batch of previously deleted LinkItems in a single storage write,
- * preserving exact IDs, collections, notes, tags, tagsLocked, and original order.
- */
-export async function restoreLinksInStorage(
-  linksToRestore: readonly LinkItem[],
-): Promise<LinkItem[]> {
-  if (linksToRestore.length === 0) return [];
-
-  const [collections, existingLinks] = await Promise.all([
-    collectionsStorage.getValue(),
-    linksStorage.getValue(),
-  ]);
-  const validCollectionIds = new Set(collections.map((c) => c.id));
-
-  let working = [...existingLinks];
-  const restoredIds = new Set<string>();
-
-  // Restore in ascending original order per collection so indices land accurately
-  const orderedToRestore = [...linksToRestore].sort(
-    (a, b) => a.order - b.order,
-  );
-
-  for (const link of orderedToRestore) {
-    if (!validCollectionIds.has(link.collectionId)) continue;
-    const normalized = normalizeUrlForComparison(link.url);
-    const duplicate = working.find(
-      (item) =>
-        item.id === link.id ||
-        (item.collectionId === link.collectionId &&
-          normalizeUrlForComparison(item.url) === normalized),
-    );
-    if (duplicate) continue;
-
-    working = insertLinkAtIndexInList(working, link, link.order);
-    restoredIds.add(link.id);
-  }
-
-  if (restoredIds.size === 0) return [];
-
-  await Promise.all([
-    linksStorage.setValue(working),
-    removeRestoredLinksFromTrash(Array.from(restoredIds)),
-  ]);
-  return working.filter((item) => restoredIds.has(item.id));
 }

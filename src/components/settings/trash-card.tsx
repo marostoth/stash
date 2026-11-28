@@ -1,12 +1,15 @@
 import { Folder, Link2, RotateCcw, Trash2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { SettingsSectionCard } from '@/components/settings/settings-section-card';
 import { Button } from '@/components/ui/button';
 import { stashRepo } from '@/lib/storage/repo';
 import { TRASH_RETENTION_DAYS } from '@/lib/storage/trash-ops';
 import type { TrashEntry } from '@/lib/types/stash';
+import { cn } from '@/lib/utils/cn';
 import { extractDomain } from '@/lib/utils/url';
+
+const EMPTY_ARM_DURATION_MS = 3000;
 
 function formatRelativeAge(iso: string): string {
   const diffMs = Math.max(0, Date.now() - Date.parse(iso));
@@ -22,6 +25,17 @@ function formatRelativeAge(iso: string): string {
 export function TrashCard() {
   const [entries, setEntries] = useState<TrashEntry[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [emptyArmed, setEmptyArmed] = useState(false);
+  const armTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emptyWrapperRef = useRef<HTMLSpanElement | null>(null);
+
+  const disarmEmpty = useCallback(() => {
+    if (armTimerRef.current !== null) {
+      clearTimeout(armTimerRef.current);
+      armTimerRef.current = null;
+    }
+    setEmptyArmed(false);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -37,7 +51,47 @@ export function TrashCard() {
     };
   }, []);
 
+  useEffect(() => {
+    if (entries.length === 0 && emptyArmed) disarmEmpty();
+  }, [entries.length, emptyArmed, disarmEmpty]);
+
+  useEffect(() => {
+    return () => {
+      if (armTimerRef.current !== null) clearTimeout(armTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!emptyArmed) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        disarmEmpty();
+      }
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        !emptyWrapperRef.current?.contains(target)
+      ) {
+        disarmEmpty();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true);
+      document.removeEventListener('pointerdown', onPointerDown);
+    };
+  }, [emptyArmed, disarmEmpty]);
+
+  const anyBusy = busyId !== null;
+
   const handleRestore = async (entry: TrashEntry) => {
+    if (anyBusy) return;
+    disarmEmpty();
     setBusyId(entry.id);
     try {
       const res = await stashRepo.restoreTrashEntry(entry.id);
@@ -57,6 +111,8 @@ export function TrashCard() {
   };
 
   const handlePermanentDelete = async (entryId: string) => {
+    if (anyBusy) return;
+    disarmEmpty();
     setBusyId(entryId);
     try {
       await stashRepo.deleteTrashEntry(entryId);
@@ -66,8 +122,25 @@ export function TrashCard() {
   };
 
   const handleEmptyTrash = async () => {
-    await stashRepo.emptyTrash();
-    toast.info('Emptied Recently Deleted');
+    if (anyBusy || entries.length === 0) return;
+    if (!emptyArmed) {
+      setEmptyArmed(true);
+      if (armTimerRef.current !== null) clearTimeout(armTimerRef.current);
+      armTimerRef.current = setTimeout(() => {
+        armTimerRef.current = null;
+        setEmptyArmed(false);
+      }, EMPTY_ARM_DURATION_MS);
+      return;
+    }
+
+    disarmEmpty();
+    setBusyId('__empty__');
+    try {
+      await stashRepo.emptyTrash();
+      toast.info('Emptied Recently Deleted');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
@@ -81,15 +154,27 @@ export function TrashCard() {
       }}
       headerAction={
         entries.length > 0 ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => void handleEmptyTrash()}
-            className="h-7 gap-1 px-2 text-[11px] text-danger hover:bg-danger/10 hover:text-danger"
-          >
-            <Trash2 className="h-3 w-3" />
-            Empty Trash
-          </Button>
+          <span ref={emptyWrapperRef}>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={anyBusy}
+              onClick={() => void handleEmptyTrash()}
+              onBlur={() => {
+                if (emptyArmed) disarmEmpty();
+              }}
+              className={cn(
+                'h-7 gap-1 px-2 text-[11px] text-danger hover:bg-danger/10 hover:text-danger',
+                emptyArmed &&
+                  'border border-danger/60 bg-danger/15 font-medium',
+              )}
+            >
+              <Trash2 className="h-3 w-3" />
+              {emptyArmed
+                ? `Confirm Empty (${entries.length})?`
+                : 'Empty Trash'}
+            </Button>
+          </span>
         ) : null
       }
     >
@@ -98,7 +183,6 @@ export function TrashCard() {
       ) : (
         <div className="max-h-64 divide-y divide-border/60 overflow-y-auto rounded-control border border-border/80 bg-panel/45">
           {entries.map((entry) => {
-            const busy = busyId === entry.id;
             const title =
               entry.kind === 'collection'
                 ? entry.collection.name
@@ -136,7 +220,7 @@ export function TrashCard() {
                     type="button"
                     variant="secondary"
                     size="sm"
-                    disabled={busy}
+                    disabled={anyBusy}
                     onClick={() => void handleRestore(entry)}
                     className="h-7 gap-1 px-2 text-[11px]"
                   >
@@ -147,7 +231,7 @@ export function TrashCard() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    disabled={busy}
+                    disabled={anyBusy}
                     onClick={() => void handlePermanentDelete(entry.id)}
                     aria-label={`Permanently delete ${title}`}
                     title="Delete permanently"

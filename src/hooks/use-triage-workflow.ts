@@ -122,7 +122,12 @@ export function useTriageWorkflow(
 
   useEffect(() => {
     if (!triageCollectionId || !sessionCollection) {
+      cancelAnalysisRef.current = true;
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
       analyzedCollectionIdRef.current = null;
+      setAnalyzing(false);
+      setAnalyzeProgress(null);
       setRows([]);
       setCustomCategories([]);
       setEditingCustomRowId(null);
@@ -166,6 +171,7 @@ export function useTriageWorkflow(
       let borrowedWarmSession = false;
       let triedCreateNano = false;
 
+      let keepReadyJob = false;
       try {
         for (let i = 0; i < sessionLinks.length; i++) {
           const link = sessionLinks[i];
@@ -238,6 +244,26 @@ export function useTriageWorkflow(
             title: link.title,
           });
         }
+
+        if (!cancelAnalysisRef.current && !controller.signal.aborted) {
+          setRows(nextRows);
+          if (!openRef.current) {
+            keepReadyJob = true;
+            useBackgroundJobsStore.getState().upsertJob({
+              id: 'triage',
+              title: 'Auto-Categorize ready',
+              detail: `${nextRows.length} ${nextRows.length === 1 ? 'link' : 'links'} analyzed · Click to review`,
+              status: 'ready',
+              reopenLabel: 'Review',
+              onReopen: reopenTriage,
+              onCancel: clearTriage,
+            });
+          }
+        }
+      } catch {
+        if (!cancelAnalysisRef.current && !controller.signal.aborted) {
+          toast.error('Auto-Categorize failed. Please try again.');
+        }
       } finally {
         if (borrowedWarmSession) {
           releaseWarmNanoSession(nanoSession);
@@ -247,31 +273,11 @@ export function useTriageWorkflow(
         if (abortControllerRef.current === controller) {
           abortControllerRef.current = null;
         }
-      }
-
-      if (cancelAnalysisRef.current || controller.signal.aborted) {
         setAnalyzing(false);
         setAnalyzeProgress(null);
-        useBackgroundJobsStore.getState().removeJob('triage');
-        return;
-      }
-
-      setRows(nextRows);
-      setAnalyzing(false);
-      setAnalyzeProgress(null);
-
-      if (!openRef.current) {
-        useBackgroundJobsStore.getState().upsertJob({
-          id: 'triage',
-          title: 'Auto-Categorize ready',
-          detail: `${nextRows.length} ${nextRows.length === 1 ? 'link' : 'links'} analyzed · Click to review`,
-          status: 'ready',
-          reopenLabel: 'Review',
-          onReopen: reopenTriage,
-          onCancel: clearTriage,
-        });
-      } else {
-        useBackgroundJobsStore.getState().removeJob('triage');
+        if (!keepReadyJob) {
+          useBackgroundJobsStore.getState().removeJob('triage');
+        }
       }
     };
 

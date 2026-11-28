@@ -22,6 +22,7 @@ import {
   ProductFieldsSection,
   type ProductFormDraft,
 } from '@/components/workbench/product-fields-section';
+import { getPreferredScrollBehavior } from '@/hooks/use-workbench-shortcuts';
 import { playDrop, playError } from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
 import { triggerAutoTagSingleLink } from '@/lib/tagging/trigger-auto-tag';
@@ -111,7 +112,10 @@ export function QuickEditModal({
       const el = document.querySelector<HTMLElement>(
         `[data-link-id="${CSS.escape(existingLinkId)}"]`,
       );
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el?.scrollIntoView({
+        behavior: getPreferredScrollBehavior(),
+        block: 'center',
+      });
     });
   };
 
@@ -182,7 +186,11 @@ export function QuickEditModal({
     });
 
     if (!result.ok) {
-      await revealDuplicateCard(result.existingLink.id, resolvedCollectionId);
+      if (result.reason === 'duplicate') {
+        await revealDuplicateCard(result.existingLink.id, resolvedCollectionId);
+      } else {
+        setUrlError('Please enter a valid http:// or https:// URL.');
+      }
       return;
     }
 

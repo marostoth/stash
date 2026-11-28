@@ -27,7 +27,7 @@ Organize links into color-coded collections across Spaces, save entire browsing 
 KEY FEATURES
 
 • Spaces & Visual Collections
-  Separate Work, Personal, Research, or Shopping into dedicated Spaces (switch instantly with keys 1–9). View boards as responsive card grids or a structured Details table, sort any collection (Manual, A–Z, Newest, Recently Opened, or Price), and slice Spaces with clickable #tag filters.
+  Separate Work, Personal, Research, or Shopping into dedicated Spaces (switch instantly with keys 1–9). Flip between responsive card grids and a structured Details table (grouped by Collection or Retailer) right from the Space bar, sort any collection (Manual, A–Z, Newest, Recently Opened, or Price), and slice Spaces with clickable #tag filters.
 
 • Tab Session Manager & Pocket Side Panel
   Keep open browser tabs in a dockable right-hand rail. Drag any tab straight into a collection, click Save Session or Save & Close to declutter your window, and click Wake Up to reopen a collection into a named Chrome Tab Group. Open the Side Panel (Alt+Shift+S) from any website to search your library, switch Spaces, or quick-stash the active tab.
@@ -42,7 +42,7 @@ KEY FEATURES
   Create fast local domain/keyword auto-categorization rules, or enable optional on-device AI powered by Chrome's built-in LanguageModel API (Gemini Nano) to suggest collections and tags—inference runs strictly locally on your machine.
 
 • 12 Curated Themes, Custom Motion & Sound Packs
-  Choose from 12 built-in light and dark themes with live hover preview, remix skins in Theme Studio, add local wallpapers, tune motion physics (Off, Reduced, Tactile, Arcade), and pick from 5 Web Audio sound packs or upload your own audio clips.
+  Choose from 12 built-in light and dark themes with live hover preview, remix skins in Theme Studio, add local wallpapers, tune motion physics (Off, Reduced, Tactile, Arcade with layered Impact Shockwave & Ground Fracture effects), and pick from 5 Web Audio sound packs or upload your own audio clips.
 
 • Zero Lock-In & Local-First Privacy
   Everything stays in chrome.storage.local (and local IndexedDB for optional visual previews). Export or restore your library anytime via schema-versioned JSON backups or standard Netscape HTML bookmark files, and import directly from Chrome bookmarks or HTML exports.

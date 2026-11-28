@@ -155,7 +155,7 @@ export function ShortcutsPanel({ settingsOpen }: ShortcutsPanelProps) {
                     {tokens.length > 0 ? (
                       <KeyChord tokens={tokens} joiner="+" />
                     ) : (
-                      <span className="rounded-pill border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] text-amber-400">
+                      <span className="rounded-pill border border-warning/40 bg-warning/15 px-2 py-0.5 font-mono text-[10px] text-warning">
                         Unassigned
                       </span>
                     )}

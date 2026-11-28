@@ -89,6 +89,7 @@ interface UiStoreState {
   triageOpen: boolean;
   highlightedLinkId: string | null;
   settledLinkId: string | null;
+  settledSeq: number;
   taggingLinkIds: string[];
   cascadingCollectionIds: string[];
   hoveredPreviewCandidate: PreviewTarget | null;
@@ -162,6 +163,7 @@ export const useUiStore = create<UiStoreState>((set) => ({
   triageOpen: false,
   highlightedLinkId: null,
   settledLinkId: null,
+  settledSeq: 0,
   taggingLinkIds: [],
   cascadingCollectionIds: [],
   hoveredPreviewCandidate: null,
@@ -330,7 +332,10 @@ export const useUiStore = create<UiStoreState>((set) => ({
     if (settleTimer) {
       clearTimeout(settleTimer);
     }
-    set({ settledLinkId: linkId });
+    set((state) => ({
+      settledLinkId: linkId,
+      settledSeq: state.settledSeq + 1,
+    }));
     settleTimer = setTimeout(() => {
       set((state) =>
         state.settledLinkId === linkId ? { settledLinkId: null } : state,

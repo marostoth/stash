@@ -131,7 +131,7 @@ function readExtensionVersion(): string {
   } catch {
     // Fallback outside extension runtime
   }
-  return 'v1.26.0';
+  return 'v1.27.0';
 }
 
 export function SettingsModal({
@@ -183,8 +183,8 @@ export function SettingsModal({
       : nanoStatus === 'downloadable' || nanoStatus === 'downloading'
         ? {
             label: 'Nano Download',
-            dotClass: 'bg-amber-400',
-            pillClass: 'border-amber-500/40 bg-amber-500/10 text-amber-400',
+            dotClass: 'bg-warning',
+            pillClass: 'border-warning/40 bg-warning/10 text-warning',
           }
         : {
             label: 'Nano Off',
@@ -239,23 +239,34 @@ export function SettingsModal({
                         onClick={() => setActiveTab(id)}
                         aria-current={active ? 'page' : undefined}
                         className={cn(
-                          'flex shrink-0 items-center justify-between gap-2 rounded-control px-2.5 py-2 text-left text-[13px] font-medium transition-colors cursor-pointer md:w-full',
+                          'relative flex shrink-0 items-center justify-between gap-2 rounded-control px-2.5 py-2 text-left text-[13px] font-medium transition-colors cursor-pointer md:w-full',
                           active
-                            ? 'bg-accent text-accent-fg'
-                            : 'text-fg-muted hover:bg-card hover:text-fg',
+                            ? 'bg-elevated text-fg'
+                            : 'text-fg-muted hover:bg-card/70 hover:text-fg',
                         )}
                       >
+                        {active && (
+                          <span
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-y-1.5 left-0 hidden w-[2px] rounded-full bg-accent md:block"
+                          />
+                        )}
                         <span className="flex items-center gap-2.5">
-                          <Icon className="h-4 w-4 shrink-0" />
+                          <Icon
+                            className={cn(
+                              'h-4 w-4 shrink-0',
+                              active ? 'text-fg' : 'text-fg-muted',
+                            )}
+                          />
                           <span className="whitespace-nowrap">{label}</span>
                         </span>
                         {badgeCount !== null ? (
                           <span
                             className={cn(
-                              'rounded-pill px-1.5 py-0.25 font-mono text-[10px]',
+                              'rounded-pill border px-1.5 py-0.25 font-mono text-[10px]',
                               active
-                                ? 'bg-black/20 text-accent-fg'
-                                : 'border border-border bg-panel text-fg-muted',
+                                ? 'border-hairline bg-panel text-fg'
+                                : 'border-border bg-panel text-fg-muted',
                             )}
                           >
                             {badgeCount}

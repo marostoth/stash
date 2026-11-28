@@ -5,6 +5,7 @@ import {
   createCooldownGate,
   HOVER_RIFFLE_COOLDOWN_MS,
   PENTATONIC_SEMITONES,
+  resolveComboTier,
   semitonesToMultiplier,
 } from '@/lib/audio/combo';
 import { playHoverRiffle, resetFoleyContextForTests } from '@/lib/audio/foley';
@@ -55,8 +56,28 @@ describe('combo pitch tracker & hover-riffle cooldown', () => {
     // Waiting > 2500ms resets cleanly back to step 0
     const afterGap = tracker.next(t + COMBO_RESET_MS + 1);
     expect(afterGap.step).toBe(0);
+    expect(afterGap.count).toBe(1);
+    expect(afterGap.tier).toBe(1);
     expect(afterGap.semitones).toBe(0);
     expect(afterGap.multiplier).toBe(1);
+  });
+
+  it('escalates combo tiers (1-2x tier 1, 3-4x tier 2, 5x+ tier 3) within the 2500ms window', () => {
+    expect(resolveComboTier(1)).toBe(1);
+    expect(resolveComboTier(2)).toBe(1);
+    expect(resolveComboTier(3)).toBe(2);
+    expect(resolveComboTier(4)).toBe(2);
+    expect(resolveComboTier(5)).toBe(3);
+    expect(resolveComboTier(9)).toBe(3);
+
+    const tracker = createComboTracker();
+    expect(tracker.next(1000).tier).toBe(1);
+    expect(tracker.next(1300).tier).toBe(1);
+    expect(tracker.next(1600).tier).toBe(2);
+    expect(tracker.next(1900).tier).toBe(2);
+    const fifth = tracker.next(2200);
+    expect(fifth.count).toBe(5);
+    expect(fifth.tier).toBe(3);
   });
 
   it('enforces the 45ms hover-riffle cooldown throttle', () => {

@@ -23,7 +23,7 @@ const BADGE_TONE_CLASS: Record<
 > = {
   accent: 'border-accent/40 bg-accent/15 text-accent',
   neutral: 'border-border bg-panel text-fg-muted',
-  warning: 'border-amber-500/40 bg-amber-500/15 text-amber-400',
+  warning: 'border-warning/40 bg-warning/15 text-warning',
 };
 
 /**

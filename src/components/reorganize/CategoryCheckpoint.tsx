@@ -66,16 +66,17 @@ function CategoryIconPickerButton({
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.preventDefault();
         event.stopPropagation();
         setOpen(false);
       }
     };
 
     document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, { capture: true });
     return () => {
       document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keydown', onKeyDown, { capture: true });
     };
   }, [open]);
 

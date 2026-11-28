@@ -7,6 +7,7 @@ import type {
   UpdateLinkResult,
 } from '@/lib/storage/repo-types';
 import { pruneEmptyAutoInboxesInStorage } from '@/lib/storage/spaces-ops';
+import { isStashableUrl } from '@/lib/tabs/session-filter';
 import type { LinkItem, ProductMeta } from '@/lib/types/stash';
 import {
   insertLinkAtIndexInList,
@@ -17,6 +18,7 @@ import {
   extractDomain,
   normalizeTags,
   normalizeUrlForComparison,
+  sanitizeFaviconUrl,
 } from '@/lib/utils/url';
 
 export {
@@ -131,18 +133,22 @@ export async function addLinkInStorage(
   input: AddLinkInput,
   targetIndex?: number,
 ): Promise<AddLinkResult> {
+  const trimmedUrl = input.url.trim();
+  if (!isStashableUrl(trimmedUrl)) {
+    return { ok: false, reason: 'invalid_url' };
+  }
+
   const existing = await linksStorage.getValue();
   const duplicate = findDuplicateLinkInList(
     existing,
     input.collectionId,
-    input.url,
+    trimmedUrl,
   );
   if (duplicate) {
     return { ok: false, reason: 'duplicate', existingLink: duplicate };
   }
 
   const timestamp = nowIso();
-  const trimmedUrl = input.url.trim();
   const product = normalizeProductMeta(input.product);
   const created: LinkItem = {
     id: crypto.randomUUID(),
@@ -156,7 +162,7 @@ export async function addLinkInStorage(
     ...(input.checked === true ? { checked: true } : {}),
     ...(input.pinnedToDock === true ? { pinnedToDock: true } : {}),
     ...(product ? { product } : {}),
-    faviconUrl: input.faviconUrl?.trim() || undefined,
+    faviconUrl: sanitizeFaviconUrl(input.faviconUrl),
     order: 0,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -178,6 +184,9 @@ export async function updateLinkInStorage(
 
   const targetCollectionId = patch.collectionId ?? current.collectionId;
   const targetUrl = patch.url !== undefined ? patch.url.trim() : current.url;
+  if (patch.url !== undefined && !isStashableUrl(targetUrl)) {
+    return { ok: false, reason: 'invalid_url' };
+  }
 
   const duplicate = findDuplicateLinkInList(
     existing,
@@ -251,7 +260,7 @@ export async function updateLinkInStorage(
     product: nextProduct,
     faviconUrl:
       patch.faviconUrl !== undefined
-        ? patch.faviconUrl.trim() || undefined
+        ? sanitizeFaviconUrl(patch.faviconUrl)
         : current.faviconUrl,
     order: nextOrder,
     updatedAt: nowIso(),

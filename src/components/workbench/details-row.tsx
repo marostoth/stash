@@ -3,8 +3,8 @@ import { useSortable } from '@dnd-kit/react/sortable';
 import { Check, GripVertical, Pencil, Star, Trash2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { memo, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import { LinkFavicon } from '@/components/LinkFavicon';
+import { showDeletedLinkToast } from '@/components/workbench/card-effects';
 import {
   buildPriceTooltip,
   InlinePriceCell,
@@ -12,15 +12,10 @@ import {
   InlineSpecCell,
 } from '@/components/workbench/details-inline-cells';
 import { DropSparks } from '@/components/workbench/drop-sparks';
-import { playDelete, playDrop, playTagPop } from '@/lib/audio/foley';
+import { playDelete, playTagPop, playUncheck } from '@/lib/audio/foley';
 import { isArcadeMotion, isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
-import type {
-  DropEffectStyle,
-  LinkItem,
-  MotionMode,
-  ProductMeta,
-} from '@/lib/types/stash';
+import type { LinkItem, MotionMode, ProductMeta } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 import {
   createDebouncedWriter,
@@ -29,6 +24,9 @@ import {
 import { HighlightText } from '@/lib/utils/highlight-match';
 import { normalizeCurrencyCode } from '@/lib/utils/price-math';
 import { normalizeStoreName } from '@/lib/utils/product-url';
+import { toSafeHref } from '@/lib/utils/url';
+import { captureSelectorRect, vfxEngine } from '@/lib/vfx/engine';
+import { useFxStore } from '@/store/fx-store';
 import { useSelectionStore } from '@/store/selection-store';
 import { useUiStore } from '@/store/ui-store';
 
@@ -45,7 +43,6 @@ interface DetailsRowProps {
   defaultCurrency: string;
   openInNewTab: boolean;
   motionMode: MotionMode;
-  dropEffectStyle?: DropEffectStyle;
   soundEffects: boolean;
   hoverPreviews: boolean;
   gridTemplateClass: string;
@@ -66,7 +63,6 @@ function DetailsRowView({
   defaultCurrency,
   openInNewTab,
   motionMode,
-  dropEffectStyle = 'dust',
   soundEffects,
   hoverPreviews,
   gridTemplateClass,
@@ -75,19 +71,20 @@ function DetailsRowView({
   isDragging,
   isDropTarget,
 }: DetailsRowViewProps) {
-  const openEditLink = useUiStore((s) => s.openEditLink);
-  const schedulePreview = useUiStore((s) => s.schedulePreview);
-  const dismissPreview = useUiStore((s) => s.dismissPreview);
-  const settleLink = useUiStore((s) => s.settleLink);
+  const { openEditLink, schedulePreview, dismissPreview } =
+    useUiStore.getState();
   const isKeyboardFocused = useUiStore(
     (s) => s.keyboardFocusedLinkId === link.id,
   );
-  const isSettling = useUiStore((s) => s.settledLinkId === link.id);
+  const settledBurstKey = useUiStore((s) =>
+    s.settledLinkId === link.id ? s.settledSeq : 0,
+  );
+  const isSettling = settledBurstKey > 0;
   const searchQuery = useUiStore((s) => s.searchQuery);
+  const { recordComboHit, triggerContainerShake } = useFxStore.getState();
   const isSelected = useSelectionStore((s) => s.selectedIds.includes(link.id));
   const selectionMode = useSelectionStore((s) => s.selectedIds.length > 0);
-  const toggleSelect = useSelectionStore((s) => s.toggleSelect);
-  const selectRangeTo = useSelectionStore((s) => s.selectRangeTo);
+  const { toggleSelect, selectRangeTo } = useSelectionStore.getState();
   const arcade = isArcadeMotion(motionMode);
   const tactile = isTactileMotion(motionMode);
 
@@ -156,8 +153,15 @@ function DetailsRowView({
   const handleToggleChecked = async () => {
     const nextChecked = !isChecked;
     const res = await stashRepo.updateLink(link.id, { checked: nextChecked });
-    if (res.ok && nextChecked) {
-      playTagPop(soundEffects, motionMode);
+    if (res.ok) {
+      if (nextChecked) {
+        playTagPop(soundEffects, motionMode);
+        if (arcade && recordComboHit() >= 5) {
+          triggerContainerShake('combo');
+        }
+      } else {
+        playUncheck(soundEffects);
+      }
     }
   };
 
@@ -179,23 +183,16 @@ function DetailsRowView({
       ...(link.product ? { product: { ...link.product } } : {}),
     };
     dismissPreview();
+    const preDeleteRect = arcade
+      ? captureSelectorRect(`[data-link-id="${CSS.escape(snapshot.id)}"]`)
+      : null;
     const deleted = await stashRepo.deleteLink(snapshot.id);
     if (!deleted) return;
     playDelete(soundEffects);
-    toast('Link removed', {
-      duration: 5000,
-      className: 'stash-undo-toast',
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          void stashRepo.restoreLink(snapshot).then((restored) => {
-            if (restored) {
-              playDrop(soundEffects, motionMode);
-              settleLink(restored.id);
-            }
-          });
-        },
-      },
+    if (preDeleteRect) vfxEngine.spawnDelete(preDeleteRect);
+    showDeletedLinkToast(snapshot, {
+      soundEffects,
+      motionMode,
     });
   };
 
@@ -227,26 +224,21 @@ function DetailsRowView({
     <div
       ref={rowRef}
       data-link-id={link.id}
+      data-vfx-occluder="true"
       className={cn(
-        'group relative grid min-h-[42px] items-center gap-3.5 border-b border-border/60 px-3.5 py-1.5 text-xs transition-all last:border-b-0 hover:bg-card-hover/80',
+        'group relative grid min-h-[42px] items-center gap-3.5 border-b border-hairline px-3.5 py-1.5 text-xs transition-colors last:border-b-0 hover:bg-card-hover/80',
         gridTemplateClass,
-        isStarred && !isChecked && 'bg-accent/[0.06]',
         isSelected && 'bg-accent/[0.14] ring-1 ring-inset ring-accent/75',
         isChecked && 'opacity-60 hover:opacity-90',
         isDragging && 'opacity-40',
-        isDropTarget && 'bg-accent/12 ring-1 ring-inset ring-accent/65',
-        isKeyboardFocused && 'bg-accent/10 ring-1 ring-inset ring-accent/70',
+        isDropTarget && 'bg-elevated ring-1 ring-inset ring-accent/45',
+        isKeyboardFocused && 'bg-elevated ring-1 ring-inset ring-accent/55',
       )}
     >
-      {isStarred && !isChecked && (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 left-0 w-[2px] bg-accent"
-        />
-      )}
       <DropSparks
-        active={arcade && isSettling}
-        variant={dropEffectStyle}
+        active={tactile && isSettling}
+        arcade={arcade}
+        burstKey={settledBurstKey}
         compact
       />
 
@@ -317,7 +309,7 @@ function DetailsRowView({
 
       {/* 2. Item (Favicon + Title) */}
       <a
-        href={link.url}
+        href={toSafeHref(link.url)}
         target={openInNewTab ? '_blank' : '_self'}
         rel={openInNewTab ? 'noopener noreferrer' : undefined}
         onClick={(event) => {

@@ -192,7 +192,7 @@ export function ScopeStep({
       </div>
 
       {!nanoReady ? (
-        <p className="rounded-control border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+        <p className="rounded-control border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
           Chrome&apos;s on-device Gemini Nano model is not ready yet. Open
           Settings → General &amp; AI to check availability or download the
           model.

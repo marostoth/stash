@@ -1,256 +1,40 @@
-import { useDraggable } from '@dnd-kit/react';
-import {
-  Archive,
-  FolderPlus,
-  Layers,
-  Loader2,
-  Pin,
-  Plus,
-  Volume2,
-  X,
-} from 'lucide-react';
-import { motion } from 'motion/react';
+import { Archive, Layers, Loader2, Pin } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { LinkFavicon } from '@/components/LinkFavicon';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { ClearTabsButton } from '@/components/workbench/clear-tabs-button';
+import { OpenTabRow } from '@/components/workbench/open-tab-row';
 import { playSessionFreeze } from '@/lib/audio/foley';
-import { isTactileMotion } from '@/lib/motion/presets';
+import { isArcadeMotion, isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import {
   type OpenTabInfo,
   selectTabsForSession,
 } from '@/lib/tabs/session-filter';
-import { closeTabs, switchToTab } from '@/lib/tabs/tab-actions';
-import {
-  type Collection,
-  type StashSettings,
-  TAB_GROUP_COLOR_SWATCH,
-} from '@/lib/types/stash';
-import { cn } from '@/lib/utils/cn';
-import { extractDomain } from '@/lib/utils/url';
+import { closeTabs } from '@/lib/tabs/tab-actions';
+import type { Collection, StashSettings } from '@/lib/types/stash';
+import { spawnBulkPulseForSelector } from '@/lib/vfx/engine';
 import { useFxStore } from '@/store/fx-store';
+import { useOpenTabsStore } from '@/store/open-tabs-store';
 import { useUiStore } from '@/store/ui-store';
 
 interface OpenTabsSidebarProps {
-  tabs: readonly OpenTabInfo[];
-  pinnedTabs: readonly OpenTabInfo[];
-  regularTabs: readonly OpenTabInfo[];
-  clearableCount: number;
   collections: readonly Collection[];
   activeSpaceId: string;
   settings: StashSettings;
   onQuickStashTab: (tab: OpenTabInfo, collectionId: string) => Promise<void>;
 }
 
-interface TabRowProps {
-  tab: OpenTabInfo;
-  index: number;
-  dimmed: boolean;
-  sweeping: boolean;
-  hoverPreviews: boolean;
-  collections: readonly Collection[];
-  onQuickStashTab: (tab: OpenTabInfo, collectionId: string) => Promise<void>;
-}
-
-function OpenTabRow({
-  tab,
-  index,
-  dimmed,
-  sweeping,
-  hoverPreviews,
-  collections,
-  onQuickStashTab,
-}: TabRowProps) {
-  const openCreateCollection = useUiStore((s) => s.openCreateCollection);
-  const schedulePreview = useUiStore((s) => s.schedulePreview);
-  const dismissPreview = useUiStore((s) => s.dismissPreview);
-
-  const { ref, isDragging } = useDraggable({
-    id: `tab:${tab.id}`,
-    type: 'open-tab',
-    data: { kind: 'open-tab', tab },
-  });
-
-  const domain = extractDomain(tab.url);
-
-  const handleCloseTab = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    void closeTabs([tab.id]);
-  };
-
-  return (
-    <motion.div
-      ref={ref}
-      animate={
-        sweeping
-          ? { x: -54, y: 14, scale: 0.88, opacity: 0.12 }
-          : { x: 0, y: 0, scale: 1, opacity: 1 }
-      }
-      transition={{
-        duration: 0.22,
-        delay: sweeping ? Math.min(index, 10) * 0.022 : 0,
-        ease: [0.22, 1, 0.36, 1],
-      }}
-      className={cn(
-        'group relative flex items-center gap-2 rounded-control border border-transparent px-2 py-1.5 transition-colors hover:border-border hover:bg-card cursor-grab active:cursor-grabbing',
-        dimmed && 'opacity-65 hover:opacity-95',
-        isDragging && 'opacity-35',
-      )}
-    >
-      <button
-        type="button"
-        onClick={() => {
-          dismissPreview();
-          void switchToTab(tab.id);
-        }}
-        onPointerEnter={(event) => {
-          if (!hoverPreviews || isDragging) return;
-          const rect = event.currentTarget.getBoundingClientRect();
-          schedulePreview({
-            id: `tab:${tab.id}`,
-            url: tab.url,
-            title: tab.title,
-            faviconUrl: tab.favIconUrl,
-            anchor: {
-              top: rect.top,
-              right: rect.right,
-              bottom: rect.bottom,
-              left: rect.left,
-              width: rect.width,
-              height: rect.height,
-            },
-            preferredSide: 'left',
-          });
-        }}
-        onPointerLeave={dismissPreview}
-        title={`${tab.title}\n${tab.url}`}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 rounded cursor-pointer"
-      >
-        <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-canvas">
-          <LinkFavicon url={tab.url} faviconUrl={tab.favIconUrl} size="sm" />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            {tab.pinned && (
-              <Pin
-                className="h-2.5 w-2.5 shrink-0 text-fg-muted"
-                aria-label="Pinned tab"
-              />
-            )}
-            {tab.audible && (
-              <Volume2
-                className="h-2.5 w-2.5 shrink-0 text-accent"
-                aria-label="Playing audio"
-              />
-            )}
-            <span
-              title={tab.title}
-              className="truncate text-xs font-medium text-fg"
-            >
-              {tab.title}
-            </span>
-          </div>
-          <div className="truncate font-mono text-[10px] text-fg-muted">
-            {domain}
-          </div>
-        </div>
-      </button>
-
-      {/* Hover quick actions: 1-click stash + close */}
-      <div
-        data-dnd-no-drag="true"
-        onPointerEnter={dismissPreview}
-        className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
-      >
-        {collections.length === 1 && collections[0] ? (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              const target = collections[0];
-              if (target) {
-                void onQuickStashTab(tab, target.id);
-              }
-            }}
-            aria-label={`Stash to ${collections[0].name}`}
-            title={`Stash to ${collections[0].name}`}
-            className="inline-flex h-6 w-6 items-center justify-center rounded text-fg-muted hover:bg-panel hover:text-accent cursor-pointer"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
-        ) : (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                onClick={(event) => event.stopPropagation()}
-                aria-label="Stash tab to collection"
-                title="Stash to collection"
-                className="inline-flex h-6 w-6 items-center justify-center rounded text-fg-muted hover:bg-panel hover:text-accent cursor-pointer"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Stash to...</DropdownMenuLabel>
-              {collections.map((col) => (
-                <DropdownMenuItem
-                  key={col.id}
-                  onSelect={() => void onQuickStashTab(tab, col.id)}
-                >
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{
-                      backgroundColor: TAB_GROUP_COLOR_SWATCH[col.color],
-                    }}
-                  />
-                  <span className="truncate">{col.name}</span>
-                </DropdownMenuItem>
-              ))}
-              {collections.length > 0 && <DropdownMenuSeparator />}
-              <DropdownMenuItem onSelect={openCreateCollection}>
-                <FolderPlus className="h-3.5 w-3.5 text-fg-muted" />
-                New collection...
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-
-        <button
-          type="button"
-          onClick={handleCloseTab}
-          aria-label={`Close ${tab.title}`}
-          title="Close tab"
-          className="inline-flex h-6 w-6 items-center justify-center rounded text-fg-muted hover:bg-panel hover:text-danger cursor-pointer"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    </motion.div>
-  );
-}
-
 export function OpenTabsSidebar({
-  tabs,
-  pinnedTabs,
-  regularTabs,
-  clearableCount,
   collections,
   activeSpaceId,
   settings,
   onQuickStashTab,
 }: OpenTabsSidebarProps) {
+  const tabs = useOpenTabsStore((s) => s.tabs);
+  const pinnedTabs = useOpenTabsStore((s) => s.pinnedTabs);
+  const regularTabs = useOpenTabsStore((s) => s.regularTabs);
+  const clearableCount = useOpenTabsStore((s) => s.clearableCount);
   const [saving, setSaving] = useState(false);
   const triggerCollectionCascade = useUiStore(
     (s) => s.triggerCollectionCascade,
@@ -259,6 +43,10 @@ export function OpenTabsSidebar({
   const sessionSweeping = useFxStore((s) => s.sessionSweeping);
   const setSessionSweeping = useFxStore((s) => s.setSessionSweeping);
   const triggerCollectionSlam = useFxStore((s) => s.triggerCollectionSlam);
+  const triggerContainerShake = useFxStore((s) => s.triggerContainerShake);
+  const triggerSidebarSweep = useFxStore((s) => s.triggerSidebarSweep);
+  const sidebarSweepSeq = useFxStore((s) => s.sidebarSweepSeq);
+  const arcade = isArcadeMotion(settings.motionMode);
   const sweepEnabled =
     isTactileMotion(settings.motionMode) && settings.fxAmbientWaves !== false;
 
@@ -291,9 +79,20 @@ export function OpenTabsSidebar({
       if (sweepEnabled) {
         triggerCollectionSlam(saved.collection.id);
       }
+      if (arcade && settings.fxDeskJolt !== false) {
+        triggerContainerShake('heavy');
+      }
+      if (arcade && settings.fxAmbientWaves !== false) {
+        triggerSidebarSweep();
+        spawnBulkPulseForSelector('[data-stash-sidebar="open-tabs"]', 0);
+      }
 
       if (closeAfterSave) {
-        await closeTabs(saved.closableTabs.map((t) => t.id));
+        try {
+          await closeTabs(saved.closableTabs.map((t) => t.id));
+        } catch {
+          // Session is already safely persisted; ignore closed-tab race errors
+        }
         playSessionFreeze(settings.soundEffects, settings.motionMode);
         const collapsedDuplicates =
           saved.closableTabs.length - saved.links.length;
@@ -312,6 +111,8 @@ export function OpenTabsSidebar({
           `Saved ${saved.links.length} tab${saved.links.length === 1 ? '' : 's'} into "${saved.collection.name}"`,
         );
       }
+    } catch {
+      toast.error('Could not save tab session. Please try again.');
     } finally {
       setSessionSweeping(false);
       setSaving(false);
@@ -326,11 +127,21 @@ export function OpenTabsSidebar({
 
   return (
     <aside
+      data-stash-sidebar="open-tabs"
       aria-label="Open tabs"
-      className="flex w-[280px] shrink-0 flex-col border-l border-border bg-panel/70"
+      className="relative flex w-[280px] shrink-0 flex-col overflow-hidden border-l border-hairline bg-panel/70"
     >
+      {arcade && settings.fxAmbientWaves !== false && sidebarSweepSeq > 0 && (
+        <div
+          key={`sidebar-sweep-${sidebarSweepSeq}`}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-20 overflow-hidden"
+        >
+          <div className="stash-action-sweep absolute inset-y-0 w-2/3" />
+        </div>
+      )}
       {/* Sidebar Header & Session Controls */}
-      <div className="space-y-2.5 border-b border-border p-3.5">
+      <div className="space-y-2.5 border-b border-hairline p-3.5">
         <div className="flex items-center justify-between gap-1.5">
           <div className="flex min-w-0 items-center gap-1.5">
             <Layers className="h-3.5 w-3.5 shrink-0 text-accent" />
@@ -353,13 +164,15 @@ export function OpenTabsSidebar({
             clearableCount={clearableCount}
             soundEffects={settings.soundEffects}
             motionMode={settings.motionMode}
+            fxDeskJolt={settings.fxDeskJolt ?? true}
+            fxAmbientWaves={settings.fxAmbientWaves ?? true}
             disabled={saving}
           />
         </div>
 
         <div className="grid grid-cols-2 gap-1.5">
           <Button
-            variant="primary"
+            variant="secondary"
             size="sm"
             disabled={saving || eligibleTabs.length === 0}
             onClick={() => void handleSaveSession(false)}
@@ -369,7 +182,7 @@ export function OpenTabsSidebar({
             {saving ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Archive className="h-3.5 w-3.5" />
+              <Archive className="h-3.5 w-3.5 text-fg-muted" />
             )}
             {saving ? 'Saving...' : 'Save Session'}
           </Button>
@@ -467,7 +280,7 @@ export function OpenTabsSidebar({
       </div>
 
       {/* Hint Footer */}
-      <div className="border-t border-border px-3.5 py-2 font-mono text-[10px] text-fg-muted">
+      <div className="border-t border-hairline px-3.5 py-2 font-mono text-[10px] text-fg-muted">
         Drag any tab onto a collection
       </div>
     </aside>

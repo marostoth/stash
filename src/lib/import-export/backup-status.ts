@@ -1,6 +1,21 @@
 export const BACKUP_STALE_DAYS = 14;
+export const TRUNCATION_MIN_LIBRARY_LINKS = 10;
+export const TRUNCATION_DROP_RATIO = 0.3;
 
 const MS_PER_DAY = 86_400_000;
+
+/**
+ * Flags a backup as potentially truncated (e.g. by an external LLM cutting off
+ * output) when the current library has >= 10 links and the backup drops > 30%.
+ */
+export function isLikelyTruncatedBackup(
+  currentLinkCount: number,
+  backupLinkCount: number,
+): boolean {
+  if (currentLinkCount < TRUNCATION_MIN_LIBRARY_LINKS) return false;
+  const dropped = currentLinkCount - backupLinkCount;
+  return dropped / currentLinkCount > TRUNCATION_DROP_RATIO;
+}
 
 export interface BackupStalenessInfo {
   label: string;

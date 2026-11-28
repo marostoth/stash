@@ -1,7 +1,6 @@
 import { useSortable } from '@dnd-kit/react/sortable';
 import { motion } from 'motion/react';
 import { memo, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import { CoverCardBanner } from '@/components/CoverCardBanner';
 import { LinkFavicon } from '@/components/LinkFavicon';
 import {
@@ -15,13 +14,13 @@ import {
   resolveLinkCardMotion,
   StarredCardAccents,
   StarShimmerOverlay,
+  showDeletedLinkToast,
   useNeighborJolt,
 } from '@/components/workbench/card-effects';
+import { LinkCardMotionShell } from '@/components/workbench/card-foil-wrapper';
 import { DropSparks } from '@/components/workbench/drop-sparks';
-import { useCardFoilTilt } from '@/hooks/use-card-foil-tilt';
-import { playDelete, playDrop, playTagPop } from '@/lib/audio/foley';
+import { playDelete, playTagPop, playUncheck } from '@/lib/audio/foley';
 import {
-  FOIL_PERSPECTIVE_PX,
   isArcadeMotion,
   isTactileMotion,
   TACTILE_SPRING,
@@ -30,13 +29,13 @@ import { stashRepo } from '@/lib/storage/repo';
 import type {
   CardDensity,
   CollectionViewMode,
-  DropEffectStyle,
   LinkItem,
   MotionMode,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 import { HighlightText } from '@/lib/utils/highlight-match';
-import { extractDomain } from '@/lib/utils/url';
+import { extractDomain, toSafeHref } from '@/lib/utils/url';
+import { spawnDeleteForElement } from '@/lib/vfx/engine';
 import { useFxStore } from '@/store/fx-store';
 import { useSelectionStore } from '@/store/selection-store';
 import { useUiStore } from '@/store/ui-store';
@@ -44,11 +43,11 @@ import { useUiStore } from '@/store/ui-store';
 interface LinkCardProps {
   link: LinkItem;
   index: number;
+  showInsertBefore?: boolean;
   openInNewTab: boolean;
   density: CardDensity;
   dragDisabled: boolean;
   motionMode: MotionMode;
-  dropEffectStyle?: DropEffectStyle;
   fxDeskJolt?: boolean;
   fxHoverSheen?: boolean;
   fxAmbientWaves?: boolean;
@@ -63,11 +62,11 @@ interface LinkCardProps {
 export const LinkCard = memo(function LinkCard({
   link,
   index,
+  showInsertBefore = false,
   openInNewTab,
   density,
   dragDisabled,
   motionMode,
-  dropEffectStyle = 'dust',
   fxDeskJolt = true,
   fxHoverSheen = true,
   fxAmbientWaves = true,
@@ -78,25 +77,27 @@ export const LinkCard = memo(function LinkCard({
   viewMode = 'compact',
   collectionTint,
 }: LinkCardProps) {
-  const openEditLink = useUiStore((s) => s.openEditLink);
-  const highlightedLinkId = useUiStore((s) => s.highlightedLinkId);
-  const settledLinkId = useUiStore((s) => s.settledLinkId);
-  const settleLink = useUiStore((s) => s.settleLink);
-  const schedulePreview = useUiStore((s) => s.schedulePreview);
-  const dismissPreview = useUiStore((s) => s.dismissPreview);
+  const { openEditLink, schedulePreview, dismissPreview } =
+    useUiStore.getState();
+  const isHighlighted = useUiStore((s) => s.highlightedLinkId === link.id);
+  const settledBurstKey = useUiStore((s) =>
+    s.settledLinkId === link.id ? s.settledSeq : 0,
+  );
   const isTagging = useUiStore((s) => s.taggingLinkIds.includes(link.id));
   const isKeyboardFocused = useUiStore(
     (s) => s.keyboardFocusedLinkId === link.id,
   );
   const searchQuery = useUiStore((s) => s.searchQuery);
-  const triggerStarFlash = useFxStore((s) => s.triggerStarFlash);
   const isStarFlashing = useFxStore((s) => s.starFlashLinkId === link.id);
-  const triggerSettledImpact = useFxStore((s) => s.triggerSettledImpact);
-  const triggerVacuumImplosion = useFxStore((s) => s.triggerVacuumImplosion);
+  const {
+    triggerStarFlash,
+    triggerVacuumImplosion,
+    recordComboHit,
+    triggerContainerShake,
+  } = useFxStore.getState();
   const isSelected = useSelectionStore((s) => s.selectedIds.includes(link.id));
   const selectionMode = useSelectionStore((s) => s.selectedIds.length > 0);
-  const toggleSelect = useSelectionStore((s) => s.toggleSelect);
-  const selectRangeTo = useSelectionStore((s) => s.selectRangeTo);
+  const { toggleSelect, selectRangeTo } = useSelectionStore.getState();
 
   const [vaporizing, setVaporizing] = useState(false);
   const cardMeasureRef = useRef<HTMLDivElement | null>(null);
@@ -127,15 +128,13 @@ export const LinkCard = memo(function LinkCard({
   const arcade = isArcadeMotion(motionMode);
   const tactile = isTactileMotion(motionMode);
   const hoverTiltActive = tactile && fxHoverSheen;
-  const foil = useCardFoilTilt(hoverTiltActive, arcade, isDragging);
   const neighborJolt = useNeighborJolt(
     cardMeasureRef,
     link.id,
     link.collectionId,
     arcade && fxDeskJolt && !isDragging,
   );
-  const isHighlighted = highlightedLinkId === link.id;
-  const isSettling = tactile && settledLinkId === link.id;
+  const isSettling = tactile && settledBurstKey > 0;
   const domain = extractDomain(link.url);
 
   const isStarred = Boolean(link.starred);
@@ -172,12 +171,10 @@ export const LinkCard = memo(function LinkCard({
     void stashRepo.markLinkOpened(link.id);
   };
 
-  const handleBodyPointerEnter = (
-    event: React.PointerEvent<HTMLAnchorElement>,
-  ) => {
+  const handleBodyPointerEnter = (e: React.PointerEvent<HTMLAnchorElement>) => {
     if (!hoverPreviews || isDragging) return;
     const { top, right, bottom, left, width, height } =
-      event.currentTarget.getBoundingClientRect();
+      e.currentTarget.getBoundingClientRect();
     schedulePreview({
       id: `link:${link.id}`,
       url: link.url,
@@ -192,24 +189,23 @@ export const LinkCard = memo(function LinkCard({
 
   const handleToggleStar = async () => {
     const nextStarred = !isStarred;
-    const result = await stashRepo.updateLink(link.id, {
-      starred: nextStarred,
-    });
-    if (result.ok && nextStarred) {
+    const res = await stashRepo.updateLink(link.id, { starred: nextStarred });
+    if (res.ok && nextStarred) {
       playTagPop(soundEffects, motionMode);
-      if (tactile && fxAmbientWaves) {
-        triggerStarFlash(link.id);
-      }
+      if (tactile && fxAmbientWaves) triggerStarFlash(link.id);
     }
   };
 
   const handleToggleChecked = async () => {
     const nextChecked = !isChecked;
-    const result = await stashRepo.updateLink(link.id, {
-      checked: nextChecked,
-    });
-    if (result.ok && nextChecked) {
+    const res = await stashRepo.updateLink(link.id, { checked: nextChecked });
+    if (!res.ok) return;
+    if (nextChecked) {
       playTagPop(soundEffects, motionMode);
+      if (arcade && recordComboHit() >= 5 && fxDeskJolt)
+        triggerContainerShake('combo');
+    } else {
+      playUncheck(soundEffects);
     }
   };
 
@@ -219,12 +215,14 @@ export const LinkCard = memo(function LinkCard({
     dismissPreview();
     playDelete();
 
-    if (tactile) {
+    if (motionMode !== 'off') {
+      if (arcade) spawnDeleteForElement(cardMeasureRef.current);
       setVaporizing(true);
-      if (arcade && fxDeskJolt) {
+      if (arcade && fxDeskJolt)
         triggerVacuumImplosion(link.id, link.collectionId);
-      }
-      await new Promise((resolve) => setTimeout(resolve, arcade ? 275 : 155));
+      await new Promise((resolve) =>
+        setTimeout(resolve, motionMode === 'reduced' ? 115 : 145),
+      );
     }
 
     const deleted = await stashRepo.deleteLink(snapshot.id);
@@ -233,21 +231,10 @@ export const LinkCard = memo(function LinkCard({
       return;
     }
 
-    toast('Link removed', {
-      duration: 5000,
-      className: 'stash-undo-toast',
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          void stashRepo.restoreLink(snapshot).then((restored) => {
-            if (restored) {
-              playDrop();
-              settleLink(restored.id);
-              triggerSettledImpact(restored.id, restored.collectionId);
-            }
-          });
-        },
-      },
+    showDeletedLinkToast(snapshot, {
+      soundEffects,
+      motionMode,
+      fxDeskJolt,
     });
   };
 
@@ -258,6 +245,7 @@ export const LinkCard = memo(function LinkCard({
       isSettling,
       arcade,
       tactile,
+      reduced: motionMode === 'reduced',
       cascadeActive,
       index,
       neighborJolt,
@@ -267,8 +255,14 @@ export const LinkCard = memo(function LinkCard({
   const wakeDelayMs = Math.min(index, 14) * 62;
 
   return (
-    /* Outer wrapper strictly owns @dnd-kit/react ref & transforms — never apply Motion transforms here */
+    /* Direct CSS grid child — strictly owns @dnd-kit/react ref & transforms (never wrap in another div!) */
     <div ref={ref} data-link-id={link.id} className="relative h-full">
+      {showInsertBefore && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-2 inset-y-1 z-20 w-1 rounded-full bg-accent shadow-[0_0_8px_var(--stash-accent)]"
+        />
+      )}
       {isDragging ? (
         <LinkCardDragPlaceholder
           title={link.title}
@@ -283,6 +277,7 @@ export const LinkCard = memo(function LinkCard({
       ) : (
         <div
           ref={cardMeasureRef}
+          data-vfx-occluder="true"
           className={cn(
             'relative h-full rounded-card',
             wakeWaveActive &&
@@ -296,9 +291,16 @@ export const LinkCard = memo(function LinkCard({
               : undefined
           }
         >
-          {/* Arcade shockwave & edge dust erupting strictly BEHIND the card */}
-          <DropSparks active={arcade && isSettling} variant={dropEffectStyle} />
-          <DeleteVaporPuff active={arcade && vaporizing} />
+          {/* Clipped 1px rim-light drop & delete flashes (+ tight Arcade micro-sparks) */}
+          <DropSparks
+            active={tactile && isSettling}
+            arcade={arcade}
+            burstKey={settledBurstKey}
+          />
+          <DeleteVaporPuff
+            active={motionMode !== 'off' && vaporizing}
+            arcade={arcade}
+          />
 
           {/* Gliding keyboard navigation spotlight frame */}
           {isKeyboardFocused && tactile && (
@@ -310,44 +312,32 @@ export const LinkCard = memo(function LinkCard({
             />
           )}
 
-          <motion.div
+          <LinkCardMotionShell
+            hoverTiltActive={hoverTiltActive}
+            arcade={arcade}
+            isDragging={isDragging}
             initial={
-              cascadeActive && arcade
-                ? { opacity: 0, y: 16, x: -10, rotate: -2.5, scale: 0.94 }
-                : cascadeActive && tactile
-                  ? { opacity: 0, y: 10, scale: 0.97 }
-                  : false
+              isSettling && arcade
+                ? { opacity: 1, scale: 1.08, y: -4 }
+                : cascadeActive && arcade
+                  ? { opacity: 0, y: 16, x: -10, rotate: -2.5, scale: 0.94 }
+                  : cascadeActive && tactile
+                    ? { opacity: 0, y: 10, scale: 0.97 }
+                    : false
             }
             animate={cardAnimate}
             whileHover={tactile && !vaporizing ? { y: -2 } : undefined}
             whileTap={tactile && !vaporizing ? { scale: 0.98 } : undefined}
             transition={cardTransition}
-            style={
-              hoverTiltActive
-                ? {
-                    transformPerspective: FOIL_PERSPECTIVE_PX,
-                    rotateX: foil.rotateX,
-                    rotateY: foil.rotateY,
-                  }
-                : undefined
-            }
-            onPointerEnter={foil.handlePointerEnter}
-            onPointerMove={(event) => {
-              foil.handlePointerMove(event);
-              drawerHover.handleCardPointerMove(event);
-            }}
-            onPointerLeave={() => {
-              foil.handlePointerLeave();
-              drawerHover.handleCardPointerLeave();
-            }}
+            onCardPointerMove={drawerHover.handleCardPointerMove}
+            onCardPointerLeave={drawerHover.handleCardPointerLeave}
             className={cn(
-              'group relative z-[1] h-full rounded-card border border-border bg-card transition-[background-color,border-color,opacity,box-shadow] hover:border-accent/45 hover:bg-card-hover',
-              isStarred && !isChecked && 'stash-card-starred',
+              'group relative z-[1] h-full rounded-card border border-hairline bg-card transition-[background-color,border-color,opacity,box-shadow] hover:border-border/90 hover:bg-card-hover',
               isSelected &&
                 'border-accent bg-accent/[0.11] ring-2 ring-accent/70',
               isChecked && 'opacity-65 hover:opacity-95',
               !dragDisabled && 'cursor-grab active:cursor-grabbing',
-              isDropTarget && 'border-accent ring-2 ring-accent/40',
+              isDropTarget && 'border-accent/65 ring-1 ring-accent/35',
               isKeyboardFocused &&
                 !tactile &&
                 'border-accent ring-2 ring-accent/75 ring-offset-2 ring-offset-canvas',
@@ -364,18 +354,6 @@ export const LinkCard = memo(function LinkCard({
               arcade={arcade}
             />
 
-            {/* 3D hover tilt specular sheen overlay */}
-            {hoverTiltActive && (
-              <motion.div
-                aria-hidden="true"
-                style={{
-                  backgroundImage: foil.glareBackground,
-                  opacity: foil.glareOpacity,
-                }}
-                className="pointer-events-none absolute inset-0 z-10 rounded-card transition-opacity duration-150"
-              />
-            )}
-
             {/* Arcade live AI phosphor scan beam while Gemini Nano is tagging */}
             {arcade && isTagging && (
               <div
@@ -387,7 +365,7 @@ export const LinkCard = memo(function LinkCard({
             )}
 
             <a
-              href={link.url}
+              href={toSafeHref(link.url)}
               draggable={false}
               target={openInNewTab ? '_blank' : '_self'}
               rel={openInNewTab ? 'noopener noreferrer' : undefined}
@@ -425,7 +403,7 @@ export const LinkCard = memo(function LinkCard({
                 >
                   <div
                     className={cn(
-                      'mt-0.5 flex shrink-0 items-center justify-center overflow-hidden rounded-control border border-border bg-panel',
+                      'mt-0.5 flex shrink-0 items-center justify-center overflow-hidden rounded-control border border-hairline bg-panel',
                       isMicro ? 'h-6 w-6' : 'h-7 w-7',
                     )}
                   >
@@ -445,14 +423,14 @@ export const LinkCard = memo(function LinkCard({
                           : 'text-fg',
                         isMicro
                           ? 'truncate text-[13px]'
-                          : 'line-clamp-2 text-sm',
+                          : 'line-clamp-2 min-h-[2.35rem] text-sm',
                       )}
                     >
                       <HighlightText text={link.title} query={searchQuery} />
                     </div>
                     <div
                       className={cn(
-                        'mt-0.5 truncate font-mono text-fg-muted',
+                        'mt-1 truncate font-mono text-fg-muted',
                         isMicro ? 'text-[10px]' : 'text-[11px]',
                       )}
                     >
@@ -491,7 +469,7 @@ export const LinkCard = memo(function LinkCard({
               onEdit={() => openEditLink(link)}
               onDelete={() => void handleQuickDelete()}
             />
-          </motion.div>
+          </LinkCardMotionShell>
         </div>
       )}
     </div>

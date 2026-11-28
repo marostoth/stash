@@ -12,7 +12,7 @@ import {
   Tag,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import type { CSSProperties } from 'react';
+import { type CSSProperties, memo } from 'react';
 import { toast } from 'sonner';
 import { CollectionAppearancePopover } from '@/components/CollectionAppearancePopover';
 import { InlineProgressPill } from '@/components/ui/ai-activity-panel';
@@ -20,6 +20,8 @@ import { Button } from '@/components/ui/button';
 import { CollectionActionsMenu } from '@/components/workbench/collection-actions-menu';
 import {
   CollectionHeaderBadges,
+  DropSlotPlaceholder,
+  EmptyCollectionDropButton,
   resolveCollectionGridClass,
 } from '@/components/workbench/collection-header-badges';
 import { CollectionSortMenu } from '@/components/workbench/collection-sort-menu';
@@ -27,6 +29,7 @@ import { deleteCollectionWithUndo } from '@/components/workbench/delete-collecti
 import { LinkCard } from '@/components/workbench/link-card';
 import { SmoothCollapse } from '@/components/workbench/smooth-collapse';
 import { useAutoTagSweep } from '@/hooks/use-auto-tag-sweep';
+import { playSessionFreeze } from '@/lib/audio/foley';
 import { isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import {
@@ -39,7 +42,6 @@ import {
   type CardDensity,
   type Collection,
   DEFAULT_SPACE_ID,
-  type DropEffectStyle,
   type LinkItem,
   type MotionMode,
   type Space,
@@ -50,6 +52,7 @@ import {
   formatCurrencySummaries,
   summarizePrices,
 } from '@/lib/utils/price-math';
+import { spawnBulkPulseForSelector } from '@/lib/vfx/engine';
 import { useFxStore } from '@/store/fx-store';
 import { useUiStore } from '@/store/ui-store';
 
@@ -66,8 +69,8 @@ interface CollectionSectionProps {
   wideBoard?: boolean;
   forceExpanded: boolean;
   dragDisabled: boolean;
+  hasHiddenChecked?: boolean;
   motionMode: MotionMode;
-  dropEffectStyle?: DropEffectStyle;
   fxDeskJolt?: boolean;
   fxHoverSheen?: boolean;
   fxAmbientWaves?: boolean;
@@ -75,7 +78,7 @@ interface CollectionSectionProps {
   hoverPreviews: boolean;
 }
 
-export function CollectionSection({
+export const CollectionSection = memo(function CollectionSection({
   collection,
   index,
   links,
@@ -88,26 +91,31 @@ export function CollectionSection({
   wideBoard = false,
   forceExpanded,
   dragDisabled,
+  hasHiddenChecked = false,
   motionMode,
-  dropEffectStyle = 'dust',
   fxDeskJolt = true,
   fxHoverSheen = true,
   fxAmbientWaves = true,
   soundEffects,
   hoverPreviews,
 }: CollectionSectionProps) {
-  const openCreateLink = useUiStore((s) => s.openCreateLink);
-  const openEditCollection = useUiStore((s) => s.openEditCollection);
-  const openTriage = useUiStore((s) => s.openTriage);
-  const triggerCollectionCascade = useUiStore(
-    (s) => s.triggerCollectionCascade,
-  );
+  const {
+    openCreateLink,
+    openEditCollection,
+    openTriage,
+    triggerCollectionCascade,
+  } = useUiStore.getState();
   const isCascading = useUiStore((s) =>
     s.cascadingCollectionIds.includes(collection.id),
   );
   const isWaking = useFxStore((s) => s.wakingCollectionId === collection.id);
   const isSlammed = useFxStore((s) => s.slammedCollectionId === collection.id);
-  const triggerWakeWave = useFxStore((s) => s.triggerWakeWave);
+  const dragInsertIndex = useFxStore((s) =>
+    s.dragInsertTarget?.collectionId === collection.id
+      ? s.dragInsertTarget.index
+      : null,
+  );
+  const { triggerWakeWave } = useFxStore.getState();
   const tactile = isTactileMotion(motionMode);
   const autoTag = useAutoTagSweep(collection.id);
   const untaggedCount = links.filter(isEligibleForAutoTag).length;
@@ -160,18 +168,16 @@ export function CollectionSection({
     void stashRepo.toggleCollectionCollapsed(collection.id);
   };
 
-  const handleDeleteCollection = async () => {
-    await deleteCollectionWithUndo(collection.id, collection.name);
-  };
+  const handleDeleteCollection = () =>
+    deleteCollectionWithUndo(collection.id, collection.name);
 
   const handleMoveToSpace = async (targetSpace: Space) => {
     const moved = await stashRepo.moveCollectionToSpace(
       collection.id,
       targetSpace.id,
     );
-    if (moved) {
+    if (moved)
       toast.success(`Moved "${collection.name}" to ${targetSpace.name}`);
-    }
   };
 
   const currentSpaceId =
@@ -185,298 +191,299 @@ export function CollectionSection({
     summarizePrices(starredLinks, defaultCurrency),
   );
 
-  const handleWakeUp = async () => {
+  const runWakeAction = async (mode: 'group' | 'window') => {
     if (links.length === 0) {
       toast.info('No links in this collection to open.');
       return;
     }
-    if (tactile && fxAmbientWaves) {
-      triggerWakeWave(collection.id);
-      await new Promise((resolve) => setTimeout(resolve, 140));
-    }
-    const opened = await wakeUpCollectionInTabGroup(collection, links);
-    if (opened > 0) {
-      toast.success(
-        `Opened ${opened} tab${opened === 1 ? '' : 's'} in "${collection.name}" group`,
-      );
-    }
-  };
-
-  const handleOpenInNewWindow = async () => {
-    if (links.length === 0) {
-      toast.info('No links in this collection to open.');
-      return;
+    playSessionFreeze(soundEffects, motionMode);
+    if (motionMode === 'arcade' && fxDeskJolt) {
+      useFxStore.getState().triggerContainerShake('heavy');
     }
     if (tactile && fxAmbientWaves) {
       triggerWakeWave(collection.id);
+      if (motionMode === 'arcade')
+        spawnBulkPulseForSelector(
+          `[data-collection-id="${CSS.escape(collection.id)}"]`,
+        );
       await new Promise((resolve) => setTimeout(resolve, 140));
     }
-    const opened = await wakeUpCollectionInNewWindow(links);
+    const opened =
+      mode === 'group'
+        ? await wakeUpCollectionInTabGroup(collection, links)
+        : await wakeUpCollectionInNewWindow(links);
     if (opened > 0) {
       toast.success(
-        `Opened ${opened} tab${opened === 1 ? '' : 's'} in a new window`,
+        mode === 'group'
+          ? `Opened ${opened} tab${opened === 1 ? '' : 's'} in "${collection.name}" group`
+          : `Opened ${opened} tab${opened === 1 ? '' : 's'} in a new window`,
       );
     }
   };
+  const handleWakeUp = () => runWakeAction('group');
+  const handleOpenInNewWindow = () => runWakeAction('window');
 
   return (
     <section
       ref={sortableRef}
+      data-collection-id={collection.id}
       className={cn(
         'rounded-card transition-colors',
         isDragging && 'opacity-40',
       )}
     >
-      <motion.div
-        ref={dropRef}
-        style={tintStyle}
-        animate={
-          isSlammed && tactile
-            ? { scale: [1.03, 0.985, 1.004, 1], y: [-10, 2, 0, 0] }
-            : { scale: 1, y: 0 }
-        }
-        transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
-        className={cn(
-          'space-y-4 rounded-card transition-colors',
-          collection.tintColor ? 'stash-collection-tinted p-4' : 'p-1.5 -m-1.5',
-          isDropTarget &&
-            cn(
-              'bg-panel/60 ring-2 ring-accent/55',
-              tactile && 'stash-dropzone-breathe',
-            ),
-        )}
-      >
-        {/* Collection Header */}
-        <div
+      <div ref={dropRef}>
+        <motion.div
+          style={tintStyle}
+          animate={
+            isSlammed && tactile
+              ? { scale: [1.03, 0.985, 1.004, 1], y: [-10, 2, 0, 0] }
+              : { scale: 1, y: 0 }
+          }
+          transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
           className={cn(
-            'flex items-center justify-between gap-2 border-b border-border/70 pb-2.5 transition-transform duration-150',
-            isDropTarget && tactile && '-translate-y-0.5',
+            'space-y-4 rounded-card transition-colors',
+            collection.tintColor
+              ? 'stash-collection-tinted p-4'
+              : 'p-1.5 -m-1.5',
+            isDropTarget && 'bg-panel/45 ring-1 ring-accent/35',
           )}
         >
-          <div className="flex min-w-0 items-center gap-1.5">
-            {!dragDisabled && (
-              <button
-                ref={handleRef}
-                type="button"
-                aria-label={`Reorder ${collection.name}`}
-                title="Drag to reorder collection"
-                className="inline-flex h-6 w-5 shrink-0 items-center justify-center rounded text-fg-muted/60 transition-colors hover:bg-card hover:text-fg cursor-grab active:cursor-grabbing"
-              >
-                <GripVertical className="h-3.5 w-3.5" />
-              </button>
+          {/* Collection Header */}
+          <div
+            className={cn(
+              'relative flex items-center justify-between gap-2 border-b border-hairline pb-2.5 transition-transform duration-150',
+              isDropTarget && tactile && '-translate-y-0.5',
             )}
-
-            <button
-              type="button"
-              onClick={handleToggleCollapse}
-              aria-expanded={!isCollapsed}
-              className="group flex min-w-0 items-center gap-2 rounded-control pr-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 cursor-pointer"
-            >
-              <span className="text-fg-muted transition-colors group-hover:text-fg">
-                {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </span>
-              {CuratedIcon ? (
-                <CuratedIcon
-                  className="h-4 w-4 shrink-0"
-                  style={{ color: colorHex }}
-                  aria-hidden="true"
-                />
-              ) : collection.icon ? (
-                <span
-                  className="shrink-0 text-sm leading-none"
-                  aria-hidden="true"
-                >
-                  {collection.icon}
-                </span>
-              ) : (
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: colorHex }}
-                  aria-hidden="true"
-                />
-              )}
-              <h2 className="truncate text-sm font-semibold tracking-tight text-fg">
-                {collection.name}
-              </h2>
-              <CollectionHeaderBadges
-                collection={collection}
-                linkCount={links.length}
-                collectionTotalText={collectionTotalText}
-                starredCount={starredLinks.length}
-                starredTotalText={starredTotalText}
-                spaceBadge={spaceBadge}
-                motionMode={motionMode}
-                fxAmbientWaves={fxAmbientWaves}
-                onSwitchSpace={onSwitchSpace}
-              />
-            </button>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-1">
-            {autoTag.running ? (
-              <InlineProgressPill
-                label={`Tagging ${autoTag.progress?.current ?? 1} / ${autoTag.progress?.total ?? untaggedCount}...`}
-                current={autoTag.progress?.current ?? 1}
-                total={autoTag.progress?.total ?? untaggedCount}
-                onCancel={autoTag.cancel}
-              />
-            ) : (
-              untaggedCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void autoTag.start()}
-                  title={`Auto-tag ${untaggedCount} untagged link${untaggedCount === 1 ? '' : 's'} with on-device AI`}
-                  className="h-7 gap-1 px-2 text-xs text-fg/80 hover:text-accent"
-                >
-                  <Tag className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline">Auto-Tag</span>
-                </Button>
-              )
-            )}
-
-            {collection.isSession && links.length > 0 && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => openTriage(collection.id)}
-                title="Auto-categorize and file links from this session"
-                className="h-7 gap-1 border-accent/45 px-2 text-xs text-accent hover:bg-accent/10"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Auto-Categorize</span>
-              </Button>
-            )}
-
-            {links.length > 0 && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => void handleWakeUp()}
-                title="Open all links in a Chrome Tab Group"
-                className="h-7 gap-1 border-fg-muted/30 px-2 text-xs text-fg hover:border-accent/50"
-              >
-                <span>Wake Up</span>
-                <ArrowUpRight className="h-3.5 w-3.5 text-accent" />
-              </Button>
-            )}
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openCreateLink(collection.id)}
-              className="h-7 gap-1 px-2 text-xs text-fg/85 hover:text-fg"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Add Link</span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleToggleViewMode}
-              aria-label={
-                viewMode === 'cover'
-                  ? `Switch ${collection.name} to compact view`
-                  : `Switch ${collection.name} to visual cover view`
-              }
-              title={
-                viewMode === 'cover'
-                  ? 'Cover view active (click for Compact)'
-                  : 'Compact view active (click for Visual Cover view)'
-              }
-              className={cn(
-                'h-7 w-7 text-fg-muted hover:text-accent',
-                viewMode === 'cover' && 'bg-accent/15 text-accent',
-              )}
-            >
-              {viewMode === 'cover' ? (
-                <ImageIcon className="h-3.5 w-3.5" />
-              ) : (
-                <LayoutGrid className="h-3.5 w-3.5" />
-              )}
-            </Button>
-
-            <CollectionSortMenu collection={collection} />
-
-            <CollectionAppearancePopover
-              collection={collection}
-              sampleLinkTitles={links.slice(0, 5).map((l) => l.title)}
-            />
-
-            <CollectionActionsMenu
-              collectionName={collection.name}
-              hasLinks={links.length > 0}
-              otherSpaces={otherSpaces}
-              onAddLink={() => openCreateLink(collection.id)}
-              onWakeUp={() => void handleWakeUp()}
-              onOpenInNewWindow={() => void handleOpenInNewWindow()}
-              onEditCollection={() => openEditCollection(collection)}
-              onMoveToSpace={(targetSpace) =>
-                void handleMoveToSpace(targetSpace)
-              }
-              onDeleteCollection={() => void handleDeleteCollection()}
-            />
-          </div>
-        </div>
-
-        {/* Links Grid (native CSS grid-rows smooth expand/collapse) */}
-        <SmoothCollapse open={!isCollapsed} animated={tactile}>
-          <div className="px-0.5 py-1">
-            {links.length > 0 ? (
+          >
+            {motionMode === 'arcade' && fxAmbientWaves && isWaking && (
               <div
-                className={resolveCollectionGridClass(
-                  density,
-                  viewMode,
-                  wideBoard,
-                )}
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 z-10 overflow-hidden"
               >
-                {links.map((link, cardIndex) => (
-                  <LinkCard
-                    key={link.id}
-                    link={link}
-                    index={cardIndex}
-                    openInNewTab={openInNewTab}
-                    density={density}
-                    dragDisabled={dragDisabled || isAutoSorted}
-                    motionMode={motionMode}
-                    dropEffectStyle={dropEffectStyle}
-                    fxDeskJolt={fxDeskJolt}
-                    fxHoverSheen={fxHoverSheen}
-                    fxAmbientWaves={fxAmbientWaves}
-                    soundEffects={soundEffects}
-                    cascadeActive={isCascading}
-                    wakeWaveActive={isWaking}
-                    hoverPreviews={hoverPreviews}
-                    viewMode={viewMode}
-                    collectionTint={collection.tintColor}
-                  />
-                ))}
+                <div className="stash-action-sweep absolute inset-y-0 w-1/2" />
               </div>
-            ) : (
+            )}
+            <div className="flex min-w-0 items-center gap-1.5">
+              {!dragDisabled && (
+                <button
+                  ref={handleRef}
+                  type="button"
+                  aria-label={`Reorder ${collection.name}`}
+                  title="Drag to reorder collection"
+                  className="inline-flex h-6 w-5 shrink-0 items-center justify-center rounded text-fg-muted/60 transition-colors hover:bg-card hover:text-fg cursor-grab active:cursor-grabbing"
+                >
+                  <GripVertical className="h-3.5 w-3.5" />
+                </button>
+              )}
+
               <button
                 type="button"
+                onClick={handleToggleCollapse}
+                aria-expanded={!isCollapsed}
+                className="group flex min-w-0 items-center gap-2 rounded-control pr-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 cursor-pointer"
+              >
+                <span className="text-fg-muted transition-colors group-hover:text-fg">
+                  {isCollapsed ? (
+                    <ChevronRight className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </span>
+                {CuratedIcon ? (
+                  <CuratedIcon
+                    className="h-4 w-4 shrink-0"
+                    style={{ color: colorHex }}
+                    aria-hidden="true"
+                  />
+                ) : collection.icon ? (
+                  <span
+                    className="shrink-0 text-sm leading-none"
+                    aria-hidden="true"
+                  >
+                    {collection.icon}
+                  </span>
+                ) : (
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: colorHex }}
+                    aria-hidden="true"
+                  />
+                )}
+                <h2 className="truncate text-sm font-semibold tracking-tight text-fg">
+                  {collection.name}
+                </h2>
+                <CollectionHeaderBadges
+                  collection={collection}
+                  linkCount={links.length}
+                  collectionTotalText={collectionTotalText}
+                  starredCount={starredLinks.length}
+                  starredTotalText={starredTotalText}
+                  spaceBadge={spaceBadge}
+                  motionMode={motionMode}
+                  fxAmbientWaves={fxAmbientWaves}
+                  onSwitchSpace={onSwitchSpace}
+                />
+              </button>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-1">
+              {autoTag.running ? (
+                <InlineProgressPill
+                  label={`Tagging ${autoTag.progress?.current ?? 1} / ${autoTag.progress?.total ?? untaggedCount}...`}
+                  current={autoTag.progress?.current ?? 1}
+                  total={autoTag.progress?.total ?? untaggedCount}
+                  onCancel={autoTag.cancel}
+                />
+              ) : (
+                untaggedCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void autoTag.start()}
+                    title={`Auto-tag ${untaggedCount} untagged link${untaggedCount === 1 ? '' : 's'} with on-device AI`}
+                    className="h-7 gap-1 px-2 text-xs text-fg/80 hover:text-accent"
+                  >
+                    <Tag className="h-3.5 w-3.5" />
+                    <span className="hidden md:inline">Auto-Tag</span>
+                  </Button>
+                )
+              )}
+
+              {collection.isSession && links.length > 0 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => openTriage(collection.id)}
+                  title="Auto-categorize and file links from this session"
+                  className="h-7 gap-1 border-accent/45 px-2 text-xs text-accent hover:bg-accent/10"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Auto-Categorize</span>
+                </Button>
+              )}
+
+              {links.length > 0 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void handleWakeUp()}
+                  title="Open all links in a Chrome Tab Group"
+                  className="h-7 gap-1 border-fg-muted/30 px-2 text-xs text-fg hover:border-accent/50"
+                >
+                  <span>Wake Up</span>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-accent" />
+                </Button>
+              )}
+
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => openCreateLink(collection.id)}
+                className="h-7 gap-1 px-2 text-xs text-fg/85 hover:text-fg"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Add Link</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleToggleViewMode}
+                aria-label={
+                  viewMode === 'cover'
+                    ? `Switch ${collection.name} to compact view`
+                    : `Switch ${collection.name} to visual cover view`
+                }
+                title={
+                  viewMode === 'cover'
+                    ? 'Cover view active (click for Compact)'
+                    : 'Compact view active (click for Visual Cover view)'
+                }
                 className={cn(
-                  'flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-border bg-panel/40 px-4 py-5 text-xs text-fg-muted transition-colors hover:border-accent/50 hover:bg-panel hover:text-fg cursor-pointer',
-                  isDropTarget && 'border-accent bg-accent/10 text-accent',
+                  'h-7 w-7 text-fg-muted hover:text-accent',
+                  viewMode === 'cover' && 'bg-accent/15 text-accent',
                 )}
               >
-                <Plus className="h-3.5 w-3.5 text-accent" />
-                <span>
-                  {isDropTarget
-                    ? `Drop to stash into ${collection.name}`
-                    : `Drop an open tab here or add your first link to ${collection.name}`}
-                </span>
-              </button>
-            )}
+                {viewMode === 'cover' ? (
+                  <ImageIcon className="h-3.5 w-3.5" />
+                ) : (
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                )}
+              </Button>
+
+              <CollectionSortMenu collection={collection} />
+
+              <CollectionAppearancePopover
+                collection={collection}
+                sampleLinkTitles={links.slice(0, 5).map((l) => l.title)}
+              />
+
+              <CollectionActionsMenu
+                collectionName={collection.name}
+                hasLinks={links.length > 0}
+                otherSpaces={otherSpaces}
+                onAddLink={() => openCreateLink(collection.id)}
+                onWakeUp={() => void handleWakeUp()}
+                onOpenInNewWindow={() => void handleOpenInNewWindow()}
+                onEditCollection={() => openEditCollection(collection)}
+                onMoveToSpace={(targetSpace) =>
+                  void handleMoveToSpace(targetSpace)
+                }
+                onDeleteCollection={() => void handleDeleteCollection()}
+              />
+            </div>
           </div>
-        </SmoothCollapse>
-      </motion.div>
+
+          {/* Links Grid (native CSS grid-rows smooth expand/collapse) */}
+          <SmoothCollapse open={!isCollapsed} motionMode={motionMode}>
+            <div className="px-0.5 py-1">
+              {links.length > 0 ? (
+                <div
+                  className={resolveCollectionGridClass(
+                    density,
+                    viewMode,
+                    wideBoard,
+                  )}
+                >
+                  {links.map((link, cardIndex) => (
+                    <LinkCard
+                      key={link.id}
+                      link={link}
+                      index={cardIndex}
+                      showInsertBefore={dragInsertIndex === cardIndex}
+                      openInNewTab={openInNewTab}
+                      density={density}
+                      dragDisabled={
+                        dragDisabled || isAutoSorted || hasHiddenChecked
+                      }
+                      motionMode={motionMode}
+                      fxDeskJolt={fxDeskJolt}
+                      fxHoverSheen={fxHoverSheen}
+                      fxAmbientWaves={fxAmbientWaves}
+                      soundEffects={soundEffects}
+                      cascadeActive={isCascading}
+                      wakeWaveActive={isWaking}
+                      hoverPreviews={hoverPreviews}
+                      viewMode={viewMode}
+                      collectionTint={collection.tintColor}
+                    />
+                  ))}
+                  {dragInsertIndex === -1 && (
+                    <DropSlotPlaceholder density={density} />
+                  )}
+                </div>
+              ) : (
+                <EmptyCollectionDropButton
+                  collectionName={collection.name}
+                  isDropTarget={isDropTarget}
+                  onAddLink={() => openCreateLink(collection.id)}
+                />
+              )}
+            </div>
+          </SmoothCollapse>
+        </motion.div>
+      </div>
     </section>
   );
-}
+});

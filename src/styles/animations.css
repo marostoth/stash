@@ -63,6 +63,34 @@
   will-change: transform, opacity;
 }
 
+@keyframes stash-action-sweep-anim {
+  0% {
+    transform: translate3d(-115%, 0, 0) skewX(-18deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate3d(220%, 0, 0) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+.stash-action-sweep {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--stash-accent) 14%, transparent) 34%,
+    color-mix(in srgb, var(--stash-accent) 36%, white 18%) 50%,
+    color-mix(in srgb, var(--stash-accent) 14%, transparent) 66%,
+    transparent 100%
+  );
+  animation: stash-action-sweep-anim 340ms cubic-bezier(0.18, 0.86, 0.28, 1)
+    forwards;
+  will-change: transform, opacity;
+}
+
 @keyframes stash-dropzone-breathe-ring {
   0%,
   100% {
@@ -201,6 +229,15 @@ html[data-theme-transition="true"] *::after {
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after {
+  /* biome-ignore lint/complexity/noImportantStyles: Global Motion: Off lock must override all utility transitions/animations */
+  animation: none !important;
+  /* biome-ignore lint/complexity/noImportantStyles: Global Motion: Off lock must override all utility transitions/animations */
+  transition-duration: 0ms !important;
+}
+
 html:is([data-motion="reduced"], [data-motion="off"])
   :is(
     .stash-indeterminate-bar,
@@ -208,7 +245,12 @@ html:is([data-motion="reduced"], [data-motion="off"])
     .stash-phosphor-scan-beam,
     .stash-dropzone-breathe,
     .stash-wake-ignition,
-    .stash-star-sheen
+    .stash-star-sheen,
+    .stash-action-sweep,
+    .stash-stamp-flash,
+    .stash-total-flash,
+    .stash-match-highlight,
+    .stash-duplicate-pulse
   ) {
   animation: none;
   opacity: 0.7;
@@ -227,6 +269,17 @@ html:is([data-motion="reduced"], [data-motion="off"])
     animation: none;
     opacity: 0.7;
     width: 100%;
+    transform: none;
+  }
+  .stash-dropzone-breathe,
+  .stash-wake-ignition,
+  .stash-star-sheen,
+  .stash-action-sweep,
+  .stash-stamp-flash,
+  .stash-total-flash,
+  .stash-match-highlight,
+  .stash-duplicate-pulse {
+    animation: none;
     transform: none;
   }
 }

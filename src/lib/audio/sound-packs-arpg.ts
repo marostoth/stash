@@ -1,9 +1,9 @@
 import {
-  jitter,
   scheduleFilteredNoise,
   scheduleFmClang,
   scheduleTone,
 } from '@/lib/audio/audio-bus';
+import { gainJitter, pitchJitter } from '@/lib/audio/audio-math';
 import type { SoundPackRecipe } from '@/lib/audio/sound-packs';
 
 /**
@@ -13,75 +13,77 @@ import type { SoundPackRecipe } from '@/lib/audio/sound-packs';
  * and lush dark stone-hall reverb.
  */
 export const ARPG_HEAVY_PACK: SoundPackRecipe = {
-  pickup({ ctx, destination, punch, reverb }) {
-    const j = jitter(0.05);
+  pickup({ ctx, destination, punch, reverb, tailScale }) {
+    const pj = pitchJitter();
+    const gj = gainJitter();
     scheduleFilteredNoise(ctx, destination, {
       color: 'brown',
       filterType: 'bandpass',
-      startFreq: 340 * j,
-      endFreq: 1050 * j,
+      startFreq: 340 * pj,
+      endFreq: 1050 * pj,
       q: 1.5,
       startOffsetSec: 0,
-      durationSec: 0.06,
-      gain: 0.42,
+      durationSec: 0.06 * tailScale,
+      gain: 0.42 * gj,
       reverbNode: reverb,
-      reverbSend: 0.35,
+      reverbSend: 0.35 * tailScale,
     });
     scheduleFmClang(ctx, punch, {
-      carrierFreq: 320 * j,
-      endCarrierFreq: 510 * j,
+      carrierFreq: 320 * pj,
+      endCarrierFreq: 510 * pj,
       modRatio: 2.38,
       modIndex: 150,
       startOffsetSec: 0.004,
-      durationSec: 0.042,
-      gain: 0.3,
+      durationSec: 0.042 * tailScale,
+      gain: 0.3 * gj,
       reverbNode: reverb,
-      reverbSend: 0.3,
+      reverbSend: 0.3 * tailScale,
     });
   },
 
   drop({ ctx, destination, punch, reverb, arcade, pitch }) {
-    const j = jitter(0.055);
+    const pj = pitchJitter();
+    const gj = gainJitter();
     const heavy = arcade ? 1 : 0.78;
 
     // 1. Stereo stone-fracture snap (instant tactile bite)
     scheduleFilteredNoise(ctx, punch, {
       color: 'white',
       filterType: 'bandpass',
-      startFreq: 2100 * j,
-      endFreq: 380 * j,
+      startFreq: 2100 * pj,
+      endFreq: 380 * pj,
       q: 1.1,
       startOffsetSec: 0,
       durationSec: 0.024,
-      gain: 0.72 * heavy,
+      gain: 0.72 * heavy * gj,
       attackSec: 0.0008,
       pan: -0.25,
       reverbNode: reverb,
-      reverbSend: 0.42,
+      reverbSend: arcade ? 0.42 : 0.28,
     });
     scheduleFilteredNoise(ctx, punch, {
       color: 'white',
       filterType: 'bandpass',
-      startFreq: 1650 * j,
-      endFreq: 320 * j,
+      startFreq: 1650 * pj,
+      endFreq: 320 * pj,
       q: 1.2,
       startOffsetSec: 0.003,
       durationSec: 0.028,
-      gain: 0.64 * heavy,
+      gain: 0.64 * heavy * gj,
       attackSec: 0.0008,
       pan: 0.25,
       reverbNode: reverb,
-      reverbSend: 0.42,
+      reverbSend: arcade ? 0.42 : 0.28,
     });
 
-    // 2. Massive seismic sub-drop (165 Hz -> 22 Hz driven hard through punch saturator)
+    // 2. Massive seismic sub-drop (168 Hz -> 22 Hz driven hard through punch saturator)
     scheduleTone(ctx, punch, {
       type: 'sine',
-      startFreq: (arcade ? 168 : 132) * j,
+      startFreq: (arcade ? 168 : 132) * pj,
       endFreq: 22,
       startOffsetSec: 0,
       durationSec: arcade ? 0.32 : 0.17,
-      gain: 1.0 * heavy,
+      gain: 1.0 * heavy * gj,
       attackSec: 0.001,
       reverbNode: reverb,
       reverbSend: arcade ? 0.65 : 0.35,
@@ -91,12 +93,12 @@ export const ARPG_HEAVY_PACK: SoundPackRecipe = {
     scheduleFilteredNoise(ctx, punch, {
       color: 'brown',
       filterType: 'lowpass',
-      startFreq: (arcade ? 1150 : 620) * j,
+      startFreq: (arcade ? 1150 : 620) * pj,
       endFreq: 48,
       q: 2.5,
       startOffsetSec: 0.001,
       durationSec: arcade ? 0.38 : 0.18,
-      gain: 0.96 * heavy,
+      gain: 0.96 * heavy * gj,
       attackSec: 0.002,
       pan: -0.32,
       reverbNode: reverb,
@@ -105,12 +107,12 @@ export const ARPG_HEAVY_PACK: SoundPackRecipe = {
     scheduleFilteredNoise(ctx, punch, {
       color: 'brown',
       filterType: 'lowpass',
-      startFreq: (arcade ? 980 : 540) * j,
+      startFreq: (arcade ? 980 : 540) * pj,
       endFreq: 44,
       q: 2.4,
       startOffsetSec: 0.006,
       durationSec: arcade ? 0.4 : 0.19,
-      gain: 0.9 * heavy,
+      gain: 0.9 * heavy * gj,
       attackSec: 0.003,
       pan: 0.32,
       reverbNode: reverb,
@@ -119,15 +121,15 @@ export const ARPG_HEAVY_PACK: SoundPackRecipe = {
 
     // 4. Forged iron / heavy stone slab anvil resonance (inharmonic FM)
     scheduleFmClang(ctx, punch, {
-      carrierFreq: 162 * j,
-      endCarrierFreq: 58 * j,
+      carrierFreq: 162 * pj,
+      endCarrierFreq: 58 * pj,
       modRatio: 2.41,
       modIndex: 340,
       startOffsetSec: 0.003,
       durationSec: arcade ? 0.17 : 0.095,
-      gain: 0.42 * heavy,
+      gain: 0.42 * heavy * gj,
       reverbNode: reverb,
-      reverbSend: 0.58,
+      reverbSend: arcade ? 0.58 : 0.38,
     });
 
     if (arcade) {
@@ -142,19 +144,19 @@ export const ARPG_HEAVY_PACK: SoundPackRecipe = {
         scheduleFilteredNoise(ctx, destination, {
           color: 'white',
           filterType: 'bandpass',
-          startFreq: grain.freq * j,
-          endFreq: grain.freq * 0.42 * j,
+          startFreq: grain.freq * pj,
+          endFreq: grain.freq * 0.42 * pj,
           q: 1.9,
           startOffsetSec: grain.offset,
           durationSec: grain.dur,
-          gain: grain.gain,
+          gain: grain.gain * gj,
           pan: grain.pan,
           reverbNode: reverb,
           reverbSend: 0.64,
         });
       }
 
-      // 6. Dark resonant combo iron ring
+      // 6. Dark resonant combo iron ring (tuned cleanly to combo pitch)
       scheduleFmClang(ctx, destination, {
         carrierFreq: 293.66 * pitch,
         endCarrierFreq: 286 * pitch,
@@ -169,41 +171,43 @@ export const ARPG_HEAVY_PACK: SoundPackRecipe = {
     }
   },
 
-  sessionFreeze({ ctx, destination, punch, reverb, pitch }) {
-    const j = jitter(0.03);
+  sessionFreeze({ ctx, destination, punch, reverb, pitch, tailScale }) {
+    const pj = pitchJitter();
+    const gj = gainJitter();
     scheduleTone(ctx, punch, {
       type: 'sine',
-      startFreq: 138 * j,
+      startFreq: 138 * pj,
       endFreq: 24,
       startOffsetSec: 0,
-      durationSec: 0.38,
-      gain: 0.95,
+      durationSec: 0.38 * tailScale,
+      gain: 0.95 * gj,
       reverbNode: reverb,
-      reverbSend: 0.78,
+      reverbSend: 0.78 * tailScale,
     });
     scheduleFilteredNoise(ctx, punch, {
       color: 'brown',
       filterType: 'lowpass',
-      startFreq: 760,
+      startFreq: 760 * pj,
       endFreq: 56,
       q: 2.2,
       startOffsetSec: 0,
-      durationSec: 0.34,
-      gain: 0.85,
+      durationSec: 0.34 * tailScale,
+      gain: 0.85 * gj,
       reverbNode: reverb,
-      reverbSend: 0.75,
+      reverbSend: 0.75 * tailScale,
     });
+    // Tuned iron chord — zero random pitch jitter on musical intervals
     scheduleFmClang(ctx, destination, {
       carrierFreq: 220 * pitch,
       endCarrierFreq: 214 * pitch,
       modRatio: 2.76,
       modIndex: 190,
       startOffsetSec: 0.022,
-      durationSec: 0.36,
+      durationSec: 0.36 * tailScale,
       gain: 0.28,
       pan: -0.25,
       reverbNode: reverb,
-      reverbSend: 0.85,
+      reverbSend: 0.85 * tailScale,
     });
     scheduleFmClang(ctx, destination, {
       carrierFreq: 329.63 * pitch,
@@ -211,37 +215,37 @@ export const ARPG_HEAVY_PACK: SoundPackRecipe = {
       modRatio: 2.0,
       modIndex: 85,
       startOffsetSec: 0.072,
-      durationSec: 0.44,
+      durationSec: 0.44 * tailScale,
       gain: 0.24,
       pan: 0.25,
       reverbNode: reverb,
-      reverbSend: 0.9,
+      reverbSend: 0.9 * tailScale,
     });
   },
 
-  tagPop({ ctx, destination, reverb, pitch }) {
-    const j = jitter(0.025);
+  tagPop({ ctx, destination, reverb, pitch, tailScale }) {
+    // Pure tuned pentatonic crystal chimes — no random pitch jitter
     scheduleFmClang(ctx, destination, {
-      carrierFreq: 783.99 * pitch * j,
+      carrierFreq: 783.99 * pitch,
       modRatio: 2.756,
       modIndex: 380,
       startOffsetSec: 0,
-      durationSec: 0.34,
+      durationSec: 0.34 * tailScale,
       gain: 0.32,
       pan: -0.2,
       reverbNode: reverb,
-      reverbSend: 0.88,
+      reverbSend: 0.88 * tailScale,
     });
     scheduleFmClang(ctx, destination, {
-      carrierFreq: 1174.66 * pitch * j,
+      carrierFreq: 1174.66 * pitch,
       modRatio: 1.995,
       modIndex: 220,
       startOffsetSec: 0.036,
-      durationSec: 0.42,
+      durationSec: 0.42 * tailScale,
       gain: 0.28,
       pan: 0.22,
       reverbNode: reverb,
-      reverbSend: 0.92,
+      reverbSend: 0.92 * tailScale,
     });
     scheduleFilteredNoise(ctx, destination, {
       color: 'white',
@@ -251,89 +255,124 @@ export const ARPG_HEAVY_PACK: SoundPackRecipe = {
       durationSec: 0.018,
       gain: 0.2,
       reverbNode: reverb,
-      reverbSend: 0.55,
+      reverbSend: 0.55 * tailScale,
     });
   },
 
-  hoverRiffle({ ctx, destination, reverb }) {
-    const j = jitter(0.08);
+  uncheck({ ctx, destination, reverb, tailScale }) {
+    const pj = pitchJitter();
+    const gj = gainJitter();
+    // Crisp 9ms high-mid iron latch attack + boosted non-musical release (~+4 dB)
     scheduleFilteredNoise(ctx, destination, {
       color: 'white',
       filterType: 'bandpass',
-      startFreq: 1350 * j,
-      endFreq: 780 * j,
-      q: 2.1,
+      startFreq: 3100 * pj,
+      endFreq: 2100 * pj,
+      q: 1.8,
       startOffsetSec: 0,
-      durationSec: 0.013,
-      gain: 0.14,
+      durationSec: 0.009,
+      gain: 0.54 * gj,
+      attackSec: 0.0006,
+    });
+    scheduleFilteredNoise(ctx, destination, {
+      color: 'white',
+      filterType: 'bandpass',
+      startFreq: 1380 * pj,
+      endFreq: 680 * pj,
+      q: 2.0,
+      startOffsetSec: 0,
+      durationSec: 0.017,
+      gain: 0.58 * gj,
+      attackSec: 0.0008,
       reverbNode: reverb,
-      reverbSend: 0.22,
+      reverbSend: 0.14 * tailScale,
+    });
+    scheduleTone(ctx, destination, {
+      type: 'triangle',
+      startFreq: 280 * pj,
+      endFreq: 170 * pj,
+      startOffsetSec: 0,
+      durationSec: 0.015,
+      gain: 0.34 * gj,
+      attackSec: 0.0008,
     });
   },
 
-  delete({ ctx, punch, reverb }) {
-    const j = jitter(0.05);
-    scheduleFmClang(ctx, punch, {
-      carrierFreq: 580 * j,
-      endCarrierFreq: 98 * j,
-      modRatio: 2.62,
-      modIndex: 340,
+  hoverRiffle({ ctx, destination, reverb, tailScale }) {
+    const pj = pitchJitter();
+    const gj = gainJitter();
+    // Crisp 7ms bandpass stone-grit brush clearly audible at 35% desk volume
+    scheduleFilteredNoise(ctx, destination, {
+      color: 'white',
+      filterType: 'bandpass',
+      startFreq: 2800 * pj,
+      endFreq: 2350 * pj,
+      q: 2.0,
       startOffsetSec: 0,
-      durationSec: 0.14,
-      gain: 0.42,
+      durationSec: 0.007,
+      gain: 0.3 * gj,
+      attackSec: 0.0006,
       reverbNode: reverb,
-      reverbSend: 0.62,
+      reverbSend: 0.16 * tailScale,
+    });
+  },
+
+  delete({ ctx, punch, reverb, tailScale }) {
+    const pj = pitchJitter();
+    const gj = gainJitter();
+    scheduleFilteredNoise(ctx, punch, {
+      color: 'white',
+      filterType: 'bandpass',
+      startFreq: 2100 * pj,
+      endFreq: 520 * pj,
+      q: 1.5,
+      startOffsetSec: 0,
+      durationSec: 0.018,
+      gain: 0.56 * gj,
+      attackSec: 0.0008,
+      reverbNode: reverb,
+      reverbSend: 0.25 * tailScale,
     });
     scheduleFilteredNoise(ctx, punch, {
       color: 'brown',
-      filterType: 'bandpass',
-      startFreq: 1350 * j,
-      endFreq: 110,
-      q: 1.3,
-      startOffsetSec: 0.006,
-      durationSec: 0.25,
-      gain: 0.78,
-      attackSec: 0.003,
-      reverbNode: reverb,
-      reverbSend: 0.7,
-    });
-    scheduleTone(ctx, punch, {
-      type: 'sine',
-      startFreq: 136 * j,
-      endFreq: 26,
+      filterType: 'lowpass',
+      startFreq: 680 * pj,
+      endFreq: 140,
+      q: 1.4,
       startOffsetSec: 0.003,
-      durationSec: 0.2,
-      gain: 0.68,
+      durationSec: 0.025,
+      gain: 0.62 * gj,
+      attackSec: 0.001,
       reverbNode: reverb,
-      reverbSend: 0.55,
+      reverbSend: 0.3 * tailScale,
     });
   },
 
-  error({ ctx, punch, reverb }) {
-    const j = jitter(0.04);
+  error({ ctx, punch, reverb, tailScale }) {
+    const pj = pitchJitter();
     for (const [idx, offset] of [0, 0.09].entries()) {
       const f = idx === 0 ? 142 : 104;
       scheduleTone(ctx, punch, {
         type: 'sine',
-        startFreq: f * j,
+        startFreq: f * pj,
         endFreq: 28,
         startOffsetSec: offset,
-        durationSec: 0.13,
+        durationSec: 0.13 * tailScale,
         gain: 0.72,
         pan: idx === 0 ? -0.18 : 0.18,
         reverbNode: reverb,
-        reverbSend: 0.58,
+        reverbSend: 0.58 * tailScale,
       });
       scheduleFmClang(ctx, punch, {
-        carrierFreq: (idx === 0 ? 215 : 162) * j,
+        carrierFreq: (idx === 0 ? 215 : 162) * pj,
         endCarrierFreq: 86,
         modRatio: 2.53,
         modIndex: 240,
         startOffsetSec: offset,
-        durationSec: 0.095,
+        durationSec: 0.095 * tailScale,
         gain: 0.36,
         reverbNode: reverb,
-        reverbSend: 0.55,
+        reverbSend: 0.55 * tailScale,
       });
     }
   },

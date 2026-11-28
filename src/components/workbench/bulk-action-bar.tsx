@@ -16,8 +16,13 @@ import {
   parseSpaceInboxValue,
   SpaceGroupedCollectionOptions,
 } from '@/components/ui/space-grouped-collection-options';
+import { isAnyModalOpen } from '@/hooks/use-workbench-shortcuts';
 import { playDelete, playDrop, playTagPop } from '@/lib/audio/foley';
-import { isTactileMotion, TACTILE_SPRING } from '@/lib/motion/presets';
+import {
+  isArcadeMotion,
+  isTactileMotion,
+  TACTILE_SPRING,
+} from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import { openLinksInNamedTabGroup } from '@/lib/tabs/tab-actions';
 import type {
@@ -27,6 +32,7 @@ import type {
   Space,
 } from '@/lib/types/stash';
 import { parseTagsInput } from '@/lib/utils/url';
+import { useFxStore } from '@/store/fx-store';
 import { useSelectionStore } from '@/store/selection-store';
 
 interface BulkActionBarProps {
@@ -35,6 +41,7 @@ interface BulkActionBarProps {
   collections: readonly Collection[];
   spaces: readonly Space[];
   motionMode: MotionMode;
+  fxDeskJolt?: boolean;
   soundEffects: boolean;
 }
 
@@ -44,8 +51,10 @@ export function BulkActionBar({
   collections,
   spaces,
   motionMode,
+  fxDeskJolt = true,
   soundEffects,
 }: BulkActionBarProps) {
+  const triggerContainerShake = useFxStore((s) => s.triggerContainerShake);
   const selectedIds = useSelectionStore((s) => s.selectedIds);
   const selectAll = useSelectionStore((s) => s.selectAll);
   const clearSelection = useSelectionStore((s) => s.clearSelection);
@@ -57,10 +66,16 @@ export function BulkActionBar({
   useEffect(() => {
     if (selectedIds.length === 0) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        clearSelection();
-        setTagInputOpen(false);
+      if (
+        event.key !== 'Escape' ||
+        event.defaultPrevented ||
+        isAnyModalOpen()
+      ) {
+        return;
       }
+      event.preventDefault();
+      clearSelection();
+      setTagInputOpen(false);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -156,7 +171,11 @@ export function BulkActionBar({
     const removed = await stashRepo.deleteLinks(selectedIds);
     if (removed.length === 0) return;
     playDelete(soundEffects);
+    if (isArcadeMotion(motionMode) && fxDeskJolt) {
+      triggerContainerShake('heavy');
+    }
     clearSelection();
+    let undone = false;
     toast(`Deleted ${removed.length} link${removed.length === 1 ? '' : 's'}`, {
       duration: 6000,
       className: 'stash-undo-toast',
@@ -164,6 +183,8 @@ export function BulkActionBar({
       action: {
         label: 'Undo',
         onClick: () => {
+          if (undone) return;
+          undone = true;
           void stashRepo.restoreLinks(removed).then((restored) => {
             if (restored.length > 0) playDrop(soundEffects, motionMode);
           });

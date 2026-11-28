@@ -52,9 +52,7 @@ export function QuickStashProductPanel({
         </span>
       </Button>
 
-      {notice && (
-        <p className="font-mono text-[10px] text-amber-400">{notice}</p>
-      )}
+      {notice && <p className="font-mono text-[10px] text-warning">{notice}</p>}
 
       <ProductFieldsSection
         expanded={expanded}

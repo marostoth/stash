@@ -303,12 +303,12 @@ export function ThemeStudio({
           'flex flex-wrap items-center justify-between gap-2 rounded-control border px-3 py-2 text-[11px]',
           contrast.passesAA
             ? 'border-border bg-panel/50 text-fg-muted'
-            : 'border-amber-500/45 bg-amber-500/10 text-amber-300',
+            : 'border-warning/45 bg-warning/10 text-warning',
         )}
       >
         <div className="flex items-center gap-1.5">
           {!contrast.passesAA ? (
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warning" />
           ) : null}
           <span>
             {contrast.passesAA

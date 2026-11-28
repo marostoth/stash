@@ -75,16 +75,18 @@ export function CollectionAppearancePopover({
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
         setOpen(false);
       }
     };
 
     document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => {
       active = false;
       document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, { capture: true });
     };
   }, [open]);
 

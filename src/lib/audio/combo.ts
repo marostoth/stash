@@ -2,8 +2,18 @@ export const PENTATONIC_SEMITONES = [0, 2, 4, 7, 9, 12, 14, 16] as const;
 export const COMBO_RESET_MS = 2500;
 export const HOVER_RIFFLE_COOLDOWN_MS = 45;
 
+export type ComboTier = 1 | 2 | 3;
+
+export function resolveComboTier(count: number): ComboTier {
+  if (count >= 5) return 3;
+  if (count >= 3) return 2;
+  return 1;
+}
+
 export interface ComboStep {
   step: number;
+  count: number;
+  tier: ComboTier;
   semitones: number;
   multiplier: number;
 }
@@ -32,6 +42,7 @@ export function createComboTracker(
   scale: readonly number[] = PENTATONIC_SEMITONES,
 ): ComboTracker {
   let step = -1;
+  let count = 0;
   let lastEventMs: number | null = null;
 
   return {
@@ -39,14 +50,18 @@ export function createComboTracker(
       const expired = lastEventMs === null || nowMs - lastEventMs > resetMs;
       if (expired) {
         step = 0;
+        count = 1;
       } else {
         step = Math.min(step + 1, Math.max(0, scale.length - 1));
+        count += 1;
       }
       lastEventMs = nowMs;
 
       const semitones = scale[step] ?? 0;
       return {
         step,
+        count,
+        tier: resolveComboTier(count),
         semitones,
         multiplier: semitonesToMultiplier(semitones),
       };
@@ -61,6 +76,7 @@ export function createComboTracker(
 
     reset(): void {
       step = -1;
+      count = 0;
       lastEventMs = null;
     },
   };

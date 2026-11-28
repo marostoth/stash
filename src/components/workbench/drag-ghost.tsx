@@ -1,6 +1,6 @@
 import { GripVertical } from 'lucide-react';
 import { motion, useMotionValue, useSpring } from 'motion/react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { DragItemData } from '@/lib/dnd/types';
 import {
   ARCADE_DRAG_TILT_MAX_DEGREES,
@@ -15,7 +15,12 @@ import {
   TILT_SPRING_CONFIG,
 } from '@/lib/motion/physics';
 import { type MotionMode, TAB_GROUP_COLOR_SWATCH } from '@/lib/types/stash';
-import { extractDomain, getMonogram } from '@/lib/utils/url';
+import {
+  extractDomain,
+  getMonogram,
+  sanitizeFaviconUrl,
+} from '@/lib/utils/url';
+import { vfxEngine } from '@/lib/vfx/engine';
 
 interface DragGhostProps {
   data: DragItemData;
@@ -24,7 +29,6 @@ interface DragGhostProps {
 }
 
 const TRAIL_SPRING_NEAR = { stiffness: 260, damping: 22, mass: 0.65 };
-const TRAIL_SPRING_FAR = { stiffness: 190, damping: 24, mass: 0.85 };
 
 function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val));
@@ -38,6 +42,7 @@ export function DragGhost({
   const arcade = isArcadeMotion(motionMode);
   const tactile = isTactileMotion(motionMode);
   const tiltActive = tactile && dragTiltEnabled;
+  const ghostRef = useRef<HTMLDivElement | null>(null);
 
   const targetTilt = useMotionValue(0);
   const smoothTilt = useSpring(
@@ -45,13 +50,11 @@ export function DragGhost({
     arcade ? ARCADE_TILT_SPRING_CONFIG : TILT_SPRING_CONFIG,
   );
 
-  // Velocity-driven Arcade comet trail offsets (zero React re-renders)
+  // Velocity-driven Arcade trail offsets (zero React re-renders)
   const rawLagX = useMotionValue(0);
   const rawLagY = useMotionValue(0);
   const nearX = useSpring(rawLagX, TRAIL_SPRING_NEAR);
   const nearY = useSpring(rawLagY, TRAIL_SPRING_NEAR);
-  const farX = useSpring(rawLagX, TRAIL_SPRING_FAR);
-  const farY = useSpring(rawLagY, TRAIL_SPRING_FAR);
 
   useEffect(() => {
     if (!tiltActive && !arcade) {
@@ -85,6 +88,13 @@ export function DragGhost({
         if (arcade) {
           rawLagX.set(clamp(-velocityX * 0.016, -34, 34));
           rawLagY.set(clamp(-velocityY * 0.016, -28, 28));
+          const ghostRect = ghostRef.current?.getBoundingClientRect();
+          if (ghostRect && ghostRect.width > 0) {
+            const moteX = ghostRect.left + Math.random() * ghostRect.width;
+            vfxEngine.spawnDragMote(moteX, ghostRect.bottom - 2, now);
+          } else {
+            vfxEngine.spawnDragMote(event.clientX, event.clientY + 34, now);
+          }
         }
       }
       lastX = event.clientX;
@@ -113,9 +123,9 @@ export function DragGhost({
 
   const glowStyle: React.CSSProperties = {
     boxShadow: arcade
-      ? '0 26px 46px -12px rgba(0, 0, 0, 0.65), 0 0 30px -4px color-mix(in srgb, var(--stash-accent) 52%, transparent)'
+      ? '0 22px 44px -14px rgba(0, 0, 0, 0.72), 0 0 0 1px color-mix(in srgb, var(--stash-accent) 42%, transparent)'
       : tactile
-        ? '0 22px 38px -12px rgba(0, 0, 0, 0.58), 0 0 24px -6px color-mix(in srgb, var(--stash-accent) 42%, transparent)'
+        ? '0 18px 36px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px color-mix(in srgb, var(--stash-text) 16%, transparent)'
         : '0 14px 28px -10px rgba(0, 0, 0, 0.45)',
   };
 
@@ -123,22 +133,15 @@ export function DragGhost({
     const colorHex = TAB_GROUP_COLOR_SWATCH[data.collection.color];
     return (
       <div className="relative">
-        {arcade && (
-          <motion.div
-            aria-hidden="true"
-            style={{ x: nearX, y: nearY, rotate: tiltActive ? smoothTilt : 0 }}
-            className="pointer-events-none absolute inset-0 rounded-card border border-accent/40 bg-accent/14 blur-[2px]"
-          />
-        )}
         <motion.div
           initial={tactile ? { scale: 1 } : false}
-          animate={tactile ? { scale: arcade ? 1.04 : 1.03 } : { scale: 1 }}
+          animate={tactile ? { scale: 0.97 } : { scale: 1 }}
           transition={TACTILE_SPRING}
           style={{
             ...glowStyle,
             rotate: tiltActive ? smoothTilt : 0,
           }}
-          className="relative z-[2] flex w-72 items-center gap-2 rounded-card border border-accent/75 bg-panel px-3.5 py-2.5 will-change-transform"
+          className="relative z-[2] flex w-72 items-center gap-2 rounded-card border border-border bg-panel px-3.5 py-2.5 will-change-transform"
         >
           <GripVertical className="h-4 w-4 text-accent" />
           <span
@@ -155,69 +158,66 @@ export function DragGhost({
 
   const title = data.kind === 'link' ? data.link.title : data.tab.title;
   const url = data.kind === 'link' ? data.link.url : data.tab.url;
-  const faviconUrl =
-    data.kind === 'link' ? data.link.faviconUrl : data.tab.favIconUrl;
+  const faviconUrl = sanitizeFaviconUrl(
+    data.kind === 'link' ? data.link.faviconUrl : data.tab.favIconUrl,
+  );
+  const tags = data.kind === 'link' ? data.link.tags.slice(0, 3) : [];
   const domain = extractDomain(url);
   const monogram = getMonogram(title, url);
 
   return (
-    <div className="relative">
+    <div ref={ghostRef} className="relative">
       {arcade && (
-        <>
-          <motion.div
-            aria-hidden="true"
-            style={{
-              x: farX,
-              y: farY,
-              scale: 0.94,
-              rotate: tiltActive ? smoothTilt : 0,
-            }}
-            className="pointer-events-none absolute inset-0 rounded-card border border-accent/25 bg-accent/10 blur-[4px]"
-          />
-          <motion.div
-            aria-hidden="true"
-            style={{
-              x: nearX,
-              y: nearY,
-              scale: 0.98,
-              rotate: tiltActive ? smoothTilt : 0,
-            }}
-            className="pointer-events-none absolute inset-0 rounded-card border border-accent/45 bg-accent/16 blur-[1.5px]"
-          />
-        </>
+        <motion.div
+          aria-hidden="true"
+          style={{
+            x: nearX,
+            y: nearY,
+            scale: 0.94,
+            rotate: tiltActive ? smoothTilt : 0,
+          }}
+          className="pointer-events-none absolute inset-0 rounded-card border border-hairline bg-card/55"
+        />
       )}
       <motion.div
         initial={tactile ? { scale: 1 } : false}
-        animate={tactile ? { scale: arcade ? 1.06 : 1.04 } : { scale: 1 }}
+        animate={tactile ? { scale: 0.96 } : { scale: 1 }}
         transition={TACTILE_SPRING}
         style={{
           ...glowStyle,
           rotate: tiltActive ? smoothTilt : 0,
         }}
-        className="relative z-[2] flex w-64 items-start gap-2.5 rounded-card border border-accent/80 bg-card p-3 will-change-transform"
+        className="relative z-[2] flex min-h-[88px] w-[280px] flex-col justify-between gap-2.5 rounded-card border border-border bg-card p-3.5 will-change-transform"
       >
-        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-control border border-border bg-panel font-mono text-xs font-semibold text-accent">
-          {faviconUrl ? (
-            <img
-              src={faviconUrl}
-              alt=""
-              width={16}
-              height={16}
-              draggable={false}
-              className="h-4 w-4 object-contain"
-            />
-          ) : (
-            <span>{monogram}</span>
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="line-clamp-1 text-xs font-medium text-fg">
-            {title}
+        <div className="flex items-start gap-2.5">
+          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-control border border-hairline bg-panel font-mono text-xs font-semibold text-accent">
+            {faviconUrl ? (
+              <img
+                src={faviconUrl}
+                alt=""
+                width={16}
+                height={16}
+                draggable={false}
+                className="h-4 w-4 object-contain"
+              />
+            ) : (
+              <span>{monogram}</span>
+            )}
           </div>
-          <div className="mt-0.5 truncate font-mono text-[10px] text-fg-muted">
-            {domain}
+          <div className="min-w-0 flex-1">
+            <div className="line-clamp-2 text-sm font-medium leading-snug text-fg">
+              {title}
+            </div>
+            <div className="mt-1 truncate font-mono text-[11px] text-fg-muted">
+              {domain}
+            </div>
           </div>
         </div>
+        {tags.length > 0 && (
+          <div className="truncate font-mono text-[10.5px] text-fg-muted/75">
+            {tags.join(' · ')}
+          </div>
+        )}
       </motion.div>
     </div>
   );

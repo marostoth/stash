@@ -11,7 +11,10 @@ const decodedCache = new Map<
   SoundEventId,
   { dataUrl: string; buffer: AudioBuffer }
 >();
-const pendingDecodes = new Set<SoundEventId>();
+const pendingDecodes = new Map<
+  SoundEventId,
+  { dataUrl: string; promise: Promise<AudioBuffer | null> }
+>();
 
 export function setCustomSoundsEnabled(enabled: boolean): void {
   customEnabled = enabled;
@@ -19,11 +22,17 @@ export function setCustomSoundsEnabled(enabled: boolean): void {
 
 export function setCustomSfxClips(clips: CustomSfxMap): void {
   activeClips = clips;
-  // Evict stale decoded buffers when a slot changed or was removed
+  // Evict stale decoded buffers and in-flight decodes when a slot changed or was removed
   for (const [eventId, entry] of decodedCache.entries()) {
     const nextClip = clips[eventId];
     if (!nextClip || nextClip.dataUrl !== entry.dataUrl) {
       decodedCache.delete(eventId);
+    }
+  }
+  for (const [eventId, entry] of pendingDecodes.entries()) {
+    const nextClip = clips[eventId];
+    if (!nextClip || nextClip.dataUrl !== entry.dataUrl) {
+      pendingDecodes.delete(eventId);
     }
   }
 }
@@ -35,32 +44,52 @@ export function resetCustomSfxCacheForTests(): void {
   pendingDecodes.clear();
 }
 
+function getOrStartDecode(
+  ctx: AudioContext,
+  eventId: SoundEventId,
+  dataUrl: string,
+): Promise<AudioBuffer | null> | null {
+  if (typeof ctx.decodeAudioData !== 'function') return null;
+
+  const existing = pendingDecodes.get(eventId);
+  if (existing && existing.dataUrl === dataUrl) {
+    return existing.promise;
+  }
+
+  const arrayBuffer = dataUrlToArrayBuffer(dataUrl);
+  if (!arrayBuffer) return null;
+
+  const promise = ctx.decodeAudioData(arrayBuffer).then(
+    (buffer) => {
+      if (pendingDecodes.get(eventId)?.promise === promise) {
+        pendingDecodes.delete(eventId);
+      }
+      if (activeClips[eventId]?.dataUrl === dataUrl) {
+        decodedCache.set(eventId, { dataUrl, buffer });
+        return buffer;
+      }
+      return null;
+    },
+    () => {
+      if (pendingDecodes.get(eventId)?.promise === promise) {
+        pendingDecodes.delete(eventId);
+      }
+      return null;
+    },
+  );
+
+  pendingDecodes.set(eventId, { dataUrl, promise });
+  return promise;
+}
+
 export function prewarmCustomSfx(
   ctx: AudioContext,
   eventId: SoundEventId,
 ): void {
   const clip = activeClips[eventId];
-  if (!clip || typeof ctx.decodeAudioData !== 'function') return;
+  if (!clip) return;
   if (decodedCache.get(eventId)?.dataUrl === clip.dataUrl) return;
-  if (pendingDecodes.has(eventId)) return;
-
-  const arrayBuffer = dataUrlToArrayBuffer(clip.dataUrl);
-  if (!arrayBuffer) return;
-
-  pendingDecodes.add(eventId);
-  void ctx
-    .decodeAudioData(arrayBuffer)
-    .then((buffer) => {
-      if (activeClips[eventId]?.dataUrl === clip.dataUrl) {
-        decodedCache.set(eventId, { dataUrl: clip.dataUrl, buffer });
-      }
-    })
-    .catch(() => {
-      // Ignore corrupt clips; built-in sound pack will seamlessly take over
-    })
-    .finally(() => {
-      pendingDecodes.delete(eventId);
-    });
+  void getOrStartDecode(ctx, eventId, clip.dataUrl);
 }
 
 function playDecodedBuffer(
@@ -69,25 +98,51 @@ function playDecodedBuffer(
   options: { pitchMultiplier: number; gain: number; jitterAmount: number },
 ): void {
   if (typeof bus.ctx.createBufferSource !== 'function') return;
+  if (bus.ctx.state !== 'running' || bus.isChoked?.()) return;
+
   const src = bus.ctx.createBufferSource();
   src.buffer = buffer;
 
+  const now = bus.ctx.currentTime;
+  const appliedRate = Math.max(
+    0.7,
+    Math.min(1.5, options.pitchMultiplier * jitter(options.jitterAmount)),
+  );
   if (
     src.playbackRate &&
     typeof src.playbackRate.setValueAtTime === 'function'
   ) {
-    const rate = Math.max(
-      0.7,
-      Math.min(1.5, options.pitchMultiplier * jitter(options.jitterAmount)),
-    );
-    src.playbackRate.setValueAtTime(rate, bus.ctx.currentTime);
+    src.playbackRate.setValueAtTime(appliedRate, now);
   }
 
   const amp = bus.ctx.createGain();
-  amp.gain.setValueAtTime(options.gain, bus.ctx.currentTime);
+  const safeGain = Math.max(0.0002, options.gain);
+  amp.gain.setValueAtTime(0.0001, now);
+  amp.gain.linearRampToValueAtTime(safeGain, now + 0.002);
+
+  if (
+    typeof buffer.duration === 'number' &&
+    Number.isFinite(buffer.duration) &&
+    buffer.duration > 0.02
+  ) {
+    const end = now + buffer.duration / appliedRate;
+    const fadeStart = Math.max(now + 0.004, end - 0.008);
+    amp.gain.setValueAtTime(safeGain, fadeStart);
+    amp.gain.exponentialRampToValueAtTime(0.0001, end);
+    amp.gain.linearRampToValueAtTime(0, end + 0.004);
+  }
+
   src.connect(amp);
   amp.connect(bus.destination);
-  src.start(bus.ctx.currentTime);
+  src.onended = () => {
+    try {
+      if (typeof src.disconnect === 'function') src.disconnect();
+      if (typeof amp.disconnect === 'function') amp.disconnect();
+    } catch {
+      // Ignore already-disconnected node errors
+    }
+  };
+  src.start(now);
 }
 
 /**
@@ -120,21 +175,20 @@ export function tryPlayCustomSfx(
     }
   }
 
-  // First-time decode on demand: decode asynchronously and play once ready
-  if (typeof bus.ctx.decodeAudioData !== 'function') return false;
-  const arrayBuffer = dataUrlToArrayBuffer(clip.dataUrl);
-  if (!arrayBuffer) return false;
+  // Deduplicated first-time cold decode: guard against choked gates or stale clips on resolve
+  const decodePromise = getOrStartDecode(bus.ctx, eventId, clip.dataUrl);
+  if (!decodePromise) return false;
 
-  void bus.ctx
-    .decodeAudioData(arrayBuffer)
-    .then((buffer) => {
-      if (activeClips[eventId]?.dataUrl !== clip.dataUrl) return;
-      decodedCache.set(eventId, { dataUrl: clip.dataUrl, buffer });
+  void decodePromise.then((buffer) => {
+    if (!buffer) return;
+    if (activeClips[eventId]?.dataUrl !== clip.dataUrl) return;
+    if (bus.ctx.state !== 'running' || bus.isChoked?.()) return;
+    try {
       playDecodedBuffer(bus, buffer, playOpts);
-    })
-    .catch(() => {
-      // Fail silently on decode error
-    });
+    } catch {
+      // Fail silently on playback error
+    }
+  });
 
   return true;
 }

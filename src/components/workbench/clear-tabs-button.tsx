@@ -3,7 +3,11 @@ import { motion } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { playDelete } from '@/lib/audio/foley';
-import { isTactileMotion, TACTILE_SPRING } from '@/lib/motion/physics';
+import {
+  isArcadeMotion,
+  isTactileMotion,
+  TACTILE_SPRING,
+} from '@/lib/motion/physics';
 import { formatClearTabsToast } from '@/lib/tabs/clearFilter';
 import {
   executeClearWindowTabs,
@@ -11,6 +15,8 @@ import {
 } from '@/lib/tabs/tab-actions';
 import type { MotionMode } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
+import { spawnBulkPulseForElement } from '@/lib/vfx/engine';
+import { useFxStore } from '@/store/fx-store';
 
 const ARM_DURATION_MS = 3000;
 const REOPEN_TOAST_DURATION_MS = 8000;
@@ -19,6 +25,8 @@ interface ClearTabsButtonProps {
   clearableCount: number;
   soundEffects: boolean;
   motionMode: MotionMode;
+  fxDeskJolt?: boolean;
+  fxAmbientWaves?: boolean;
   disabled?: boolean;
 }
 
@@ -26,8 +34,12 @@ export function ClearTabsButton({
   clearableCount,
   soundEffects,
   motionMode,
+  fxDeskJolt = true,
+  fxAmbientWaves = true,
   disabled = false,
 }: ClearTabsButtonProps) {
+  const triggerContainerShake = useFxStore((s) => s.triggerContainerShake);
+  const triggerSidebarSweep = useFxStore((s) => s.triggerSidebarSweep);
   const [armed, setArmed] = useState(false);
   const [clearing, setClearing] = useState(false);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -63,6 +75,7 @@ export function ClearTabsButton({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.preventDefault();
         event.stopPropagation();
         disarm();
       }
@@ -75,10 +88,10 @@ export function ClearTabsButton({
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
     document.addEventListener('pointerdown', handlePointerDown);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
       document.removeEventListener('pointerdown', handlePointerDown);
     };
   }, [armed, disarm]);
@@ -109,6 +122,16 @@ export function ClearTabsButton({
       }
 
       playDelete(soundEffects);
+      if (isArcadeMotion(motionMode)) {
+        if (fxDeskJolt) triggerContainerShake('heavy');
+        if (fxAmbientWaves) {
+          triggerSidebarSweep();
+          spawnBulkPulseForElement(
+            buttonRef.current?.closest('[data-stash-sidebar="open-tabs"]'),
+            0,
+          );
+        }
+      }
 
       const message = formatClearTabsToast(
         outcome.clearedCount,
@@ -165,7 +188,7 @@ export function ClearTabsButton({
       className={cn(
         'inline-flex h-6 shrink-0 items-center gap-1 rounded-control border px-1.5 font-mono text-[10px] font-medium transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:pointer-events-none disabled:opacity-40 cursor-pointer',
         armed
-          ? 'border-amber-500/70 bg-amber-500/15 text-danger hover:bg-amber-500/25'
+          ? 'border-warning/70 bg-warning/15 text-danger hover:bg-warning/25'
           : 'border-transparent text-fg-muted hover:border-border hover:bg-card hover:text-fg',
       )}
     >

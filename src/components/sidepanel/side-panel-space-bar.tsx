@@ -58,8 +58,8 @@ export function SidePanelSpaceBar({
         className={cn(
           'inline-flex h-6 shrink-0 items-center gap-1 rounded-pill border px-2 text-[11px] font-medium transition-colors cursor-pointer',
           allActive
-            ? 'border-accent/60 bg-accent/15 text-accent'
-            : 'border-border/75 bg-canvas/70 text-fg-muted hover:border-accent/40 hover:text-fg',
+            ? 'border-hairline bg-elevated text-fg'
+            : 'border-hairline bg-canvas/70 text-fg-muted hover:border-border hover:text-fg',
         )}
       >
         <Globe className="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -82,8 +82,8 @@ export function SidePanelSpaceBar({
             className={cn(
               'inline-flex h-6 shrink-0 items-center gap-1 rounded-pill border px-2 text-[11px] font-medium transition-colors cursor-pointer',
               active
-                ? 'border-accent/60 bg-accent/15 text-accent'
-                : 'border-border/75 bg-canvas/70 text-fg-muted hover:border-accent/40 hover:text-fg',
+                ? 'border-hairline bg-elevated text-fg'
+                : 'border-hairline bg-canvas/70 text-fg-muted hover:border-border hover:text-fg',
             )}
           >
             <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />

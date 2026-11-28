@@ -360,7 +360,7 @@ export function RulesManager({ rules, collections }: RulesManagerProps) {
                         style={{
                           backgroundColor: target
                             ? TAB_GROUP_COLOR_SWATCH[target.color]
-                            : '#94A3B8',
+                            : 'var(--stash-text-muted)',
                         }}
                       />
                       {target?.name ?? 'Deleted collection'}

@@ -15,7 +15,7 @@ import { CopyListButton } from '@/components/workbench/details-inline-cells';
 import { DetailsRow } from '@/components/workbench/details-row';
 import { isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
-import type { DropEffectStyle, LinkItem, MotionMode } from '@/lib/types/stash';
+import type { LinkItem, MotionMode } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
 import {
   formatCurrencySummaries,
@@ -178,7 +178,6 @@ interface DetailsStoreSectionProps {
   defaultCurrency: string;
   openInNewTab: boolean;
   motionMode: MotionMode;
-  dropEffectStyle?: DropEffectStyle;
   fxAmbientWaves?: boolean;
   soundEffects: boolean;
   hoverPreviews: boolean;
@@ -200,7 +199,6 @@ export function DetailsStoreSection({
   defaultCurrency,
   openInNewTab,
   motionMode,
-  dropEffectStyle = 'dust',
   fxAmbientWaves = true,
   soundEffects,
   hoverPreviews,
@@ -333,7 +331,6 @@ export function DetailsStoreSection({
                   defaultCurrency={defaultCurrency}
                   openInNewTab={openInNewTab}
                   motionMode={motionMode}
-                  dropEffectStyle={dropEffectStyle}
                   soundEffects={soundEffects}
                   hoverPreviews={hoverPreviews}
                   gridTemplateClass={gridTemplateClass}

@@ -43,7 +43,7 @@ export function CreateSpacePopover({
   };
 
   return (
-    <div className="border-t border-border bg-panel/95 px-4 py-3 shadow-lg sm:px-6">
+    <div className="border-t border-border bg-panel/95 px-5 py-3 shadow-lg sm:px-8">
       <form
         onSubmit={(e) => void handleSubmit(e)}
         className={cn(
@@ -162,7 +162,7 @@ export function EditSpacePopover({
   };
 
   return (
-    <div className="border-t border-border bg-panel/95 px-4 py-3 shadow-lg sm:px-6">
+    <div className="border-t border-border bg-panel/95 px-5 py-3 shadow-lg sm:px-8">
       <form
         onSubmit={(e) => void handleSubmit(e)}
         className={cn(

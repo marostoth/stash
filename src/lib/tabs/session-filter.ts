@@ -1,4 +1,8 @@
-import { extractDomain, normalizeUrlForComparison } from '@/lib/utils/url';
+import {
+  extractDomain,
+  normalizeUrlForComparison,
+  sanitizeFaviconUrl,
+} from '@/lib/utils/url';
 
 export interface OpenTabInfo {
   id: number;
@@ -66,10 +70,7 @@ export function normalizeRawTabs(
       index: tab.index ?? 0,
       title: tab.title?.trim() || extractDomain(url),
       url,
-      favIconUrl:
-        tab.favIconUrl && !tab.favIconUrl.startsWith('chrome://')
-          ? tab.favIconUrl
-          : undefined,
+      favIconUrl: sanitizeFaviconUrl(tab.favIconUrl),
       pinned: Boolean(tab.pinned),
       active: Boolean(tab.active),
       audible: Boolean(tab.audible),

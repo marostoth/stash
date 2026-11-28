@@ -4,6 +4,7 @@ import {
   matchFallbackLinkIcon,
 } from '@/lib/icons/catalog';
 import { cn } from '@/lib/utils/cn';
+import { sanitizeFaviconUrl } from '@/lib/utils/url';
 
 type FaviconSize = 'sm' | 'md' | 'lg';
 
@@ -35,19 +36,20 @@ export function LinkFavicon({
 }: LinkFaviconProps) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
 
+  const safeFaviconUrl = sanitizeFaviconUrl(faviconUrl);
   const spec = SIZE_STYLES[size];
-  const showImage = Boolean(faviconUrl) && failedUrl !== faviconUrl;
+  const showImage = Boolean(safeFaviconUrl) && failedUrl !== safeFaviconUrl;
 
-  if (showImage && faviconUrl) {
+  if (showImage && safeFaviconUrl) {
     return (
       <img
-        src={faviconUrl}
+        src={safeFaviconUrl}
         alt=""
         width={spec.imgPx}
         height={spec.imgPx}
         loading="lazy"
         draggable={false}
-        onError={() => setFailedUrl(faviconUrl)}
+        onError={() => setFailedUrl(safeFaviconUrl)}
         className={cn(spec.imgClass, 'object-contain', className)}
       />
     );

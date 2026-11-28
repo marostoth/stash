@@ -9,7 +9,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { LinkFavicon } from '@/components/LinkFavicon';
-import { playDelete, playDrop, playTagPop } from '@/lib/audio/foley';
+import {
+  playDelete,
+  playDrop,
+  playSessionFreeze,
+  playTagPop,
+  playUncheck,
+} from '@/lib/audio/foley';
 import { stashRepo } from '@/lib/storage/repo';
 import { wakeUpCollectionInTabGroup } from '@/lib/tabs/tab-actions';
 import { getCuratedCollectionIcon } from '@/lib/themes/collection-icons';
@@ -24,7 +30,7 @@ import { getCollectionSortMeta } from '@/lib/utils/collection-sort';
 import { HighlightText } from '@/lib/utils/highlight-match';
 import { formatPrice, normalizeCurrencyCode } from '@/lib/utils/price-math';
 import type { FilteredCollectionGroup } from '@/lib/utils/search';
-import { extractDomain } from '@/lib/utils/url';
+import { extractDomain, toSafeHref } from '@/lib/utils/url';
 
 interface SidePanelCollectionListProps {
   groups: readonly FilteredCollectionGroup[];
@@ -62,6 +68,7 @@ export function SidePanelCollectionList({
   ) => {
     event.stopPropagation();
     if (colLinks.length === 0) return;
+    playSessionFreeze(soundEffects, motionMode);
     const opened = await wakeUpCollectionInTabGroup(collection, colLinks);
     if (opened > 0) {
       toast.success(
@@ -88,8 +95,12 @@ export function SidePanelCollectionList({
     event.stopPropagation();
     const nextChecked = link.checked !== true;
     const res = await stashRepo.updateLink(link.id, { checked: nextChecked });
-    if (res.ok && nextChecked) {
-      playTagPop(soundEffects, motionMode);
+    if (res.ok) {
+      if (nextChecked) {
+        playTagPop(soundEffects, motionMode);
+      } else {
+        playUncheck(soundEffects);
+      }
     }
   };
 
@@ -115,12 +126,15 @@ export function SidePanelCollectionList({
     const deleted = await stashRepo.deleteLink(snapshot.id);
     if (!deleted) return;
     playDelete(soundEffects);
+    let undone = false;
     toast('Link removed', {
       duration: 5000,
       className: 'stash-undo-toast',
       action: {
         label: 'Undo',
         onClick: () => {
+          if (undone) return;
+          undone = true;
           void stashRepo.restoreLink(snapshot).then((restored) => {
             if (restored) {
               playDrop(soundEffects, motionMode);
@@ -265,7 +279,7 @@ export function SidePanelCollectionList({
                       )}
 
                       <a
-                        href={link.url}
+                        href={toSafeHref(link.url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => void stashRepo.markLinkOpened(link.id)}
