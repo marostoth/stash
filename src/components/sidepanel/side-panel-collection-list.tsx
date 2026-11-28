@@ -1,14 +1,7 @@
-import {
-  ArrowUpRight,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  Star,
-  Trash2,
-} from 'lucide-react';
+import { ArrowUpRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { LinkFavicon } from '@/components/LinkFavicon';
+import { SidePanelLinkRow } from '@/components/sidepanel/side-panel-link-row';
+import { SmoothCollapse } from '@/components/workbench/smooth-collapse';
 import {
   playDelete,
   playDrop,
@@ -25,12 +18,12 @@ import {
   type MotionMode,
   TAB_GROUP_COLOR_SWATCH,
 } from '@/lib/types/stash';
-import { cn } from '@/lib/utils/cn';
 import { getCollectionSortMeta } from '@/lib/utils/collection-sort';
-import { HighlightText } from '@/lib/utils/highlight-match';
-import { formatPrice, normalizeCurrencyCode } from '@/lib/utils/price-math';
+import {
+  formatCurrencySummaries,
+  summarizePrices,
+} from '@/lib/utils/price-math';
 import type { FilteredCollectionGroup } from '@/lib/utils/search';
-import { extractDomain, toSafeHref } from '@/lib/utils/url';
 
 interface SidePanelCollectionListProps {
   groups: readonly FilteredCollectionGroup[];
@@ -44,6 +37,10 @@ interface SidePanelCollectionListProps {
   onClearFilters: () => void;
 }
 
+/**
+ * Premium Side Panel library list with `color-mix()` tinted collection headers,
+ * smooth accordion collapse, hover-revealed `Wake Up`, and breathable mini-cards.
+ */
 export function SidePanelCollectionList({
   groups,
   searchQuery,
@@ -147,7 +144,7 @@ export function SidePanelCollectionList({
 
   if (groups.length === 0) {
     return (
-      <div className="space-y-2 py-8 text-center text-xs text-fg-muted">
+      <div className="space-y-2.5 rounded-card border border-dashed border-hairline bg-[var(--stash-panel)]/45 px-4 py-8 text-center text-xs text-fg-muted">
         <p>
           {isFiltering
             ? searchQuery.trim()
@@ -159,7 +156,7 @@ export function SidePanelCollectionList({
           <button
             type="button"
             onClick={onClearFilters}
-            className="rounded-pill border border-border bg-panel px-2.5 py-1 font-mono text-[10px] text-accent transition-colors hover:border-accent/50 cursor-pointer"
+            className="rounded-pill border border-border bg-[var(--stash-card)] px-3 py-1 font-mono text-[10px] text-accent transition-colors hover:border-accent/50 cursor-pointer"
           >
             Clear filters
           </button>
@@ -169,7 +166,7 @@ export function SidePanelCollectionList({
   }
 
   return (
-    <div className="space-y-2.5">
+    <div className="min-w-0 space-y-2.5">
       {groups.map(({ collection, links: colLinks }) => {
         const expanded = isCollectionOpen(collection.id, collection.collapsed);
         const CuratedIcon = getCuratedCollectionIcon(collection.icon);
@@ -180,46 +177,70 @@ export function SidePanelCollectionList({
         const sortMeta = isSorted
           ? getCollectionSortMeta(collection.sortMode)
           : null;
+        const priceSummaries = summarizePrices(colLinks, defaultCurrency);
+        const subtotalText =
+          priceSummaries.length > 0
+            ? formatCurrencySummaries(priceSummaries)
+            : null;
 
         return (
-          <div
+          <section
             key={collection.id}
-            className="rounded-card border border-border bg-panel/70"
+            className="min-w-0 overflow-hidden rounded-card border border-hairline bg-[var(--stash-panel)]/70 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--stash-text)_4%,transparent)]"
           >
-            <div className="group/hdr flex items-center justify-between gap-1 px-2 py-1.5">
+            {/* Tinted Collapsible Header */}
+            <div
+              className="group/hdr relative flex items-center justify-between gap-1.5 px-2.5 py-2"
+              style={{
+                background: `linear-gradient(90deg, color-mix(in srgb, ${colorHex} 12%, transparent) 0%, color-mix(in srgb, ${colorHex} 3%, transparent) 55%, transparent 100%)`,
+              }}
+            >
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-1.5 left-0 w-[2.5px] rounded-r-full"
+                style={{ backgroundColor: colorHex }}
+              />
+
               <button
                 type="button"
                 onClick={() => onToggleCollection(collection.id, expanded)}
                 aria-expanded={expanded}
-                className="flex min-w-0 flex-1 items-center gap-1.5 rounded-control px-1 py-0.5 text-left text-xs font-medium text-fg transition-colors hover:bg-card/60 cursor-pointer"
+                className="flex min-w-0 flex-1 items-center gap-1.5 rounded-control px-1 py-0.5 text-left text-xs font-semibold tracking-tight text-fg transition-colors hover:bg-[var(--stash-card)]/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 cursor-pointer"
               >
                 {expanded ? (
                   <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
                 ) : (
                   <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
                 )}
-                {CuratedIcon ? (
-                  <CuratedIcon
-                    className="h-3.5 w-3.5 shrink-0"
-                    style={{ color: colorHex }}
-                    aria-hidden="true"
-                  />
-                ) : collection.icon ? (
-                  <span
-                    className="shrink-0 text-xs leading-none"
-                    aria-hidden="true"
-                  >
-                    {collection.icon}
-                  </span>
-                ) : (
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: colorHex }}
-                  />
-                )}
+
+                <span
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] border border-hairline"
+                  style={{
+                    backgroundColor: `color-mix(in srgb, ${colorHex} 14%, var(--stash-canvas))`,
+                  }}
+                  aria-hidden="true"
+                >
+                  {CuratedIcon ? (
+                    <CuratedIcon
+                      className="h-3 w-3"
+                      style={{ color: colorHex }}
+                    />
+                  ) : collection.icon ? (
+                    <span className="text-[11px] leading-none">
+                      {collection.icon}
+                    </span>
+                  ) : (
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: colorHex }}
+                    />
+                  )}
+                </span>
+
                 <span className="truncate">{collection.name}</span>
+
                 {sortMeta && (
-                  <span className="shrink-0 rounded-pill border border-accent/35 bg-accent/10 px-1.5 py-0.25 font-mono text-[9px] text-accent">
+                  <span className="shrink-0 rounded-pill border border-accent/35 bg-accent/10 px-1.5 py-0.25 font-mono text-[9px] font-normal text-accent">
                     {sortMeta.shortLabel}
                   </span>
                 )}
@@ -232,162 +253,50 @@ export function SidePanelCollectionList({
                     onClick={(e) => void handleWakeUp(e, collection, colLinks)}
                     title={`Wake Up "${collection.name}" in a Chrome Tab Group`}
                     aria-label={`Wake Up ${collection.name}`}
-                    className="inline-flex h-6 items-center gap-0.5 rounded px-1.5 font-mono text-[10px] text-fg-muted opacity-0 transition-opacity hover:bg-card hover:text-accent group-hover/hdr:opacity-100 focus-visible:opacity-100 cursor-pointer"
+                    className="inline-flex h-6 items-center gap-0.5 rounded-control border border-transparent px-1.5 font-mono text-[10px] font-medium text-fg-muted opacity-0 transition-[opacity,background-color,border-color,color] hover:border-accent/40 hover:bg-[var(--stash-card)] hover:text-accent group-hover/hdr:opacity-100 focus-visible:opacity-100 cursor-pointer"
                   >
-                    <span>Wake</span>
+                    <span className="hidden min-[360px]:inline">Wake Up</span>
                     <ArrowUpRight className="h-3 w-3" />
                   </button>
                 )}
-                <span className="pr-1 font-mono text-[10px] text-fg-muted">
+                {subtotalText && (
+                  <span
+                    title={`Collection subtotal: ${subtotalText}`}
+                    className="max-w-[92px] truncate rounded-pill border border-hairline bg-canvas/75 px-1.5 py-0.25 font-mono text-[10px] text-fg-muted tabular-nums"
+                  >
+                    {subtotalText}
+                  </span>
+                )}
+                <span className="rounded-pill border border-hairline bg-canvas/75 px-1.5 py-0.25 font-mono text-[10px] text-fg-muted tabular-nums">
                   {colLinks.length}
                 </span>
               </div>
             </div>
 
-            {expanded && colLinks.length > 0 && (
-              <div className="space-y-0.5 border-t border-border p-1.5">
-                {colLinks.map((link) => {
-                  const isStarred = link.starred === true;
-                  const isChecked = link.checked === true;
-                  const price =
-                    typeof link.product?.price === 'number' &&
-                    Number.isFinite(link.product.price)
-                      ? formatPrice(
-                          link.product.price *
-                            Math.max(1, Math.floor(link.product.orderQty ?? 1)),
-                          normalizeCurrencyCode(
-                            link.product.currency,
-                            defaultCurrency,
-                          ),
-                        )
-                      : null;
-
-                  return (
-                    <div
-                      key={link.id}
-                      className={cn(
-                        'group/row relative flex items-center gap-1 rounded-control transition-colors hover:bg-card',
-                        isStarred && !isChecked && 'bg-accent/[0.06]',
-                        isChecked && 'opacity-60 hover:opacity-90',
-                      )}
-                    >
-                      {isStarred && !isChecked && (
-                        <span
-                          aria-hidden="true"
-                          className="pointer-events-none absolute inset-y-1 left-0 w-[2px] rounded-full bg-accent"
-                        />
-                      )}
-
-                      <a
-                        href={toSafeHref(link.url)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => void stashRepo.markLinkOpened(link.id)}
-                        className="flex min-w-0 flex-1 items-start gap-2 px-2 py-1.5"
-                      >
-                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-canvas">
-                          <LinkFavicon
-                            url={link.url}
-                            faviconUrl={link.faviconUrl}
-                            size="sm"
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className={cn(
-                                'truncate text-xs font-medium',
-                                isChecked
-                                  ? 'text-fg-muted line-through decoration-fg-muted/70'
-                                  : 'text-fg',
-                              )}
-                            >
-                              <HighlightText
-                                text={link.title}
-                                query={searchQuery}
-                              />
-                            </span>
-                            {price && (
-                              <span className="shrink-0 rounded border border-border/80 bg-canvas px-1 py-0.25 font-mono text-[9px] text-fg-muted tabular-nums">
-                                {price}
-                              </span>
-                            )}
-                          </div>
-                          <div className="truncate font-mono text-[10px] text-fg-muted">
-                            {extractDomain(link.url)}
-                            {link.note ? ` · ${link.note}` : ''}
-                          </div>
-                        </div>
-                      </a>
-
-                      {/* Compact Hover Quick Actions */}
-                      <div className="mr-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100">
-                        <button
-                          type="button"
-                          onClick={(e) => void handleToggleChecked(e, link)}
-                          aria-label={
-                            isChecked
-                              ? `Uncheck ${link.title}`
-                              : `Mark ${link.title} done`
-                          }
-                          title={isChecked ? 'Unmark done' : 'Mark done'}
-                          className={cn(
-                            'inline-flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-panel cursor-pointer',
-                            isChecked
-                              ? 'text-accent'
-                              : 'text-fg-muted hover:text-accent',
-                          )}
-                        >
-                          <Check className="h-3 w-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => void handleToggleStar(e, link)}
-                          aria-label={
-                            isStarred
-                              ? `Unstar ${link.title}`
-                              : `Star ${link.title}`
-                          }
-                          title={isStarred ? 'Remove star' : 'Star link'}
-                          className={cn(
-                            'inline-flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-panel cursor-pointer',
-                            isStarred
-                              ? 'text-accent'
-                              : 'text-fg-muted hover:text-accent',
-                          )}
-                        >
-                          <Star
-                            className={cn(
-                              'h-3 w-3',
-                              isStarred && 'fill-accent text-accent',
-                            )}
-                          />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => void handleCopyUrl(e, link.url)}
-                          aria-label={`Copy URL for ${link.title}`}
-                          title="Copy URL"
-                          className="inline-flex h-6 w-6 items-center justify-center rounded text-fg-muted transition-colors hover:bg-panel hover:text-fg cursor-pointer"
-                        >
-                          <Copy className="h-3 w-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => void handleDelete(e, link)}
-                          aria-label={`Delete ${link.title}`}
-                          title="Delete (Undo available)"
-                          className="inline-flex h-6 w-6 items-center justify-center rounded text-fg-muted transition-colors hover:bg-danger/15 hover:text-danger cursor-pointer"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+            {/* Smoothly Collapsible Spaced Mini-Card List */}
+            <SmoothCollapse
+              open={expanded && colLinks.length > 0}
+              motionMode={motionMode}
+            >
+              <div className="min-w-0 space-y-1.5 overflow-hidden border-t border-hairline bg-canvas/30 p-2">
+                {colLinks.map((link) => (
+                  <SidePanelLinkRow
+                    key={link.id}
+                    link={link}
+                    searchQuery={searchQuery}
+                    defaultCurrency={defaultCurrency}
+                    motionMode={motionMode}
+                    onToggleChecked={(e, item) =>
+                      void handleToggleChecked(e, item)
+                    }
+                    onToggleStar={(e, item) => void handleToggleStar(e, item)}
+                    onCopyUrl={(e, url) => void handleCopyUrl(e, url)}
+                    onDelete={(e, item) => void handleDelete(e, item)}
+                  />
+                ))}
               </div>
-            )}
-          </div>
+            </SmoothCollapse>
+          </section>
         );
       })}
     </div>

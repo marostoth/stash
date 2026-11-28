@@ -19,8 +19,8 @@ interface SidePanelSpaceBarProps {
 }
 
 /**
- * Compact horizontal Space switcher for the Chrome Side Panel.
- * Includes an "All" scope pill plus every user Space with its icon and link count.
+ * Machined horizontal Space switcher for the Chrome Side Panel.
+ * Includes an "All" scope pill plus every user Space with its icon and tabular link count.
  */
 export function SidePanelSpaceBar({
   spaces,
@@ -48,7 +48,7 @@ export function SidePanelSpaceBar({
     <div
       role="tablist"
       aria-label="Spaces"
-      className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border/75 bg-panel/55 px-3 py-1.5"
+      className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-hairline bg-[var(--stash-panel)]/70 px-3 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <button
         type="button"
@@ -56,15 +56,23 @@ export function SidePanelSpaceBar({
         aria-selected={allActive}
         onClick={() => onSelectSpace(SIDE_PANEL_ALL_SPACES)}
         className={cn(
-          'inline-flex h-6 shrink-0 items-center gap-1 rounded-pill border px-2 text-[11px] font-medium transition-colors cursor-pointer',
+          'inline-flex h-6.5 shrink-0 items-center gap-1.5 rounded-control border px-2 text-[11px] font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
           allActive
-            ? 'border-hairline bg-elevated text-fg'
-            : 'border-hairline bg-canvas/70 text-fg-muted hover:border-border hover:text-fg',
+            ? 'border-accent/45 bg-[var(--stash-card)] text-fg shadow-[inset_0_1px_0_color-mix(in_srgb,var(--stash-text)_8%,transparent)]'
+            : 'border-transparent bg-transparent text-fg-muted hover:border-hairline hover:bg-[var(--stash-card)]/60 hover:text-fg',
         )}
       >
-        <Globe className="h-3 w-3 shrink-0" aria-hidden="true" />
+        <Globe
+          className={cn(
+            'h-3 w-3 shrink-0',
+            allActive ? 'text-accent' : 'opacity-75',
+          )}
+          aria-hidden="true"
+        />
         <span>All</span>
-        <span className="font-mono text-[9px] opacity-75">{links.length}</span>
+        <span className="font-mono text-[10px] text-fg-muted tabular-nums">
+          {links.length}
+        </span>
       </button>
 
       {spaces.map((space) => {
@@ -80,15 +88,23 @@ export function SidePanelSpaceBar({
             aria-selected={active}
             onClick={() => onSelectSpace(space.id)}
             className={cn(
-              'inline-flex h-6 shrink-0 items-center gap-1 rounded-pill border px-2 text-[11px] font-medium transition-colors cursor-pointer',
+              'inline-flex h-6.5 shrink-0 items-center gap-1.5 rounded-control border px-2 text-[11px] font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
               active
-                ? 'border-hairline bg-elevated text-fg'
-                : 'border-hairline bg-canvas/70 text-fg-muted hover:border-border hover:text-fg',
+                ? 'border-accent/45 bg-[var(--stash-card)] text-fg shadow-[inset_0_1px_0_color-mix(in_srgb,var(--stash-text)_8%,transparent)]'
+                : 'border-transparent bg-transparent text-fg-muted hover:border-hairline hover:bg-[var(--stash-card)]/60 hover:text-fg',
             )}
           >
-            <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
-            <span className="max-w-[92px] truncate">{space.name}</span>
-            <span className="font-mono text-[9px] opacity-75">{count}</span>
+            <Icon
+              className={cn(
+                'h-3 w-3 shrink-0',
+                active ? 'text-accent' : 'opacity-75',
+              )}
+              aria-hidden="true"
+            />
+            <span className="max-w-[96px] truncate">{space.name}</span>
+            <span className="font-mono text-[10px] text-fg-muted tabular-nums">
+              {count}
+            </span>
           </button>
         );
       })}

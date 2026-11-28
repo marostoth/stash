@@ -1,15 +1,20 @@
-import { BookmarkPlus, Check, Loader2, Star } from 'lucide-react';
+import { BookmarkPlus, Check, Compass, Loader2, Star } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { LinkFavicon } from '@/components/LinkFavicon';
+import { QuickStashChips } from '@/components/sidepanel/quick-stash-chips';
 import { QuickStashCollectionPicker } from '@/components/sidepanel/quick-stash-collection-picker';
-import { QuickStashProductPanel } from '@/components/sidepanel/quick-stash-product-panel';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { parseSpaceInboxValue } from '@/components/ui/space-grouped-collection-options';
 import { useQuickStashCategorizer } from '@/hooks/use-quick-stash-categorizer';
 import { useQuickStashProduct } from '@/hooks/use-quick-stash-product';
-import { playDrop, playError } from '@/lib/audio/foley';
+import {
+  playDrop,
+  playError,
+  playTagPop,
+  playUncheck,
+} from '@/lib/audio/foley';
 import { isTactileMotion } from '@/lib/motion/presets';
 import { stashRepo } from '@/lib/storage/repo';
 import type { OpenTabInfo } from '@/lib/tabs/session-filter';
@@ -23,7 +28,7 @@ import type {
   StashSettings,
 } from '@/lib/types/stash';
 import { cn } from '@/lib/utils/cn';
-import { extractDomain, getMonogram, parseTagsInput } from '@/lib/utils/url';
+import { extractDomain, parseTagsInput } from '@/lib/utils/url';
 
 interface QuickStashCardProps {
   activeTab: OpenTabInfo | null;
@@ -54,9 +59,10 @@ export function QuickStashCard({
   const [tagsRaw, setTagsRaw] = useState('');
   const [starOnSave, setStarOnSave] = useState(false);
   const [tagsEditedByUser, setTagsEditedByUser] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justStamped, setJustStamped] = useState(false);
-  const [faviconFailed, setFaviconFailed] = useState(false);
   const [creatingName, setCreatingName] = useState<string | null>(null);
   const stampTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -103,11 +109,12 @@ export function QuickStashCard({
     links,
     spaces,
     onResetTab: () => {
-      setFaviconFailed(false);
       setNote('');
       setTagsRaw('');
       setStarOnSave(false);
       setTagsEditedByUser(false);
+      setNoteOpen(false);
+      setTagsOpen(false);
       userPickedCollectionRef.current = false;
       userEditedNoteRef.current = false;
       userEditedTagsRef.current = false;
@@ -120,7 +127,6 @@ export function QuickStashCard({
     hasUserEditedTags: () => userEditedTagsRef.current,
   });
 
-  // Keep a valid default selection if collections arrive after mount
   useEffect(() => {
     if (
       !selectedCollectionId &&
@@ -155,8 +161,10 @@ export function QuickStashCard({
       name: trimmed,
       ...(activeSpaceId ? { spaceId: activeSpaceId } : {}),
     });
+    userPickedCollectionRef.current = true;
     setSelectedCollectionId(created.id);
     setCreatingName(null);
+    playDrop(settings.soundEffects, settings.motionMode);
     toast.success(`Created "${created.name}"`);
   };
 
@@ -191,7 +199,8 @@ export function QuickStashCard({
             : {}),
           product: {
             ...product.productMeta,
-            ...(product.existingStashedLink.product?.orderQty
+            ...(product.existingStashedLink.product?.orderQty &&
+            !product.productMeta.orderQty
               ? { orderQty: product.existingStashedLink.product.orderQty }
               : {}),
           },
@@ -228,6 +237,8 @@ export function QuickStashCard({
       setTagsRaw('');
       setStarOnSave(false);
       setTagsEditedByUser(false);
+      setNoteOpen(false);
+      setTagsOpen(false);
 
       if (!shouldLockTags && submittedTags.length === 0) {
         void triggerAutoTagSingleLink(result.link.id);
@@ -241,47 +252,50 @@ export function QuickStashCard({
     }
   };
 
+  // Slim single-line status strip (~32px) for loading or chrome:// / New Tab pages
   if (loadingTab) {
     return (
-      <div className="rounded-card border border-border bg-panel p-3.5 text-center font-mono text-[11px] text-fg-muted">
-        Detecting active tab...
+      <div className="flex h-6 items-center gap-2 font-mono text-[11px] text-fg-muted">
+        <Loader2 className="h-3 w-3 shrink-0 animate-spin text-accent" />
+        <span className="truncate">Detecting active tab...</span>
       </div>
     );
   }
 
   if (!activeTab) {
     return (
-      <div className="rounded-card border border-dashed border-border bg-panel p-3.5 text-center text-xs text-fg-muted">
-        Navigate to any website to quick-stash it from the Side Panel.
+      <div className="flex h-6 items-center gap-2 text-[11px] text-fg-muted">
+        <Compass className="h-3.5 w-3.5 shrink-0 opacity-70" />
+        <span className="truncate">
+          Browse any website to quick-stash it here
+        </span>
       </div>
     );
   }
 
   const domain = extractDomain(activeTab.url);
-  const monogram = getMonogram(activeTab.title, activeTab.url);
-  const showFavicon = Boolean(activeTab.favIconUrl) && !faviconFailed;
   const parsedTags = parseTagsInput(tagsRaw);
-
   const aiWorking = categorizing || enrichingTags;
   const tactile = isTactileMotion(settings.motionMode);
   const stampMotion =
     justStamped && tactile && settings.fxAmbientWaves !== false;
+  const isAlreadyStashedAnywhere = Boolean(product.existingStashedLink);
 
   return (
     <motion.form
       onSubmit={(e) => void handleSubmit(e)}
       animate={
         stampMotion
-          ? { y: [0, 6, -1.5, 0], scale: [1, 0.982, 1.005, 1] }
+          ? { y: [0, 5, -1.5, 0], scale: [1, 0.985, 1.004, 1] }
           : { y: 0, scale: 1 }
       }
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        'relative space-y-3 overflow-hidden rounded-card border border-border bg-panel p-3.5 shadow-sm transition-colors',
+        'relative space-y-2.5 overflow-hidden rounded-card border border-border bg-[var(--stash-panel)] p-3 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--stash-text)_6%,transparent)] transition-colors',
         stampMotion && 'border-accent/80 stash-stamp-flash',
       )}
     >
-      {/* Top animated progress bar while On-Device AI is matching or tagging */}
+      {/* Top shimmer bar while On-Device AI is matching or tagging */}
       {aiWorking && (
         <div
           aria-hidden="true"
@@ -291,33 +305,61 @@ export function QuickStashCard({
         </div>
       )}
 
-      {/* Active Tab Identity */}
+      {/* Sleek Hero Row + Top-Right Star Toggle */}
       <div className="flex items-start gap-2.5">
-        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-control border border-border bg-canvas font-mono text-xs font-semibold text-accent">
-          {showFavicon ? (
-            <img
-              src={activeTab.favIconUrl}
-              alt=""
-              width={16}
-              height={16}
-              onError={() => setFaviconFailed(true)}
-              className="h-4 w-4 object-contain"
-            />
-          ) : (
-            <span aria-hidden="true">{monogram}</span>
-          )}
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-control border border-hairline bg-canvas shadow-[inset_0_1px_2px_color-mix(in_srgb,var(--stash-canvas)_50%,transparent)]">
+          <LinkFavicon
+            url={activeTab.url}
+            faviconUrl={activeTab.favIconUrl}
+            size="md"
+          />
         </div>
         <div className="min-w-0 flex-1">
           <div className="line-clamp-2 text-xs font-semibold leading-snug text-fg">
-            {activeTab.title}
+            {product.titleOverride.trim() || activeTab.title}
           </div>
-          <div className="mt-0.5 truncate font-mono text-[10px] text-fg-muted">
-            {domain}
+          <div className="mt-1 flex items-center gap-1.5">
+            <span className="truncate font-mono text-[10px] text-fg-muted">
+              {domain}
+            </span>
+            {isAlreadyStashedAnywhere && (
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-pill border border-accent/35 bg-accent/10 px-1.5 py-0.25 font-mono text-[9px] font-medium text-accent">
+                <Check className="h-2.5 w-2.5" />
+                Already stashed
+              </span>
+            )}
           </div>
         </div>
+        <button
+          type="button"
+          aria-pressed={starOnSave}
+          aria-label={starOnSave ? 'Unstar link on save' : 'Star link on save'}
+          title={
+            starOnSave ? 'Will save as Starred' : 'Star this link when saving'
+          }
+          onClick={() => {
+            const next = !starOnSave;
+            setStarOnSave(next);
+            if (next) playTagPop(settings.soundEffects, settings.motionMode);
+            else playUncheck(settings.soundEffects);
+          }}
+          className={cn(
+            'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-control border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+            starOnSave
+              ? 'border-accent/55 bg-accent/15 text-accent'
+              : 'border-hairline bg-[var(--stash-card)]/70 text-fg-muted hover:border-border hover:bg-card-hover hover:text-accent',
+          )}
+        >
+          <Star
+            className={cn(
+              'h-3.5 w-3.5',
+              starOnSave && 'fill-accent text-accent',
+            )}
+          />
+        </button>
       </div>
 
-      {/* Suggested Collection Picker */}
+      {/* Custom Radix Collection Picker */}
       <QuickStashCollectionPicker
         spaces={spaces}
         orderedCollections={orderedCollections}
@@ -334,116 +376,73 @@ export function QuickStashCard({
         onCreateCollection={(name) => void handleCreateQuickCollection(name)}
       />
 
-      {/* 1-Line Note & Tags */}
-      <div className="space-y-2">
-        <div className="relative">
-          <Input
-            value={note}
-            onChange={(e) => {
-              userEditedNoteRef.current = true;
-              setNote(e.target.value);
-            }}
-            placeholder={
-              aiWorking && !note
-                ? 'AI writing summary note...'
-                : 'Why I saved this... (optional)'
-            }
-            aria-label="Why I saved this"
-            className="h-8 pr-7 text-xs"
-          />
-          {aiWorking && !note && (
-            <Loader2 className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2 animate-spin text-accent/70" />
-          )}
-        </div>
-        <div className="relative">
-          <Input
-            value={tagsRaw}
-            onChange={(e) => {
-              userEditedTagsRef.current = true;
-              setTagsRaw(e.target.value);
-              setTagsEditedByUser(true);
-            }}
-            placeholder={
-              aiWorking && !tagsRaw
-                ? 'AI generating tags...'
-                : 'Tags: docs, hardware...'
-            }
-            aria-label="Tags"
-            className="h-8 pr-7 font-mono text-[11px]"
-          />
-          {aiWorking && !tagsRaw && (
-            <Loader2 className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2 animate-spin text-accent/70" />
-          )}
-        </div>
-        {parsedTags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {parsedTags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-pill border border-border bg-canvas px-2 py-0.5 font-mono text-[10px] text-fg-muted"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 2-Stage Product Capture + Manual Fallback */}
-      <QuickStashProductPanel
-        isAlreadyStashed={Boolean(product.existingStashedLink)}
-        extracting={product.extractingProduct}
-        notice={product.extractNotice}
-        expanded={product.productOpen}
-        draft={product.productDraft}
-        onExtract={product.handleExtractProduct}
-        onToggleExpanded={() => product.setProductOpen((prev) => !prev)}
-        onChangeDraft={product.setProductDraft}
+      {/* Progressive-Disclosure Summary Chip Bar & Drawers */}
+      <QuickStashChips
+        note={note}
+        onChangeNote={(next) => {
+          userEditedNoteRef.current = true;
+          setNote(next);
+        }}
+        tagsRaw={tagsRaw}
+        parsedTags={parsedTags}
+        onChangeTagsRaw={(next) => {
+          userEditedTagsRef.current = true;
+          setTagsRaw(next);
+          setTagsEditedByUser(true);
+        }}
+        onRemoveTag={(tagToRemove) => {
+          userEditedTagsRef.current = true;
+          setTagsEditedByUser(true);
+          const nextTags = parsedTags.filter((t) => t !== tagToRemove);
+          setTagsRaw(nextTags.join(', '));
+        }}
+        aiWorking={aiWorking}
+        noteOpen={noteOpen}
+        onToggleNoteOpen={() => setNoteOpen((prev) => !prev)}
+        tagsOpen={tagsOpen}
+        onToggleTagsOpen={() => setTagsOpen((prev) => !prev)}
+        productOpen={product.productOpen}
+        onToggleProductOpen={() => product.setProductOpen((prev) => !prev)}
+        productMeta={product.productMeta}
+        productDraft={product.productDraft}
+        onChangeProductDraft={product.setProductDraft}
+        isAlreadyStashed={isAlreadyStashedAnywhere}
+        extractingProduct={product.extractingProduct}
+        extractNotice={product.extractNotice}
+        onExtractProduct={product.handleExtractProduct}
+        defaultCurrency={defaultCurrency}
+        motionMode={settings.motionMode}
       />
 
-      {/* Confirm Footer */}
-      <div className="flex items-center justify-between gap-2 pt-0.5">
-        <div className="flex items-center gap-2">
-          <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-fg-muted select-none hover:text-fg">
-            <input
-              type="checkbox"
-              checked={settings.closeTabOnQuickStash}
-              onChange={() =>
-                void stashRepo.updateSettings({
-                  closeTabOnQuickStash: !settings.closeTabOnQuickStash,
-                })
-              }
-              className="h-3.5 w-3.5 accent-[var(--stash-accent)] cursor-pointer"
-            />
-            <span>Close tab</span>
-          </label>
-          <button
-            type="button"
-            aria-pressed={starOnSave}
-            onClick={() => setStarOnSave((prev) => !prev)}
-            title={
-              starOnSave ? 'Will save as Starred' : 'Star this link when saving'
+      {/* Compact Footer — Sole High-Contrast Primary CTA */}
+      <div className="flex items-center justify-between gap-2 border-t border-hairline pt-2">
+        <label className="flex min-w-0 cursor-pointer items-center gap-1.5 text-[11px] text-fg-muted select-none transition-colors hover:text-fg">
+          <input
+            type="checkbox"
+            checked={settings.closeTabOnQuickStash}
+            onChange={() =>
+              void stashRepo.updateSettings({
+                closeTabOnQuickStash: !settings.closeTabOnQuickStash,
+              })
             }
-            className={cn(
-              'inline-flex h-6 items-center gap-1 rounded-pill border px-2 text-[10px] font-medium transition-colors cursor-pointer',
-              starOnSave
-                ? 'border-accent/60 bg-accent/15 text-accent'
-                : 'border-border bg-canvas/70 text-fg-muted hover:border-accent/40 hover:text-fg',
-            )}
-          >
-            <Star
-              className={cn('h-3 w-3', starOnSave && 'fill-accent text-accent')}
-            />
-            <span>Star</span>
-          </button>
-        </div>
+            className="h-3.5 w-3.5 shrink-0 accent-[var(--stash-accent)] cursor-pointer"
+          />
+          <span className="truncate">Close tab</span>
+        </label>
 
         <Button
           type="submit"
           variant="primary"
           size="sm"
           disabled={saving || (alreadyInSelected && !product.productMeta)}
-          className="gap-1.5"
+          title={
+            alreadyInSelected
+              ? product.productMeta
+                ? 'Update saved product details'
+                : 'Already saved in selected collection'
+              : 'Stash active tab (Alt+Shift+D)'
+          }
+          className="h-8 shrink-0 gap-1.5 px-3"
         >
           <AnimatePresence mode="wait" initial={false}>
             {justStamped ? (

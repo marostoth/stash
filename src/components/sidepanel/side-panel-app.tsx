@@ -1,22 +1,15 @@
-import {
-  BookmarkPlus,
-  ChevronDown,
-  ChevronUp,
-  ExternalLink,
-  Search,
-  Star,
-  X,
-} from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown, Search, Star, X } from 'lucide-react';
 import { MotionConfig } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Toaster } from 'sonner';
 import { QuickStashCard } from '@/components/sidepanel/quick-stash-card';
 import { SidePanelCollectionList } from '@/components/sidepanel/side-panel-collection-list';
+import { SidePanelHeader } from '@/components/sidepanel/side-panel-header';
 import {
   SIDE_PANEL_ALL_SPACES,
   SidePanelSpaceBar,
 } from '@/components/sidepanel/side-panel-space-bar';
-import { Button } from '@/components/ui/button';
+import { SmoothCollapse } from '@/components/workbench/smooth-collapse';
 import { useActiveTab } from '@/hooks/use-active-tab';
 import { useStashData } from '@/hooks/use-stash-data';
 import {
@@ -50,7 +43,6 @@ export function SidePanelApp() {
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Hydrate initial Space from saved active Space
   useEffect(() => {
     let active = true;
     void stashRepo.getActiveSpaceId().then((savedId) => {
@@ -63,7 +55,6 @@ export function SidePanelApp() {
     };
   }, []);
 
-  // Quietly pre-warm Gemini Nano when Side Panel mounts so quick-stash AI feels instant
   useEffect(() => {
     if (settings.enableOnDeviceAi) {
       void prewarmNanoCategorizer(true);
@@ -76,6 +67,7 @@ export function SidePanelApp() {
   // Global Side Panel keyboard shortcuts: Ctrl/Cmd+K or / focuses search, Esc clears
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
       const target = event.target;
       const editable =
         target instanceof HTMLElement &&
@@ -170,6 +162,27 @@ export function SidePanelApp() {
     setExpandedIds((prev) => ({ ...prev, [id]: !currentlyOpen }));
   };
 
+  const allCollectionsCollapsed = useMemo(() => {
+    if (groups.length === 0) return false;
+    return groups.every(({ collection }) => {
+      const override = expandedIds[collection.id];
+      const isOpen = override !== undefined ? override : !collection.collapsed;
+      return !isOpen;
+    });
+  }, [expandedIds, groups]);
+
+  const handleToggleAllCollections = () => {
+    if (groups.length === 0 || isFiltering) return;
+    const nextOpen = allCollectionsCollapsed;
+    setExpandedIds((prev) => {
+      const updated = { ...prev };
+      for (const { collection } of groups) {
+        updated[collection.id] = nextOpen;
+      }
+      return updated;
+    });
+  };
+
   const handleOpenNewTab = () => {
     if (typeof browser !== 'undefined' && browser.tabs?.create) {
       void browser.tabs.create({});
@@ -177,82 +190,44 @@ export function SidePanelApp() {
   };
 
   const defaultCurrency = settings.defaultCurrency ?? 'GBP';
+  const targetSpaceId =
+    resolvedSpaceId === SIDE_PANEL_ALL_SPACES ? undefined : resolvedSpaceId;
+  const showQuickStashPanel = activeTab ? captureExpanded : true;
 
   return (
     <MotionConfig
       reducedMotion={resolveReducedMotionPolicy(settings.motionMode)}
       transition={settings.motionMode === 'off' ? { duration: 0 } : undefined}
     >
-      <div className="stash-backdrop flex h-screen flex-col overflow-hidden text-fg">
-        {/* Compact Header */}
-        <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border/75 bg-panel px-3.5">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-xs font-semibold tracking-[0.14em] text-fg">
-              STASH
-            </span>
-            <span className="rounded-pill border border-border bg-canvas px-1.5 py-0.5 font-mono text-[10px] text-fg-muted">
-              {links.length}
-            </span>
-          </div>
+      <div className="stash-backdrop flex h-screen min-w-0 flex-col overflow-hidden text-fg">
+        <SidePanelHeader
+          totalLinks={links.length}
+          hasStashableTab={Boolean(activeTab)}
+          activeTabSaved={activeTabSaved}
+          captureExpanded={captureExpanded}
+          onToggleCapture={() => setCaptureExpanded((prev) => !prev)}
+          onOpenBoard={handleOpenNewTab}
+          activeSpaceId={targetSpaceId}
+          motionMode={settings.motionMode}
+          soundEffects={settings.soundEffects}
+        />
 
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setCaptureExpanded((prev) => !prev)}
-              aria-expanded={captureExpanded}
-              title={
-                captureExpanded
-                  ? 'Collapse Quick Stash card for more browsing room'
-                  : 'Expand Quick Stash card'
-              }
-              className={cn(
-                'inline-flex h-7 items-center gap-1 rounded-control border px-2 text-[11px] font-medium transition-colors cursor-pointer',
-                captureExpanded
-                  ? 'border-accent/45 bg-accent/12 text-accent'
-                  : 'border-border bg-canvas/70 text-fg-muted hover:text-fg',
-              )}
-            >
-              <BookmarkPlus className="h-3 w-3" />
-              <span>Capture</span>
-              {activeTabSaved && (
-                <span
-                  aria-hidden="true"
-                  title="This tab is already in Stash"
-                  className="h-1.5 w-1.5 rounded-full bg-accent"
-                />
-              )}
-              {captureExpanded ? (
-                <ChevronUp className="h-3 w-3" />
-              ) : (
-                <ChevronDown className="h-3 w-3" />
-              )}
-            </button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleOpenNewTab}
-              className="h-7 gap-1 px-2 text-[11px]"
-              title="Open Stash New Tab workbench"
-            >
-              <span>Board</span>
-              <ExternalLink className="h-3 w-3" />
-            </Button>
-          </div>
-        </header>
-
-        {/* Collapsible Quick-Stash Capture Card */}
-        {captureExpanded && (
-          <div className="shrink-0 border-b border-border p-3">
+        {/* Progressive-Disclosure Quick Stash (slim strip on chrome:// pages) */}
+        <SmoothCollapse
+          open={showQuickStashPanel}
+          motionMode={settings.motionMode}
+        >
+          <div
+            className={cn(
+              'shrink-0 border-b border-hairline',
+              activeTab ? 'bg-[var(--stash-panel)]/45 p-2.5' : 'px-3 py-1.5',
+            )}
+          >
             <QuickStashCard
               activeTab={activeTab}
               loadingTab={loadingTab}
               loadingData={loadingData}
-              activeSpaceId={
-                resolvedSpaceId === SIDE_PANEL_ALL_SPACES
-                  ? undefined
-                  : resolvedSpaceId
-              }
+              activeSpaceId={targetSpaceId}
               spaces={spaces}
               collections={collections}
               links={links}
@@ -260,9 +235,9 @@ export function SidePanelApp() {
               settings={settings}
             />
           </div>
-        )}
+        </SmoothCollapse>
 
-        {/* Compact Space Switcher */}
+        {/* Machined Space Switcher */}
         <SidePanelSpaceBar
           spaces={spaces}
           collections={collections}
@@ -271,10 +246,10 @@ export function SidePanelApp() {
           onSelectSpace={handleSelectSpace}
         />
 
-        {/* Compact Live Search + Starred Filter + Quick Tags */}
+        {/* Recessed Live Search + Starred Filter + Quick Tags */}
         <div className="shrink-0 space-y-2 px-3 pt-2.5 pb-2">
           <div className="flex items-center gap-1.5">
-            <div className="relative flex-1">
+            <div className="relative min-w-0 flex-1">
               <Search
                 className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
                 aria-hidden="true"
@@ -284,19 +259,23 @@ export function SidePanelApp() {
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search saved links... (/)"
+                placeholder="Search saved links..."
                 aria-label="Search saved links"
-                className="h-8 w-full rounded-control border border-border bg-panel pl-8 pr-7 text-xs text-fg placeholder:text-fg-muted/75 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 [&::-webkit-search-cancel-button]:hidden"
+                className="h-8 w-full rounded-control border border-hairline bg-[var(--stash-panel)] pl-8 pr-7 text-xs text-fg shadow-[inset_0_1px_2px_color-mix(in_srgb,var(--stash-canvas)_35%,transparent)] placeholder:text-fg-muted/70 transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 [&::-webkit-search-cancel-button]:hidden"
               />
-              {searchQuery && (
+              {searchQuery ? (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
                   aria-label="Clear search"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-muted hover:text-fg cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-muted transition-colors hover:text-fg cursor-pointer"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
+              ) : (
+                <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-hairline bg-canvas/75 px-1 py-0.25 font-mono text-[9px] text-fg-muted">
+                  /
+                </kbd>
               )}
             </div>
 
@@ -308,10 +287,10 @@ export function SidePanelApp() {
                 starredOnly ? 'Showing Starred only' : 'Filter Starred links'
               }
               className={cn(
-                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-control border transition-colors cursor-pointer',
+                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-control border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
                 starredOnly
-                  ? 'border-accent/60 bg-accent/15 text-accent'
-                  : 'border-border bg-panel text-fg-muted hover:border-accent/40 hover:text-accent',
+                  ? 'border-accent/55 bg-accent/15 text-accent'
+                  : 'border-hairline bg-[var(--stash-panel)] text-fg-muted hover:border-border hover:text-accent',
               )}
             >
               <Star
@@ -321,10 +300,35 @@ export function SidePanelApp() {
                 )}
               />
             </button>
+
+            {groups.length > 0 && (
+              <button
+                type="button"
+                disabled={isFiltering}
+                onClick={handleToggleAllCollections}
+                aria-label={
+                  allCollectionsCollapsed ? 'Expand all' : 'Collapse all'
+                }
+                title={
+                  isFiltering
+                    ? 'All matching collections stay open while filtering'
+                    : allCollectionsCollapsed
+                      ? 'Expand all'
+                      : 'Collapse all'
+                }
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-control border border-hairline bg-[var(--stash-panel)] text-fg-muted transition-colors hover:border-border hover:text-fg disabled:pointer-events-none disabled:opacity-45 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              >
+                {allCollectionsCollapsed ? (
+                  <ChevronsUpDown className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronsDownUp className="h-3.5 w-3.5" />
+                )}
+              </button>
+            )}
           </div>
 
           {settings.tagBarVisible === true && topTags.length > 0 && (
-            <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {topTags.map(({ tag }) => {
                 const active = selectedTag === tag;
                 return (
@@ -334,10 +338,10 @@ export function SidePanelApp() {
                     aria-pressed={active}
                     onClick={() => setSelectedTag(active ? null : tag)}
                     className={cn(
-                      'inline-flex h-5 shrink-0 items-center rounded-pill border px-1.5 font-mono text-[10px] transition-colors cursor-pointer',
+                      'inline-flex h-5.5 shrink-0 items-center rounded-pill border px-2 font-mono text-[10px] transition-colors cursor-pointer',
                       active
-                        ? 'border-accent/60 bg-accent/15 text-accent'
-                        : 'border-border/75 bg-panel/65 text-fg-muted hover:border-accent/45 hover:text-fg',
+                        ? 'border-accent/55 bg-accent/15 text-accent'
+                        : 'border-hairline bg-[var(--stash-panel)]/75 text-fg-muted hover:border-border hover:text-fg',
                     )}
                   >
                     #{tag}
@@ -348,8 +352,8 @@ export function SidePanelApp() {
           )}
         </div>
 
-        {/* Scrollable Compact Interactive Collections List */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+        {/* Scrollable Interactive Collections List */}
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-4">
           <SidePanelCollectionList
             groups={groups}
             searchQuery={searchQuery}

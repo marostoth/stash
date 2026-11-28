@@ -74,7 +74,7 @@ export function SmoothCollapse({
   return (
     <div
       className={cn(
-        'grid',
+        'grid min-w-0 grid-cols-[minmax(0,1fr)]',
         !isOff &&
           (isReduced
             ? 'transition-opacity duration-[120ms] ease-out'
@@ -86,7 +86,12 @@ export function SmoothCollapse({
             : 'grid-rows-[0fr] opacity-0 pointer-events-none',
       )}
     >
-      <div className={overflowVisible ? 'overflow-visible' : 'overflow-hidden'}>
+      <div
+        className={cn(
+          'min-w-0',
+          overflowVisible ? 'overflow-visible' : 'overflow-hidden',
+        )}
+      >
         {children}
       </div>
     </div>
